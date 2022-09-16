@@ -1,0 +1,402 @@
+>>> for l in range(2, 20):
+...     print(f"l={l}")
+...     os.system(f"perf stat -a -r 1 -e power/energy-pkg/ ./long_message_attack {n} {l}")
+...     print("========================================================\n")
+... 
+l=2
+INPUT:- 20 number of bits in the compression function
+      - 4 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=649545, index=1, M=0x0da405
+_______________________________________
+Hash message 1:
+0x21450c
+Hash message 2:
+0x21450c
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+             34.84 Joules power/energy-pkg/                                           
+
+       0.815068577 seconds time elapsed
+
+0
+========================================================
+
+l=3
+INPUT:- 20 number of bits in the compression function
+      - 8 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=68615, index=7, M=0xf3aa0c
+_______________________________________
+Hash message 1:
+0xf3aa0c
+Hash message 2:
+0xf3aa0c
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              2.65 Joules power/energy-pkg/                                           
+
+       0.065312737 seconds time elapsed
+
+0
+========================================================
+
+l=4
+INPUT:- 20 number of bits in the compression function
+      - 16 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=15274, index=13, M=0xae0a05
+_______________________________________
+Hash message 1:
+0x52de09
+Hash message 2:
+0x52de09
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.57 Joules power/energy-pkg/                                           
+
+       0.015101331 seconds time elapsed
+
+0
+========================================================
+
+l=5
+INPUT:- 20 number of bits in the compression function
+      - 32 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=15274, index=13, M=0xae0a05
+_______________________________________
+Hash message 1:
+0x6dc40c
+Hash message 2:
+0x6dc40c
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.59 Joules power/energy-pkg/                                           
+
+       0.015024974 seconds time elapsed
+
+0
+========================================================
+
+l=6
+INPUT:- 20 number of bits in the compression function
+      - 64 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=10144, index=48, M=0x013206
+_______________________________________
+Hash message 1:
+0x792002
+Hash message 2:
+0x792002
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.38 Joules power/energy-pkg/                                           
+
+       0.010315658 seconds time elapsed
+
+0
+========================================================
+
+l=7
+INPUT:- 20 number of bits in the compression function
+      - 128 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=7246, index=82, M=0x942506
+_______________________________________
+Hash message 1:
+0x67a50a
+Hash message 2:
+0x67a50a
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.28 Joules power/energy-pkg/                                           
+
+       0.007618762 seconds time elapsed
+
+0
+========================================================
+
+l=8
+INPUT:- 20 number of bits in the compression function
+      - 256 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=5438, index=154, M=0x60f90d
+_______________________________________
+Hash message 1:
+0x0e4c0a
+Hash message 2:
+0x0e4c0a
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.27 Joules power/energy-pkg/                                           
+
+       0.006007878 seconds time elapsed
+
+0
+========================================================
+
+l=9
+INPUT:- 20 number of bits in the compression function
+      - 512 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0x32800c
+Hash message 2:
+0x32800c
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.06 Joules power/energy-pkg/                                           
+
+       0.001815976 seconds time elapsed
+
+0
+========================================================
+
+l=10
+INPUT:- 20 number of bits in the compression function
+      - 1024 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0x6b1d05
+Hash message 2:
+0x6b1d05
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.11 Joules power/energy-pkg/                                           
+
+       0.002361337 seconds time elapsed
+
+0
+========================================================
+
+l=11
+INPUT:- 20 number of bits in the compression function
+      - 2048 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0x747f0e
+Hash message 2:
+0x747f0e
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.12 Joules power/energy-pkg/                                           
+
+       0.003236850 seconds time elapsed
+
+0
+========================================================
+
+l=12
+INPUT:- 20 number of bits in the compression function
+      - 4096 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0xe4010d
+Hash message 2:
+0xe4010d
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.20 Joules power/energy-pkg/                                           
+
+       0.004865076 seconds time elapsed
+
+0
+========================================================
+
+l=13
+INPUT:- 20 number of bits in the compression function
+      - 8192 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0x9ef609
+Hash message 2:
+0x9ef609
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.39 Joules power/energy-pkg/                                           
+
+       0.009486899 seconds time elapsed
+
+0
+========================================================
+
+l=14
+INPUT:- 20 number of bits in the compression function
+      - 16384 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0x8bb601
+Hash message 2:
+0x8bb601
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              0.70 Joules power/energy-pkg/                                           
+
+       0.016576149 seconds time elapsed
+
+0
+========================================================
+
+l=15
+INPUT:- 20 number of bits in the compression function
+      - 32768 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0xaac705
+Hash message 2:
+0xaac705
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              1.32 Joules power/energy-pkg/                                           
+
+       0.031200184 seconds time elapsed
+
+0
+========================================================
+
+l=16
+INPUT:- 20 number of bits in the compression function
+      - 65536 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0x4cdd0e
+Hash message 2:
+0x4cdd0e
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              2.38 Joules power/energy-pkg/                                           
+
+       0.056116804 seconds time elapsed
+
+0
+========================================================
+
+l=17
+INPUT:- 20 number of bits in the compression function
+      - 131072 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0x3c7304
+Hash message 2:
+0x3c7304
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              4.75 Joules power/energy-pkg/                                           
+
+       0.115856820 seconds time elapsed
+
+0
+========================================================
+
+l=18
+INPUT:- 20 number of bits in the compression function
+      - 262144 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0x980e0d
+Hash message 2:
+0x980e0d
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+              9.33 Joules power/energy-pkg/                                           
+
+       0.221969366 seconds time elapsed
+
+0
+========================================================
+
+l=19
+INPUT:- 20 number of bits in the compression function
+      - 524288 is the number of blocks
+_____________________________________________
+Found a collision with the following details:
+#random message trials=911, index=256, M=0xd97f05
+_______________________________________
+Hash message 1:
+0xca4807
+Hash message 2:
+0xca4807
+_______________________________________
+
+ Performance counter stats for 'system wide':
+
+             18.91 Joules power/energy-pkg/                                           
+
+       0.449122776 seconds time elapsed
+
+0
+========================================================
+
+

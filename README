@@ -1,0 +1,44 @@
+compile:
+gcc -Wall -g -O3 long_message_attack.c sha256.c dict.c util_char_arrays.c superhash.c -lm -o long_message_attack
+
+
+cost statistics:
+sudo perf stat -o stats.txt -a -r 2 -e power/energy-pkg/ ./long_message_attack 30 15
+
+
+sudo perf stat -a -r 2 -e power/energy-pkg/ ./long_message_attack 30 15
+
+usage:
+./longa_message_attack n l
+n: 0<n<257 which is the number of bits in the output of the compression function
+l:float 2^l is the number of blocks
+
+- the two messages, that collide, will be saved in the files `message1` `message2`
+
+
+files:
+- statistics/{n}bits.txt files contain the system power usage while the program was running.
+- long_message_attack.c: main file that implements the attack
+- dict.*: chained dictionary implementation using linked list
+- util_char_arrays.* : some useful functionalities
+- ignore the tmp file
+
+
+
+taken from the internet: 
+- supherhash.* ptsdint.h (as is)
+- sha256.* (modified)
+- crypto-algorithms-master.zip
+
+
+issues:
+- Duplicate keys would create two entries! fix that.
+-- If there is a duplicate then we found a cylce that leads to collision.
+-- This can be solved using a global variable: cycle_found, with minimal changes to the attack 
+- The code is far from being generic
+
+possible optimizations:
+- all arrays has to be contagious
+- arrays instead of linked list
+- profile the code
+
