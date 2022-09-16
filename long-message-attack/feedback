@@ -1,0 +1,23 @@
+Received on 16 Sep 2022:
+
+I suggest that
+- you go see the system administrators today
+- create a git repo on gitlab.lip6.fr or github.com
+- put your code in there
+- no need to re-hash the hashes !
+- Linear probing (see TAOCP) or Cuckoo Hashing
+(https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.104.9191&rep=rep1&type=pdf)
+will in my opinion improve space usage and speed compared to linear
+chaining.
+- Your program could print the space usage before starting, and expected
+completion time a bit after starting (after 10^k iterations, you know
+how much time an iteration takes on average).
+- what takes more time? Hashing or probing the dictionnary? A way to
+know is to benchmark hashing without probing, and hashing with probing,
+and compare the results
+- hash a counter to avoid cycles
+- what is the best you can do with your laptop in 1h?
+- Use OpenMP to use threads (cf. slides in attachment)
+
+When you'll be done with your laptop, you can move on to a bigger
+machine :-).
