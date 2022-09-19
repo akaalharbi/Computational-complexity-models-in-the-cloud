@@ -1,220 +1,179 @@
-// planning: SERIOUS LIMITATION ONLY 32 BIT DICTIONARY 
-//  test the dictionary implementation
-// parameters: - size of the dictionary
-// hash function: Bernstein hash xor
-// methods: - add element: takes a list of bytes and its length
-//          - remove element: no need for that now
-//
+// Simple dictionary implementation using open addresing, linear probing
+// the input values are not hashed since we assume that keys have been
+// already hashed (context: long message attack)
 
-
-/* #include <stddef.h> */
-/* #include <stdint.h> */
-/* #include <stdlib.h> */
-/* #include "supherhash.h" */
-/* #include "pstdint.h" // maybe no need for that */
 #include "dict.h"
+#include "sha256.h"
+#include "types.h"
+#include "util_char_arrays.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
-// todo refactor this code as c++ code
 
-/* // moved to the header file */
+
+
 /* //-----------------------------------------------------// */
 /* //                  data structure                     // */
 /* //-----------------------------------------------------// */
-
-/* typedef struct linked_list { */
-/*   // we always have an extra empyt element at the end */
-/*   char* key; // the key is a list of bytes */
-/*   // in our case the value is just an index, todo make it a generic code */
-/*   size_t value; */
-/*   struct linked_list *next; */
-/* } linked_list; */
-
-
-/* typedef struct { */
-/*   // number of element */
-/*   size_t n_of_elements; // how many elements in this bin */
-/*   linked_list* start;  // first element in the list */
-/*   linked_list* last;  // pointer to the last empty element in the linked list */
-/* } bin; */
-
-
-/* typedef struct { */
-/*   // number of bins in the dictionary */
-/*   // table of bins */
-/*   uint32_t  n_of_bins; // how many bins in the dictionary todo remove this serious limtation */
-/*   bin* bins;  */
-/* } dict; */
-
+/// See the header file
 
 //-----------------------------------------------------//
 //                       methods                       //
 //-----------------------------------------------------//
 
-linked_list* new_linked_list(){
-  linked_list* list = (linked_list *) malloc(sizeof(linked_list));
-
-  //list->key = 0;
-  // list->key = (char *) malloc(sizeof(char));
-  list->value = 0;
-  list->next = 0;
-    
-  return list;
-}
 
 
+dict* dict_new(size_t nelements, size_t key_size){
+  /// initialize a dictionary that will hold nslots elements
+  /// return a pointer to the dicitonary
+  /// In memeory keys are seperate from the dictionary fields
+  /// nslots in the dictionary will be alwais a power of two
 
-/* bin* new_bin(){ */
-/*   bin* slot = (bin *) malloc(sizeof(bin)); */
-
-/*   slot -> n_of_elements = 0; */
-/*   slot -> start = new_linked_list(); */
-/*   slot -> last = slot->start; */
+  dict* d = (dict *) malloc(sizeof(dict));
+  // load factor = 1/2 =>
+  // E[#probing] = 1.5 hits
+  // E[#probing] = 2.5 misses
+  size_t nslots;
+  // also guarantees that nslots is a power of 2 
+  d->nslots = (size_t) ceil( log2(nelements)  ) + 1;
   
-/*   return slot; */
-/* } */
+  // reserve space in memeory
+  d->slots = malloc(sizeof(slot)*d->nslots);
+  // Ensure the keys are next to each other
+  char* keys_space = malloc(sizeof(char)*d->nslots);
 
-
-
-dict* dict_new(size_t n_of_bins){
-  dict* dictionary = (dict *) malloc(sizeof(dict));
-  dictionary->bins =  (bin *) malloc(sizeof(bin) * n_of_bins);
-  dictionary->n_of_bins = n_of_bins;
-
-  for (size_t i = 0; i<n_of_bins; ++i) {
-    dictionary->bins[i].n_of_elements = 0;
-    dictionary->bins[i].start = new_linked_list();
-    dictionary->bins[i].last = dictionary->bins[i].start;
-    
+  for (size_t i = 0; i < (d->nslots); ++i) {
+    d->slots[i].is_occupied = 0;
+    // each key reserves `key_size` bytes, thus we need to move key_size steps
+    // to go to the next slot key
+    d->slots[i].key = &keys_space[i*key_size];
+    d->slots[i].value = 0;
   }
 
-  
-  return dictionary;
+  return d;
 }
 
-linked_list* linked_list_add_element_to(linked_list* current, char* key, size_t value, size_t input_size){
-  linked_list* next = new_linked_list();
 
-  current->next = next;
-  current->key = key;
-  //memcpy(current->key, key, input_size);
-  current->value = value;
-  
-  return next;
-}
-
-void dict_add_element_to(dict* dictionary, char* key, size_t value, size_t input_size){
+void dict_add_element_to(dict* d, digest* key, size_t value, size_t key_size){
+  // todo edit this 
   // add (key, value) to the dictionary
-  // in this primitive design key is an array of bytes, thus input_size is how many bytes
-  // value should be an index of some array thus it has the type size_t
+  // in this primitive design key is an array of bytes, thus key_size is how many bytes
+  // value is a value that represents an index of some array thus it has the type size_t
   // todo if we entered a key twice, there will be two entries :(
 
-  // dict = {bin1, bin2, ..., bin_n}
+  // dict = {slot1, slot2, ..., slot_n}
   // find which bin to put it in
-  uint32_t h = SuperFastHash(key, input_size);
-  // mod is necessary to stay within bounds of dict
-  h =(uint32_t) (h % dictionary->n_of_bins); 
+  size_t h = key->values[0]; // for now we assume indices don't need more than 64 bits 
+  h = h & (d->nslots - 1); // assumption nslots = 2^m; 
 
-  // locate where to place (key, value) within the bin_h
-  // dictionary->bins[h];
-  bin* slot = &dictionary->bins[h];
-  // add (key, value) in the last node of linked list
-  slot->last->value = value;
 
-  slot->last->key = (char*) malloc(sizeof(char)*input_size);
-  memcpy(slot->last->key, key, input_size);
-  slot->n_of_elements += 1;
+  // locate where to place (key, value)
+  size_t i = 0;
+  slot* current = &d->slots[h];
+  
+  while (current->is_occupied){
+    // linear probing
+    // current = element with index (h+i mod nslots)
+    current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    // check if key already exists
+    if (cmp_arrays(key->bytes, current->key, key_size)) {
+      printf("a duplicated key has been detected\n");
+      return;
+    }
+    ++i;
+  }
 
-  // then add a new empty element in the linked list
-  slot->last->next = new_linked_list();
-  slot->last = slot->last->next;
-
+  // update current->key = key 
+  memcpy(current->key, key->bytes, key_size);
+  current->value = value;
+  current->is_occupied = 1;
 }
 
 
 
-size_t dict_get_value(dict* d, char* key, size_t input_size){
-  // we first find to which bin the element should be in
-  uint32_t h = SuperFastHash(key, input_size);
-  h =(uint32_t) (h % d->n_of_bins);
+size_t dict_get_value(dict* d, digest* key, size_t key_size){
+  // we first need to find where to start probing
 
+  size_t h =  key->values[0];
+  h = h & (d->nslots - 1); // assumption nslots = 2^m; 
+
+  // find (key, value) after 
+  size_t i = 0;
+  slot* current = &d->slots[h];
   
-  bin current_slot = d->bins[h];
-  linked_list* node = current_slot.start;
+  while (!current->is_occupied){
+    // linear probing
 
-  // if the bin is empty todo we should raise an error!
-  if (current_slot.n_of_elements == 0)
-    return -1;
 
-  // -k1->k2->k3->...->kn
-  // we walk through each key ki, then we compare it with input
-  char* found_key = node->key;
-  for (size_t i=0; i<current_slot.n_of_elements; ++i){ 
-    if (cmp_arrays(found_key, key, input_size)) 
-      return node->value; // we found key
-
-    node = node->next; // ki->k{i+1}
-    found_key = node->key; 
+    // check if key already exists
+    if (cmp_arrays(key->bytes, current->key, key_size)) {
+      return current->value;
+    }
+    
+    // move to the next element
+    ++i;
+    // current = element with index (h+i mod nslots)
+    current = &d->slots[ (h+i) & (d->nslots - 1)  ];
+    
   }
+
+  return -1; // no element is found
+
   
-  return -1; // we should throw an error here, todo
 }
 
 
 void dict_print(dict* d, size_t key_size){
-  size_t n_of_bins = d->n_of_bins;
 
-  for (size_t b=0; b<n_of_bins; ++b) {
-    bin* slot = &d->bins[b];
-    linked_list* node = slot->start;
 
-    printf("bin=%lu, n_of_elements=%lu\n", b, slot->n_of_elements);
-    for (size_t j=0; j<slot->n_of_elements; ++j) {
-      printf("(val=%lu, key={0x", node->value);// todo print the key as well!
-      // printing the key
-      for (size_t k=0; k<key_size; ++k)
-	printf("%x",(unsigned char) node->key[k]);
-      printf("}), ");
-      node = node->next;
-    }
-    puts("\n______________________________");
+  for (size_t b=0; b<(d->nslots); ++b) {
+    printf("slot=%lu, value=%lu\n", b, d->slots[b].value);
+    // print key
+    printf("key={0x");
+    for (size_t k=0; k<key_size; ++k)
+      printf("%x",(unsigned char) d->slots[b].key[k]);
+    printf("}, ");
   }
   
 }
 
 
-int dict_has_key(dict* d, char* key, size_t key_size){
+int dict_has_key(dict* d, digest* key, size_t key_size){
   /// 1 if the dictionary has `key`
   /// 0 otherwise
 
   
-  // we first find to which bin the element should be in
-  uint32_t h = SuperFastHash(key, key_size);
-  h =(uint32_t) (h % d->n_of_bins);
+  // we first need to find where to start probing
 
+  size_t h =  key->values[0];
+  h = h & (d->nslots - 1); // assumption nslots = 2^m; 
+
+  // find (key, value) after 
+  size_t i = 0;
+  slot* current = &d->slots[h];
   
-  bin current_slot = d->bins[h];
-  linked_list* node = current_slot.start;
+  while (!current->is_occupied){
+    // linear probing
 
-  // if the bin is empty todo we should raise an error!
-  if (current_slot.n_of_elements == 0)
-    return 0;
 
-  // -k1->k2->k3->...->kn
-  // we walk through each key ki, then we compare it with input
-  char* found_key = node->key;
-  for (size_t i=0; i<current_slot.n_of_elements; ++i){ 
-    if (cmp_arrays(found_key, key, key_size)) 
+    // check if key already exists
+    if (cmp_arrays(key->bytes, current->key, key_size)) {
       return 1;
-
-    node = node->next; // ki->k{i+1}
-    found_key = node->key; 
+    }
+    
+    // move to the next element
+    ++i;
+    // current = element with index (h+i mod nslots)
+    current = &d->slots[ (h+i) & (d->nslots - 1)  ];
+    
   }
-  
-  return 0; // we should throw an error here, todo
+
+  return 0; // no element is found
+
  
 }
 

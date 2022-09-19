@@ -15,7 +15,8 @@
 #include <math.h>
 #include <assert.h>
 #include <stdio.h>
-#include "dict.h"
+#include "types.h" // digest type
+#include "dict.h" // dict type 
 /****************************** MACROS ******************************/
 #define SHA256_BLOCK_SIZE 32            // SHA256 outputs a 32 byte digest
 // for the modified version @ahmed
@@ -34,6 +35,8 @@ typedef struct {
 	WORD state[8];
 } SHA256_CTX;
 
+
+// todo remove this and use digest union 
 typedef union {
   WORD* state;
   char* sate_as_bytes;
