@@ -32,7 +32,8 @@ typedef struct {
 	BYTE data[64];
 	WORD datalen;
 	unsigned long long bitlen;
-	WORD state[8];
+        // WORD state[8];
+        digest S[8];
 } SHA256_CTX;
 
 
@@ -48,7 +49,7 @@ void sha256_init(SHA256_CTX *ctx);
 /* void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits); */
 void sha256_transform(SHA256_CTX *ctx, const BYTE data[], int output_size_bits);
 void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
-		   int output_size_bits, dict* d, void (*add_to_dict)(dict*, char*, size_t, size_t));
+		   int output_size_bits, dict* d, void (*add_to_dict)(dict*, digest*, size_t, size_t));
 void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits);
 void print_intermediate(SHA256_CTX* ctx);
 #endif   // SHA256_H

@@ -37,16 +37,17 @@ dict* dict_new(size_t nelements, size_t key_size){
   // load factor = 1/2 =>
   // E[#probing] = 1.5 hits
   // E[#probing] = 2.5 misses
-  size_t nslots;
+  
   // also guarantees that nslots is a power of 2 
-  d->nslots = (size_t) ceil( log2(nelements)  ) + 1;
+  size_t nslots = (size_t) ceil( log2(nelements)  ) + 1;
+  d->nslots = nslots;
   
   // reserve space in memeory
   d->slots = malloc(sizeof(slot)*d->nslots);
   // Ensure the keys are next to each other
-  char* keys_space = malloc(sizeof(char)*d->nslots);
+  char* keys_space = malloc(sizeof(char)*nslots);
 
-  for (size_t i = 0; i < (d->nslots); ++i) {
+  for (size_t i = 0; i < nslots; ++i) {
     d->slots[i].is_occupied = 0;
     // each key reserves `key_size` bytes, thus we need to move key_size steps
     // to go to the next slot key
@@ -140,7 +141,7 @@ void dict_print(dict* d, size_t key_size){
   }
   
 }
-
+ 
 
 int dict_has_key(dict* d, digest* key, size_t key_size){
   /// 1 if the dictionary has `key`

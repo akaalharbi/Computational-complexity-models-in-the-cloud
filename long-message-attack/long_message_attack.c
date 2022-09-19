@@ -39,7 +39,7 @@
 
 // add_element_to_dictionary(dict *dictionary, char *key, size_t value, size_t input_size)
 
-void nothing(dict *dictionary, char *key, size_t value, size_t input_size){
+void nothing(dict *dictionary, char* key, size_t value, size_t key_size){
   // literally do nothing;
 }
 
@@ -52,11 +52,12 @@ void long_message_attack(size_t n_of_blocks, size_t n_of_bits){
 
   /* init */
   // each block has `n_of_bits`, we would like to get `n_of_blocks` blocks
+  int n_of_bytes = (int) ceil( (float)n_of_bits/8);
   BYTE* M = long_message_zeros(n_of_blocks*512);
   // store values in a dictionary
-  dict* d = dict_new(n_of_blocks);
+  dict* d = dict_new(n_of_blocks, n_of_bytes);
   // how many bytes does the compression function output?
-  int n_of_bytes = (int) ceil( (float)n_of_bits/8);
+
   
   SHA256_CTX ctx;
   // we will zero the excessive zeros, don't edit

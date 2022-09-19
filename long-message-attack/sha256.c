@@ -15,7 +15,8 @@
 * - removed merkle-damgard strngthen
 * - truncate the digest
 * - intermediate states are stored in a dictionary
-* - states are represented as a union
+* - states are represented as an instance of union
+*   not sure how the complex the code is becoming :(
 *********************************************************************/
 
 /*************************** HEADER FILES ***************************/
@@ -26,6 +27,7 @@
 #include <sys/types.h>
 #include "dict.h"
 #include "sha256.h"
+#include "types.h"
 
 /****************************** MACROS ******************************/
 #define ROTLEFT(a,b) (((a) << (b)) | ((a) >> (32-(b))))
@@ -53,12 +55,12 @@ static const WORD k[64] = {
 /*********************** FUNCTION DEFINITIONS ***********************/
 void print_intermediate(SHA256_CTX* ctx){
   for (int i=0; i<8; i++)
-    printf("0x%08x, ", ctx->state[i]);
+    printf("0x%08x, ", ctx->S->state[i]);
   puts("");
 }
 
 void truncate(SHA256_CTX* ctx, int output_size_bits){
-  // ctx->state[i] is a 32 bit block
+  // ctx->S->state[i] is a 32 bit block
   // we order the bits of state[0], state[1], ..., etc as:
   // b0 b1 ... b31    b32 b33 ... b63   b64 b65 ... b95
   //   state[0]           state[1]       state[3] .....
@@ -76,9 +78,9 @@ void truncate(SHA256_CTX* ctx, int output_size_bits){
   // printf("we are going to truncate from i=%d\n", i);
 
   for (int j = i; j<8; ++j){
-    // printf("ctx->state[%d] was %8x \n", j, ctx->state[i]);
-    ctx->state[j] = 0;
-    // printf("ctx->state[%d] is %8x \n", j, ctx->state[i]);
+    // printf("ctx->S->state[%d] was %8x \n", j, ctx->S->state[i]);
+    ctx->S->state[j] = 0;
+    // printf("ctx->S->state[%d] is %8x \n", j, ctx->S->state[i]);
   }
   // and with output_size_bits ones
   // this convluted formula to deal with the case when all the bits of the last should be active
@@ -87,7 +89,7 @@ void truncate(SHA256_CTX* ctx, int output_size_bits){
   uint64_t rem = output_size_bits % 32;
   // printf("rem=%lu bits\n", rem);
   rem = ((uint64_t) 1<<rem) - 1; // 111...1 /
-  ctx->state[i - 1] = ctx->state[i-1] & rem;
+  ctx->S->state[i - 1] = ctx->S->state[i-1] & rem;
 
 }
 
@@ -102,14 +104,14 @@ void sha256_transform(SHA256_CTX *ctx, const BYTE data[], int output_size_bits)
 	for ( ; i < 64; ++i)
 		m[i] = SIG1(m[i - 2]) + m[i - 7] + SIG0(m[i - 15]) + m[i - 16];
 
-	a = ctx->state[0];
-	b = ctx->state[1];
-	c = ctx->state[2];
-	d = ctx->state[3];
-	e = ctx->state[4];
-	f = ctx->state[5];
-	g = ctx->state[6];
-	h = ctx->state[7];
+	a = ctx->S->state[0];
+	b = ctx->S->state[1];
+	c = ctx->S->state[2];
+	d = ctx->S->state[3];
+	e = ctx->S->state[4];
+	f = ctx->S->state[5];
+	g = ctx->S->state[6];
+	h = ctx->S->state[7];
 
 	for (i = 0; i < 64; ++i) {
 		t1 = h + EP1(e) + CH(e,f,g) + k[i] + m[i];
@@ -124,14 +126,14 @@ void sha256_transform(SHA256_CTX *ctx, const BYTE data[], int output_size_bits)
 		a = t1 + t2;
 	}
 
-	ctx->state[0] += a;
-	ctx->state[1] += b;
-	ctx->state[2] += c;
-	ctx->state[3] += d;
-	ctx->state[4] += e;
-	ctx->state[5] += f;
-	ctx->state[6] += g;
-	ctx->state[7] += h;
+	ctx->S->state[0] += a;
+	ctx->S->state[1] += b;
+	ctx->S->state[2] += c;
+	ctx->S->state[3] += d;
+	ctx->S->state[4] += e;
+	ctx->S->state[5] += f;
+	ctx->S->state[6] += g;
+	ctx->S->state[7] += h;
 
 	/* puts("before truncation"); */
 	/* print_intermediate(ctx); */
@@ -142,27 +144,29 @@ void sha256_init(SHA256_CTX *ctx)
 {
 	ctx->datalen = 0;
 	ctx->bitlen = 0;
-	ctx->state[0] = 0x6a09e667;
-	ctx->state[1] = 0xbb67ae85;
-	ctx->state[2] = 0x3c6ef372;
-	ctx->state[3] = 0xa54ff53a;
-	ctx->state[4] = 0x510e527f;
-	ctx->state[5] = 0x9b05688c;
-	ctx->state[6] = 0x1f83d9ab;
-	ctx->state[7] = 0x5be0cd19;
+	ctx->S->state[0] = 0x6a09e667;
+	ctx->S->state[1] = 0xbb67ae85;
+	ctx->S->state[2] = 0x3c6ef372;
+	ctx->S->state[3] = 0xa54ff53a;
+	ctx->S->state[4] = 0x510e527f;
+	ctx->S->state[5] = 0x9b05688c;
+	ctx->S->state[6] = 0x1f83d9ab;
+	ctx->S->state[7] = 0x5be0cd19;
+
+	
 }
 
 
 // void sha256_update(SHA256_CTX *ctx, const BYTE data[], BYTE** intermediate,
 // size_t len, int output_size_bits)
 void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
-		   int output_size_bits, dict* d, void (*add_to_dict)(dict*, char*, size_t, size_t))
+		   int output_size_bits, dict* d, void (*add_to_dict)(dict*, digest*, size_t, size_t))
 
 {
         // printf("update len = %lu bytes\n", len);
-	WORD i;
-	STATE intermediate;
-	intermediate.state = ctx->state;
+        WORD i; // not sure why i added this @alzheimer
+	
+	//  ctx->S->state;
 	int output_size_bytes = (int) ceil((double) output_size_bits/8);
 	// printf("output size in bytes=%d\n", output_size_bytes);
 	for (i = 0; i < len; ++i) {
@@ -178,7 +182,7 @@ void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
 		  // printf("after %lld bits\n", ctx->bitlen);
 		  // print_intermediate(ctx);
 		  // add_element_to_dictionary(dict *dictionary, char *key, size_t value, size_t input_size)
-		  add_to_dict(d, intermediate.sate_as_bytes,(int) i/64, output_size_bytes );
+		  add_to_dict(d, ctx->S,(int) i/64, output_size_bytes );
 		  // puts("");
 		}
 	}
@@ -233,13 +237,13 @@ void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits)
 	/* // Since this implementation uses little endian byte ordering and SHA uses big endian, */
 	/* // reverse all the bytes when copying the final state to the output hash. */
 	/* for (WORD i = 0; i < 4; ++i) { */
-	/* 	hash[i]      = (ctx->state[0] >> (24 - i * 8)) & 0x000000ff; */
-	/* 	hash[i + 4]  = (ctx->state[1] >> (24 - i * 8)) & 0x000000ff; */
-	/* 	hash[i + 8]  = (ctx->state[2] >> (24 - i * 8)) & 0x000000ff; */
-	/* 	hash[i + 12] = (ctx->state[3] >> (24 - i * 8)) & 0x000000ff; */
-	/* 	hash[i + 16] = (ctx->state[4] >> (24 - i * 8)) & 0x000000ff; */
-	/* 	hash[i + 20] = (ctx->state[5] >> (24 - i * 8)) & 0x000000ff; */
-	/* 	hash[i + 24] = (ctx->state[6] >> (24 - i * 8)) & 0x000000ff; */
-	/* 	hash[i + 28] = (ctx->state[7] >> (24 - i * 8)) & 0x000000ff; */
+	/* 	hash[i]      = (ctx->S->state[0] >> (24 - i * 8)) & 0x000000ff; */
+	/* 	hash[i + 4]  = (ctx->S->state[1] >> (24 - i * 8)) & 0x000000ff; */
+	/* 	hash[i + 8]  = (ctx->S->state[2] >> (24 - i * 8)) & 0x000000ff; */
+	/* 	hash[i + 12] = (ctx->S->state[3] >> (24 - i * 8)) & 0x000000ff; */
+	/* 	hash[i + 16] = (ctx->S->state[4] >> (24 - i * 8)) & 0x000000ff; */
+	/* 	hash[i + 20] = (ctx->S->state[5] >> (24 - i * 8)) & 0x000000ff; */
+	/* 	hash[i + 24] = (ctx->S->state[6] >> (24 - i * 8)) & 0x000000ff; */
+	/* 	hash[i + 28] = (ctx->S->state[7] >> (24 - i * 8)) & 0x000000ff; */
 	/* } */
 }
