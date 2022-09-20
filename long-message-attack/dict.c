@@ -43,24 +43,23 @@ dict* dict_new(size_t nelements, size_t key_size){
   d->nslots = nslots;
   
   // reserve space in memeory
-  d->slots = malloc(sizeof(slot)*d->nslots);
+  d->slots = malloc(sizeof(slot)*nslots);
   // Ensure the keys are next to each other
-  digest* keys_space = malloc(sizeof(digest)*nslots);
+   for (size_t i = 0; i < nslots; ++i) {
 
-  for (size_t i = 0; i < nslots; ++i) {
-    d->slots[i].is_occupied = 0;
     // each key reserves `key_size` bytes, thus we need to move key_size steps
     // to go to the next slot key
-    d->slots[i].key = &keys_space[i];
-    d->slots[i].value = 0;
+     //d->slots[i].key.bytes;
+     d->slots[i].is_occupied = 0; // to be removed 
+     d->slots[i].value = 0; // 0 if it is not occupied
   }
 
-  printf("dictionary of size 0x%lx\n has been initialized", nslots);
+  printf("dictionary of size 0x%lx\n has been initialized\n", nslots);
   return d;
 }
 
 
-void dict_add_element_to(dict* d, digest* key, size_t value, size_t key_size){
+void dict_add_element_to(dict* d, dict_key* key, size_t value, size_t key_size){
   // todo edit this 
   // add (key, value) to the dictionary
   // in this primitive design key is an array of bytes, thus key_size is how many bytes
@@ -69,64 +68,58 @@ void dict_add_element_to(dict* d, digest* key, size_t value, size_t key_size){
 
   // dict = {slot1, slot2, ..., slot_n}
   // find which bin to put it in
-  size_t h = key->values[0]; // for now we assume indices don't need more than 64 bits 
+  uint64_t h = key->_uint64[0]; // for now we assume indices don't need more than 64 bits 
   h = h & (d->nslots - 1); // assumption nslots = 2^m; 
-
-
   // locate where to place (key, value)
-  size_t i = 0;
-  slot* current = &d->slots[h];
-  
-  while (current->is_occupied){
+  while (d->slots[h].is_occupied){
     // linear probing
     // current = element with index (h+i mod nslots)
-    current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    // puts("collision at adding element has been detected, linear probing");
+    
     // check if key already exists
-    if (key->values[0] == current->key->values[0] &&
-	key->values[1] == current->key->values[1] ) {
+    if (key->_uint64[0] == d->slots[h].key._uint64[0]){
       printf("a duplicated key has been detected\n");
       return;
     }
-    ++i;
+    //  ++i;
+    // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    h = (h+1) & (d->nslots - 1);
   }
 
+  /// Found an empty slot, update its 
   // update current->key = key 
   // memcpy(current->key, key->bytes, key_size);
-  current->key->values[0] = key->values[0];
-  current->key->values[1] = key->values[1];
-  current->value = value;
-  current->is_occupied = 1;
+  d->slots[h].is_occupied = 1;
+  d->slots[h].value = value;
+  d->slots[h].key._uint64[0] = key->_uint64[0];
+
 }
 
 
 
-size_t dict_get_value(dict* d, digest* key, size_t key_size){
+size_t dict_get_value(dict* d, dict_key* key, size_t key_size){
   // we first need to find where to start probing
 
-  size_t h =  key->values[0];
+  size_t h =  key->_uint64[0];
   h = h & (d->nslots - 1); // assumption nslots = 2^m; 
 
   // find (key, value) after 
-  size_t i = 0;
-  slot* current = &d->slots[h];
-  
-  while (current->is_occupied){
+  while (d->slots[h].is_occupied){
     // linear probing
     // current = element with index (h+i mod nslots)
-    current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    // puts("collision at adding element has been detected, linear probing");
+    
     // check if key already exists
-    if (key->values[0] == current->key->values[0] &&
-	key->values[1] == current->key->values[1] ) {
-      printf("a duplicated key has been detected\n");
-      return 1;
-    }
-    ++i;
+    if (key->_uint64[0] == d->slots[h].key._uint64[0])
+      return d->slots[h].value;
+    
+    // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    h = (h+1) & (d->nslots - 1); // mod 2^nslots
   }
 
   // update current->key = key 
   // memcpy(current->key, key->bytes, key_size);
-  return -1; // no element is found
-
+  return 0; // no element is found
   
 }
 
@@ -135,47 +128,45 @@ void dict_print(dict* d, size_t key_size){
 
 
   for (size_t b=0; b<(d->nslots); ++b) {
-    printf("slot=%lu, value=%lu\n", b, d->slots[b].value);
+
+    printf("slot=%lu, value=%lu, occupied=%d, ", b, d->slots[b].value, d->slots[b].is_occupied);
     // print key
-    printf("key={0x");
+    printf("key=0x");
     for (size_t k=0; k<key_size; ++k)
-      printf("%x",(unsigned char) d->slots[b].key->bytes[k]);
-    printf("}, ");
+      printf("%x",(unsigned char) d->slots[b].key.bytes[k]);
+    printf("\n");
   }
   
 }
  
 
-int dict_has_key(dict* d, digest* key, size_t key_size){
+int dict_has_key(dict* d, dict_key* key, size_t key_size){
   /// 1 if the dictionary has `key`
   /// 0 otherwise
 
   
-  // we first need to find where to start probing
 
-  size_t h =  key->values[0];
+  // we first need to find where to start probing
+  size_t h =  key->_uint64[0];
   h = h & (d->nslots - 1); // assumption nslots = 2^m; 
 
   // find (key, value) after 
-  size_t i = 0;
-  slot* current = &d->slots[h];
-
-    while (current->is_occupied){
+  while (d->slots[h].is_occupied){
     // linear probing
     // current = element with index (h+i mod nslots)
-    current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    // puts("collision at adding element has been detected, linear probing");
+    
     // check if key already exists
-    if (key->values[0] == current->key->values[0] &&
-	key->values[1] == current->key->values[1] ) {
-      printf("a duplicated key has been detected\n");
-      return 1;
-    }
-    ++i;
+    if (key->_uint64[0] == d->slots[h].key._uint64[0])
+      return d->slots[h].value;
+    
+    // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    h = (h+1) & (d->nslots - 1); // mod 2^nslots
   }
 
-
+  // update current->key = key 
+  // memcpy(current->key, key->bytes, key_size);
   return 0; // no element is found
-
  
 }
 

@@ -32,6 +32,7 @@ taken from the internet:
 
 
 issues:
+- dictionary inital values are 0, thus everything corresponds to index zero!
 - digest size is too big, find a way to save the space
 - Duplicate keys would create two entries! fix that.
 -- If there is a duplicate then we found a cylce that leads to collision.
@@ -44,6 +45,7 @@ future improvements:
   using the introduced union digest.
 - fix naming convention n_of_blocks or nblocks?
 - should dictionary deals with key_size as bits?
+- no need to store the long message
 
 possible optimizations:
 - all arrays has to be contagious

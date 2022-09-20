@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <memory.h>
+#include "types.h"
 #include "util_char_arrays.h"
 
 /*---------------------------------------------------------*/
@@ -39,7 +40,7 @@
 
 // add_element_to_dictionary(dict *dictionary, char *key, size_t value, size_t input_size)
 
-void nothing(dict *dictionary, char* key, size_t value, size_t key_size){
+void nothing(dict *dictionary, dict_key* key, size_t value, size_t key_size){
   // literally do nothing;
 }
 
@@ -83,8 +84,11 @@ void long_message_attack(size_t n_of_bits, double l){
   /* begin the attack */
   // First phase hash an extremely long message 
   sha256_update(&ctx, M, n_of_blocks*64, n_of_bits, d, dict_add_element_to);
-  dict_print(d, (int) ceil( (float)n_of_bits/8));
 
+  puts("***   long message has been hashed ***");
+  dict_print(d, (int) ceil( (float)n_of_bits/8));
+  puts("-----------------------");
+  
   // Second phase: hash a random message till a collision is found
   int collision_found = 0;
   BYTE* random_message; // 512 bits
@@ -98,18 +102,22 @@ void long_message_attack(size_t n_of_bits, double l){
   while (!collision_found) {
     // create a random message of 64 bytes
     random_message = create_radom_byte_array(64);
+    /* printf("trials=%lu\n", ctr); */
+    /* print_char((char*)ctx2.state, n_of_bytes); */
+    /* puts("------"); */
     sha256_init(&ctx2);
     sha256_transform(&ctx2, random_message, n_of_bits);
     // intermediate.state = ctx2.state; @remove
     
     // test for collision and print the results if successful.
-    if (dict_has_key(d, &(ctx2.S), n_of_bytes)){
+    if (dict_has_key(d, (dict_key *) ctx2.state, n_of_bytes)){
       collision_found = 1;
-      idx = dict_get_value(d, &(ctx2.S), n_of_bytes);
+      idx = dict_get_value(d, (dict_key *) &ctx2, n_of_bytes);
       puts("Found a collision with the following details:");
       printf("#random message trials=%lu, index=%lu, M=",ctr, idx);
-      print_char(ctx2.S.bytes, n_of_bytes);
-
+      dict_key* intermediate = (dict_key *) ctx2.state;
+      print_char(intermediate->bytes, n_of_bytes);
+      puts("");
       break; // we don't care about the rest of the loop
     }
     // collision_found = 1;
