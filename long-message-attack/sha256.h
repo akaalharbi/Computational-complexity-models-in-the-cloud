@@ -33,7 +33,7 @@ typedef struct {
 	WORD datalen;
 	unsigned long long bitlen;
         // WORD state[8];
-        digest S[8];
+        digest S; // should have 8 words, will be done at init
 } SHA256_CTX;
 
 

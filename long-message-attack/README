@@ -1,5 +1,5 @@
 compile:
-gcc -Wall -g -O3 long_message_attack.c sha256.c dict.c util_char_arrays.c superhash.c -lm -o long_message_attack
+gcc -Wall -g -O3 long_message_attack.c sha256.c dict.c util_char_arrays.c  -lm -o long_message_attack
 
 
 cost statistics:
@@ -32,10 +32,18 @@ taken from the internet:
 
 
 issues:
+- digest size is too big, find a way to save the space
 - Duplicate keys would create two entries! fix that.
 -- If there is a duplicate then we found a cylce that leads to collision.
 -- This can be solved using a global variable: cycle_found, with minimal changes to the attack 
-- The code is far from being generic
+
+
+
+future improvements:
+- truncation and representing n-bits digest can be done more elegantly
+  using the introduced union digest.
+- fix naming convention n_of_blocks or nblocks?
+- should dictionary deals with key_size as bits?
 
 possible optimizations:
 - all arrays has to be contagious

@@ -39,22 +39,23 @@ dict* dict_new(size_t nelements, size_t key_size){
   // E[#probing] = 2.5 misses
   
   // also guarantees that nslots is a power of 2 
-  size_t nslots = (size_t) ceil( log2(nelements)  ) + 1;
+  size_t nslots = (size_t) 1 << ( (size_t) ceil(log2( nelements) + 1 ) );
   d->nslots = nslots;
   
   // reserve space in memeory
   d->slots = malloc(sizeof(slot)*d->nslots);
   // Ensure the keys are next to each other
-  char* keys_space = malloc(sizeof(char)*nslots);
+  digest* keys_space = malloc(sizeof(digest)*nslots);
 
   for (size_t i = 0; i < nslots; ++i) {
     d->slots[i].is_occupied = 0;
     // each key reserves `key_size` bytes, thus we need to move key_size steps
     // to go to the next slot key
-    d->slots[i].key = &keys_space[i*key_size];
+    d->slots[i].key = &keys_space[i];
     d->slots[i].value = 0;
   }
 
+  printf("dictionary of size 0x%lx\n has been initialized", nslots);
   return d;
 }
 
@@ -81,7 +82,8 @@ void dict_add_element_to(dict* d, digest* key, size_t value, size_t key_size){
     // current = element with index (h+i mod nslots)
     current = &d->slots[  (h+i) & (d->nslots - 1)  ];
     // check if key already exists
-    if (cmp_arrays(key->bytes, current->key, key_size)) {
+    if (key->values[0] == current->key->values[0] &&
+	key->values[1] == current->key->values[1] ) {
       printf("a duplicated key has been detected\n");
       return;
     }
@@ -89,7 +91,9 @@ void dict_add_element_to(dict* d, digest* key, size_t value, size_t key_size){
   }
 
   // update current->key = key 
-  memcpy(current->key, key->bytes, key_size);
+  // memcpy(current->key, key->bytes, key_size);
+  current->key->values[0] = key->values[0];
+  current->key->values[1] = key->values[1];
   current->value = value;
   current->is_occupied = 1;
 }
@@ -106,22 +110,21 @@ size_t dict_get_value(dict* d, digest* key, size_t key_size){
   size_t i = 0;
   slot* current = &d->slots[h];
   
-  while (!current->is_occupied){
+  while (current->is_occupied){
     // linear probing
-
-
-    // check if key already exists
-    if (cmp_arrays(key->bytes, current->key, key_size)) {
-      return current->value;
-    }
-    
-    // move to the next element
-    ++i;
     // current = element with index (h+i mod nslots)
-    current = &d->slots[ (h+i) & (d->nslots - 1)  ];
-    
+    current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    // check if key already exists
+    if (key->values[0] == current->key->values[0] &&
+	key->values[1] == current->key->values[1] ) {
+      printf("a duplicated key has been detected\n");
+      return 1;
+    }
+    ++i;
   }
 
+  // update current->key = key 
+  // memcpy(current->key, key->bytes, key_size);
   return -1; // no element is found
 
   
@@ -136,7 +139,7 @@ void dict_print(dict* d, size_t key_size){
     // print key
     printf("key={0x");
     for (size_t k=0; k<key_size; ++k)
-      printf("%x",(unsigned char) d->slots[b].key[k]);
+      printf("%x",(unsigned char) d->slots[b].key->bytes[k]);
     printf("}, ");
   }
   
@@ -156,22 +159,20 @@ int dict_has_key(dict* d, digest* key, size_t key_size){
   // find (key, value) after 
   size_t i = 0;
   slot* current = &d->slots[h];
-  
-  while (!current->is_occupied){
+
+    while (current->is_occupied){
     // linear probing
-
-
+    // current = element with index (h+i mod nslots)
+    current = &d->slots[  (h+i) & (d->nslots - 1)  ];
     // check if key already exists
-    if (cmp_arrays(key->bytes, current->key, key_size)) {
+    if (key->values[0] == current->key->values[0] &&
+	key->values[1] == current->key->values[1] ) {
+      printf("a duplicated key has been detected\n");
       return 1;
     }
-    
-    // move to the next element
     ++i;
-    // current = element with index (h+i mod nslots)
-    current = &d->slots[ (h+i) & (d->nslots - 1)  ];
-    
   }
+
 
   return 0; // no element is found
 

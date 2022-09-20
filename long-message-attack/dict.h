@@ -24,7 +24,7 @@ typedef struct {
 
   
   int is_occupied: 1; // 1 bit. 0 if it is empty, 1 if slot has an element
-  char* key; // the key has a fixed length given at the beginning of the run
+  digest* key; // the key has a fixed length given at the beginning of the run
   size_t value; // to be edited when we use a digest that has more than 
 } slot;
 
@@ -43,7 +43,7 @@ typedef struct {
 //                    functions                        //
 //-----------------------------------------------------//
 slot *slot_new();
-dict *dict_new(size_t n_of_bins, size_t key_size);
+dict *dict_new(size_t nslots, size_t key_size);
 void dict_add_element_to(dict* d, digest* key,size_t value, size_t key_size);
 int dict_has_key(dict* d, digest* key, size_t key_size);
 size_t dict_get_value(dict* d, digest* key, size_t key_size);
