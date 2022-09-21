@@ -41,20 +41,21 @@
 
 
 
-
-int is_there_duplicate = 0;
+// was there a cycle in PHASE I
+int is_there_duplicate = 0; 
 
 void nothing(dict *dictionary, dict_key* key, size_t value, size_t key_size){
   // literally do nothing;
 }
 
-void long_message_attack(size_t n_of_bits, double l){
+void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 //(size_t n_of_bits, size_t n_of_blocks){    
   /*  Mount long message attack on truncated sha256 */
   /// INPUT:
   ///  - n: compression functions output size in bits
   ///  - l: 2^l = how many message blocks we need to store their intermediate values
   ///  -fp: a pointer to file where we will store the benchmark information (time,)
+  ///      it will write in the first line it encounters then 
   /// todo nblocks instead of n_of_blocks!
 
 
@@ -63,34 +64,18 @@ void long_message_attack(size_t n_of_bits, double l){
   size_t n_of_blocks = (size_t) ceil(pow(2.0, l));
   //  size_t nelements = (size_t) ceil(pow(2.0, n_of_bits));
   int n_of_bytes = (int) ceil( (float)n_of_bits/8);
-
-  /* FILE * fp; */
-  /* fp = fopen("message1", "w"); */
-  /* fwrite(M , 1 , n_of_blocks*64 , fp ); */
-  /* fclose(fp); */
-
   
-
-  /* /// --------------- printing ----------------------- /// */
-  /* printf("INPUT:- %lu number of bits in the compression function\n", n_of_bits); */
-  /* printf("      - %lu is the number of blocks\n", n_of_blocks); */
-  /* printf("Let's computer the memeory the program needs\n"); */
-  /* printf("- We need %lu bytes for the long message\n", 64*n_of_blocks); */
-  /* printf("- We need %lu bytes for the dictionary\n", sizeof(dict)); */
-  /* printf("- + %lu bytes for slots \n", 2*n_of_blocks*sizeof(slot)); */
-  /* printf("- There are other minor needs we neglect for now\n"); */
-  /* printf("n=%lu, l=%f\n", n_of_bits, l); */
-  /* printf("n_of_blocks %lu\n", n_of_blocks); */
-  /* printf("- sizeof(dict_key)=%lu\n", sizeof(dict_key)); */
-  /* printf("- sizeof(size_t)=%lu\n", sizeof(size_t)); */
-  /* printf("- sizeof(int)=%lu\n", sizeof(int)); */
-  /* printf("- sizeof(slot)=%lu\n", sizeof(slot)); */
-  /* puts("_____________________________________________"); */
-
   // size of  long_message + dict 
-  size_t memory_estimate = 64*n_of_blocks + sizeof(dict) + 2*n_of_blocks*sizeof(slot);
+  size_t memory_estimate = 64*n_of_blocks + sizeof(dict);
+         memory_estimate += 2*n_of_blocks*sizeof(slot);
+	 memory_estimate = memory_estimate / 1000; //kb
+
+  /// write it in a file
+	 fprintf(fp, "%lu, %d, NAN, %lukb, ", n_of_bits, (int) l, memory_estimate);
+  
+  
   // we need to take into account also the various pointers in this program
-  printf("ESTIMATED MEMEORY %lukb\n", memory_estimate/1000);
+  // printf("ESTIMATED MEMEORY %lukb\n", memory_estimate/1000);
   
   
   /// ------- INIT ----------------------------------///
@@ -126,32 +111,39 @@ void long_message_attack(size_t n_of_bits, double l){
   /* } */
 
 
-  /* puts("--- long message has been hashed ---"); */
-  /* dict_print(d, (int) ceil( (float)n_of_bits/8)); */
-  /* puts("-----------------------"); */
 
+  /// TIMING record PHASE I time elapsed ///
   gettimeofday(&end, 0);
   seconds = end.tv_sec - begin.tv_sec;
   microseconds = end.tv_usec - begin.tv_usec;
   elapsed = seconds + microseconds*1e-6;
-  printf("Phase I time: %.3f seconds.\n", elapsed);
+  ///
+  /// write it in a file  ///
+  fprintf(fp, "%fsec, ", elapsed);
+  /// -------------------///
+
+  /// record memeory usage ///
+  long res_mem  = 0;
+  long virt_mem = 0;
+  get_memory_usage_kb(&res_mem, &virt_mem);
+  fprintf(fp, "RES=%lukb, VmSize=%lukb, ", res_mem, virt_mem);
+  ///---------------------///
+
+
   
   /// -------------- PHASE II --------------------  ///
   // Second phase: hash a random message till a collision is found
   /// check if we have a duplicate first
-  if (is_there_duplicate)
+  if (is_there_duplicate){
     // this corresponds to having cycles while hashing the long message
     // i.e. h(mi ... mj) = h(mi ... mk) where k>i
+    fprintf(fp, "-1sec, 0\n");
     return; // todo fill this section.
+  }
+  
 
-  /// Print memeory usage ///
-  long res_mem  = 0;
-  long virt_mem = 0;
-  puts("========================================");
-  get_memory_usage_kb(&res_mem, &virt_mem);
-  printf("Phase I     : RES = %lukb, VmSize = %lukb\n", res_mem, virt_mem);
-  puts("========================================");
-  /// --------------- ///
+  /// ------------------- ///
+
   
   int collision_found = 0;
   BYTE* random_message = (BYTE *) malloc(sizeof(BYTE)*64); // 512 bits
@@ -162,10 +154,6 @@ void long_message_attack(size_t n_of_bits, double l){
   size_t ctr = 0;
   size_t idx;
 
-  puts("========================================");
-  get_memory_usage_kb(&res_mem, &virt_mem);
-  printf("Phase I done: RES = %lukb, VmSize = %lukb\n", res_mem, virt_mem);
-  puts("========================================");
   
   while (!collision_found) {
     // create a random message of 64 bytes
@@ -181,11 +169,11 @@ void long_message_attack(size_t n_of_bits, double l){
     if (dict_has_key(d, (dict_key *) ctx2.state, n_of_bytes)){
       collision_found = 1;
       idx = dict_get_value(d, (dict_key *) &ctx2.state, n_of_bytes);
-      puts("Found a collision with the following details:");
-      printf("#random message trials=%lu, index=%lu, M=",ctr, idx);
-      dict_key* intermediate = (dict_key *) ctx2.state;
-      print_char(intermediate->bytes, n_of_bytes);
-      puts("");
+      /* puts("Found a collision with the following details:"); */
+      /* printf("#random message trials=%lu, index=%lu, M=",ctr, idx); */
+      /* dict_key* intermediate = (dict_key *) ctx2.state; */
+      /* print_char(intermediate->bytes, n_of_bytes); */
+      /* puts(""); */
       break; // we don't care about the rest of the loop
     }
     ++ctr;
@@ -196,13 +184,10 @@ void long_message_attack(size_t n_of_bits, double l){
   seconds = end.tv_sec - begin.tv_sec;
   microseconds = end.tv_usec - begin.tv_usec;
   elapsed = seconds + microseconds*1e-6;
-  printf("All time: %.3f seconds.\n", elapsed);
-  
-  puts("- attack has been done");
-  puts("========================================");
-  get_memory_usage_kb(&res_mem, &virt_mem);
-  printf("Finished: RES = %lukb, VmSize = %lukb\n", res_mem, virt_mem);
-  puts("========================================");
+  /// record PHASE I time elapsed ///
+  /// write it in a file  ///
+  fprintf(fp, "%fsec, %lu\n", elapsed, ctr); // last writing
+  /// -------------------///
 
 
   // todo move this code to another functoin e.g. check collision
@@ -255,11 +240,6 @@ void long_message_attack(size_t n_of_bits, double l){
   /* free(ctx); */
   /* free(ctx2); */
 
-  puts("========================================");
-  get_memory_usage_kb(&res_mem, &virt_mem);
-  printf("After free: RES = %lukb, VmSize = %lukb\n", res_mem, virt_mem);
-  puts("========================================");
-
 }
 
 
@@ -271,32 +251,61 @@ int main(int argc, char* argv []){
   int n = 0;
   float l = 0;
   
-  if (argc != 3){
-    puts("USAGE: ./long_message_attac n l");
+  if (argc == 3){
+  // get the input from the user
+  n = atoi(argv[1]);
+  l = atof(argv[2]);
+
+  /// todo write the value of n and l explicitly in the file 
+  FILE* fp = fopen("statistics/n_l_stats.txt", "w");
+  fprintf(fp, "n l estimated_time estimated_memory time_phase_i"
+	    " real_memory_usage virt_memory_usage time_all_attack\n");
+
+  long_message_attack(n, l, fp);
+
+  fclose(fp);
+
+  return 0;
+    }
+
+  else if (argc == 2){ // we test all possible n
+    n = atoi(argv[1]);
+    FILE* fp = fopen("statistics/stats.txt", "w");
+    fprintf(fp, "n l estimated_time estimated_memory time_phase_i"
+	        " real_memory_usage virt_memory_usage time_all_attack"
+	        " #random_message\n");
+    fclose(fp);
+    for (int n1 = 2; n1 < n; ++n1){
+      for (int l=1; (l<26 && l<n1); ++l){
+	// printf("n=%d, l=%d\n", n1, l );
+	// opening file multiple time to results as soon we as we have it
+	FILE* fp = fopen("statistics/stats.txt", "a");
+	long_message_attack(n1, l, fp);
+	fclose(fp);
+	// puts("");
+      }
+    }
+    
+    
+  } else {
+    
+    
+    puts("==================================");
+    puts("Welcome to the Long message attack");
+    puts("USAGE: ./long_message_attac n l\n"
+	 "This will only record the usage of n l."
+	 "The corresponding satistics will be found in"
+	 "n_l_stats.txt");
+    
+    puts("USAGE: ./long_message_attac n\n"
+	 "This will try 0<n and increase n by 1 each time."
+	 "It will save the statistics in the file satistics/stats.txt");
     puts("n: 0<n<257, the number of bits in the output of the compression function\n"
 	 "l:positive double, 2^l is the number of blocks");
     return 0;
   }
   
-  // get the input from the user
-  n = atoi(argv[1]);
-  l = atof(argv[2]);
-
-
-  // long_message_attack(size_t n_of_blocks, size_t n_of_bits)
-
-
-  long res_mem  = 0;
-  long virt_mem = 0;
-  get_memory_usage_kb(&res_mem, &virt_mem);
-  printf("Before calling the function RES = %lukb, VmSize = %lukb\n", res_mem, virt_mem);
-  puts("============================================================");
-  long_message_attack(n, l);
-  get_memory_usage_kb(&res_mem, &virt_mem);
-  printf("After attack finsihed calling the function RES = %lukb, VmSize = %lukb\n", res_mem, virt_mem);
-  puts("============================================================");
   
-
   return 0;
 }
 

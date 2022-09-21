@@ -18,6 +18,7 @@ int get_memory_usage_kb(long* vmrss_kb, long* vmsize_kb)
   long to_read = 8192;
   char buffer[to_read];
   int read = fread(buffer, sizeof(char), to_read, procfile);
+  ++read; // dummy operation to avoid non used variable warning
   fclose(procfile);
 
   short found_vmrss = 0;
