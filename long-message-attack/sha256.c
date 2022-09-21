@@ -183,8 +183,10 @@ void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
 		  // printf("after %lld bits\n", ctx->bitlen);
 		  // print_intermediate(ctx);
 		  // add_element_to_dictionary(dict *dictionary, char *key, size_t value, size_t input_size)
-		  add_to_dict(d, (dict_key *) ctx->state,(int) i/64, output_size_bytes );
 
+		  add_to_dict(d, (dict_key *) ctx->state,((int) i/64 )+ 1, output_size_bytes );
+		  if (is_there_duplicate)
+		    break;
 		  
 		  //puts("");
 		}

@@ -1,6 +1,5 @@
 compile:
-gcc -Wall -g -O3 long_message_attack.c sha256.c dict.c util_char_arrays.c  -lm -o long_message_attack
-
+gcc -O3 -Wall -g long_message_attack.c sha256.c dict.c util_char_arrays.c util/memory.c -lm -o long_message_attack
 
 cost statistics:
 sudo perf stat -o stats.txt -a -r 2 -e power/energy-pkg/ ./long_message_attack 30 15
@@ -26,14 +25,14 @@ files:
 
 
 taken from the internet: 
-- supherhash.* ptsdint.h (as is)
 - sha256.* (modified)
 - crypto-algorithms-master.zip
 
 
 issues:
-- dictionary inital values are 0, thus everything corresponds to index zero!
-- digest size is too big, find a way to save the space
+- creating two dictionaries d1 and d2 (in order), then d2 will have keys and values from d1!
+  however is_occupied seems to be correct.
+- with the code of linear probing, the collision always happends at index 0!
 - Duplicate keys would create two entries! fix that.
 -- If there is a duplicate then we found a cylce that leads to collision.
 -- This can be solved using a global variable: cycle_found, with minimal changes to the attack 
@@ -46,6 +45,7 @@ future improvements:
 - fix naming convention n_of_blocks or nblocks?
 - should dictionary deals with key_size as bits?
 - no need to store the long message
+- 
 
 possible optimizations:
 - all arrays has to be contagious

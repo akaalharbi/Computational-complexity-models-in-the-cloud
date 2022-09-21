@@ -16,7 +16,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include "types.h" // digest type
-#include "dict.h" // dict type 
+#include "dict.h" // dict type
+#include "shared.h"
 /****************************** MACROS ******************************/
 #define SHA256_BLOCK_SIZE 32            // SHA256 outputs a 32 byte digest
 // for the modified version @ahmed

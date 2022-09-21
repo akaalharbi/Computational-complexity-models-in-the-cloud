@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <sys/random.h>
 
 int cmp_arrays(char* array1, char* array2, size_t len);
 void print_char(char *l, size_t len);

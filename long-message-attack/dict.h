@@ -11,7 +11,7 @@
 #include <stdio.h>  // printf
 #include "types.h" // dict_key union type 
 #include "util_char_arrays.h" // cmp_arrays
-
+#include "shared.h"
 ///-----------------------------------------------------///
 ///                  data structure                     ///
 ///-----------------------------------------------------///

@@ -1,0 +1,13 @@
+This folder contains a copy of useful information/code that I found while creating the other files in this repository
+
+List of codes:
+- crypto-algorithms
+-- source:
+
+- memory-usage : gets how much memory used by the current process it has code for clusters as well
+-- source: https://hpcf.umbc.edu/general-productivity/checking-memory-usage/
+
+
+- perf command
+-- tutorial: https://firefox-source-docs.mozilla.org/performance/power_profiling_overview.html
+	     https://firefox-source-docs.mozilla.org/performance/perf.html
