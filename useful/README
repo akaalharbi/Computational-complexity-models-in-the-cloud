@@ -11,3 +11,6 @@ List of codes:
 - perf command
 -- tutorial: https://firefox-source-docs.mozilla.org/performance/power_profiling_overview.html
 	     https://firefox-source-docs.mozilla.org/performance/perf.html
+
+- measuring time in c
+-- source: https://levelup.gitconnected.com/8-ways-to-measure-execution-time-in-c-c-48634458d0f9

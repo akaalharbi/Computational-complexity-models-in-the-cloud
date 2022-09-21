@@ -32,7 +32,9 @@ dict* dict_new(size_t nelements, size_t key_size){
   /// return a pointer to the dicitonary
   /// In memeory keys are seperate from the dictionary fields
   /// nslots in the dictionary will be alwais a power of two
+  /// f is a pointer to a file that saves the 
 
+  
   dict* d = (dict *) malloc(sizeof(dict));
   // load factor = 1/2 =>
   // E[#probing] = 1.5 hits

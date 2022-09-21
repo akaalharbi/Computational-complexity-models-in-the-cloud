@@ -53,6 +53,26 @@ unsigned char* create_radom_byte_array(int n_of_bytes){
   /*   A[i] = (unsigned char) d; */
   /* } */
   int returned_bytes = getrandom(A, n_of_bytes, 1);
-  
+  ++returned_bytes; // dummy operation to avoid not used warning
+
   return A;
+}
+
+
+
+void fill_radom_byte_array(unsigned char* A, int n_of_bytes){
+  /* Create seemingly a random byte array with total_n_of_bits */
+  /// INPUT: how many bytes
+  /// OUTPUT: array with ceil(total_n_of_bytes) entries
+  ///         the last entry doesn't necessarily use all the 8 bits
+  
+
+  /* int d = 0; */
+  /* for (size_t i=0; i<n_of_bytes; ++i){ */
+  /*   d = 0 + rand() / (RAND_MAX / (255 - 0 + 1) + 1);    */
+  /*   A[i] = (unsigned char) d; */
+  /* } */
+  int returned_bytes = getrandom(A, n_of_bytes, 1);
+  ++returned_bytes; // dummy operation to avoid not used warning
+
 }

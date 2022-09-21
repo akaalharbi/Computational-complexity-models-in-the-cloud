@@ -28,8 +28,13 @@ taken from the internet:
 - sha256.* (modified)
 - crypto-algorithms-master.zip
 
+questions:
+- what are the objects that needed to be free?
 
 issues:
+- too many malloc calls for the random_byte, it should only fills the buffer not malloc
+- when there is a duplicate in the dictionary the program stops instead of writing the index of cycle
+  this has to be updated
 - creating two dictionaries d1 and d2 (in order), then d2 will have keys and values from d1!
   however is_occupied seems to be correct.
 - with the code of linear probing, the collision always happends at index 0!
@@ -40,6 +45,7 @@ issues:
 
 
 future improvements:
+- optional printing if a flag has been passed
 - truncation and representing n-bits digest can be done more elegantly
   using the introduced union digest.
 - fix naming convention n_of_blocks or nblocks?
