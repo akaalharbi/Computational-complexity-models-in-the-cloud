@@ -137,7 +137,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   if (is_there_duplicate){
     // this corresponds to having cycles while hashing the long message
     // i.e. h(mi ... mj) = h(mi ... mk) where k>i
-    fprintf(fp, "-1sec, 0\n");
+    fprintf(fp, "%f, 0\n", elapsed);
     return; // todo fill this section.
   }
   
@@ -256,10 +256,16 @@ int main(int argc, char* argv []){
   n = atoi(argv[1]);
   l = atof(argv[2]);
 
+  // variable file name
+  char file_name[26];
+  snprintf(file_name, sizeof(file_name), "statistics/%d_%d_stats.txt", (int) n, (int) l);
+
+
   /// todo write the value of n and l explicitly in the file 
-  FILE* fp = fopen("statistics/n_l_stats.txt", "w");
+  //  FILE* fp = fopen("statistics/n_l_stats.txt", "w");
+  FILE* fp = fopen(file_name, "w");
   fprintf(fp, "n l estimated_time estimated_memory time_phase_i"
-	    " real_memory_usage virt_memory_usage time_all_attack\n");
+	    " real_memory_usage virt_memory_usage time_all_attack trials\n");
 
   long_message_attack(n, l, fp);
 
@@ -268,15 +274,25 @@ int main(int argc, char* argv []){
   return 0;
     }
 
-  else if (argc == 2){ // we test all possible n
+  else if (argc == 2){ // we test all n1 <= n and i <l<= n/2
+    // i is determined by the programmer 
     n = atoi(argv[1]);
+
+
+    // variable file name
+    /* char file_name[26]; */
+    /* snprintf(file_name, sizeof(file_name), "statistics/%d_%d_stats.txt", (int) n, (int) l); */
+
     FILE* fp = fopen("statistics/stats.txt", "w");
     fprintf(fp, "n l estimated_time estimated_memory time_phase_i"
 	        " real_memory_usage virt_memory_usage time_all_attack"
 	        " #random_message\n");
     fclose(fp);
+
+    int l_max = 26; // after this the program consumes more than the available ram
     for (int n1 = 2; n1 < n; ++n1){
-      for (int l=1; (l<26 && l<n1); ++l){
+      // when l > n/2 then the we expect to be a cylce in phase I
+      for (int l=1; (l<=l_max && l<= (n1>>1) ); ++l){
 	// printf("n=%d, l=%d\n", n1, l );
 	// opening file multiple time to results as soon we as we have it
 	FILE* fp = fopen("statistics/stats.txt", "a");
@@ -287,17 +303,59 @@ int main(int argc, char* argv []){
     }
     
     
-  } else {
+  } else if (argc == 5) {
+
+    // supply n_max n_min l_max l_min
+    int n_max = atoi(argv[1]);
+    int n_min = atoi(argv[2]);
+    int l_max = atoi(argv[3]);
+    int l_min = atoi(argv[4]);
+    // l = atof(argv[2]);
+
+    printf("n_max=%d,  n_min=%d, l_max=%d, l_min=%d\n",
+	   n_max, n_min, l_max, l_min);
+    // variable file name
+
+    char file_name[32];
+    snprintf(file_name, sizeof(file_name), "statistics/%d_%d_%d_%d_stats.txt",
+	     n_max, n_min, l_max, l_min);
+    FILE* fp = fopen(file_name, "w");
+    fprintf(fp, "n l estimated_time estimated_memory time_phase_i"
+	        " real_memory_usage virt_memory_usage time_all_attack"
+	        " #random_message\n");
+    fclose(fp);
+    
+    /// loop over n_min <= n <= n_max, l_min <= l <= l_max
+    for (int n1=n_min; n1 <= n_max; ++n1){
+      // when l > n/2 then the we expect to be a cylce in phase I
+      for (int l=l_min; (l<=l_max && l<= (n1>>1) ); ++l){
+	// opening file multiple time to results as soon we as we have it
+	FILE* fp = fopen(file_name, "a");
+	long_message_attack(n1, l, fp);
+	fclose(fp);
+	// puts("");
+      }
+    }
+
+
+  }
+  
+  else {
     
     
     puts("==================================");
     puts("Welcome to the Long message attack");
-    puts("USAGE: ./long_message_attac n l\n"
+    puts("USAGE: ./long_message_attack n_max n_min l_max l_min\n"
+	 "This will test all paris (n, l) such that:\n"
+	 "n_min<= n <= n_max, l_min <= l <= l_max\n"
+	 "The results will be saved in the file:\n"
+	 "nmax_nmin_lmax_lmin_stats.txt in the statistics folder.");
+    puts("USAGE: ./long_message_attack n l\n"
 	 "This will only record the usage of n l."
 	 "The corresponding satistics will be found in"
 	 "n_l_stats.txt");
     
-    puts("USAGE: ./long_message_attac n\n"
+    puts("USAGE: ./long_message_attack n\n"
 	 "This will try 0<n and increase n by 1 each time."
 	 "It will save the statistics in the file satistics/stats.txt");
     puts("n: 0<n<257, the number of bits in the output of the compression function\n"

@@ -1,0 +1,2 @@
+n l estimated_time estimated_memory time_phase_i real_memory_usage virt_memory_usage time_all_attack, trials
+58, 25, NAN, 3758096kb, 13.007822sec, RES=1574948kb, VmSize=3673724kb, 1800.971300sec, 2966990396
