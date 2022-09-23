@@ -1,8 +1,16 @@
 compile:
+- parallel
+gcc -O3 -fopenmp -Wall -g long_message_attack_parallel.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack_parallel
+
+
+
+- serial
 gcc -O3 -Wall -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack
 
 
 cost statistics:
+sudo perf stat -a  -e power/energy-pkg/ ./long_message_attack_parallel 63 29
+
 sudo perf stat -o stats.txt -a -r 2 -e power/energy-pkg/ ./long_message_attack 30 15
 
 
