@@ -424,3 +424,4 @@ n l estimated_time estimated_memory time_phase_i real_memory_usage virt_memory_u
 30, 23, NAN, 939524kb, 0.086669sec, RES=16513288kb, VmSize=38522176kb, -1sec, 0
 30, 24, NAN, 1879048kb, 0.165000sec, RES=17299728kb, VmSize=40357192kb, -1sec, 0
 30, 25, NAN, 3758096kb, 0.317924sec, RES=18872600kb, VmSize=44027216kb, -1sec, 0
+

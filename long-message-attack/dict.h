@@ -10,7 +10,7 @@
 #include <string.h> // memcpy
 #include <stdio.h>  // printf
 #include "types.h" // dict_key union type 
-#include "util_char_arrays.h" // cmp_arrays
+#include "util/util_char_arrays.h" // cmp_arrays
 #include "shared.h"
 ///-----------------------------------------------------///
 ///                  data structure                     ///
@@ -25,8 +25,10 @@ typedef struct {
   
   
   dict_key key; // the key has a fixed length given at the beginning of the run
-  size_t value; // to be edited when we use a dict_key that has more than
-  int is_occupied; // 1 bit. 0 if it is empty, 1 if slot has an element
+  size_t value; // if value==0 then its an empty slot. Any element added to dict
+                // need to be incremented by one.
+  // no need for this
+  // int is_occupied; // 1 bit. 0 if it is empty, 1 if slot has an element
   
 } slot;
 

@@ -24,7 +24,7 @@
 #include <string.h>
 #include <memory.h>
 #include "types.h"
-#include "util_char_arrays.h"
+#include "util/util_char_arrays.h"
 #include "shared.h" // shared variables for duplicate 
 #include "util/memory.h"
 #include <sys/time.h>
@@ -65,15 +65,15 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   //  size_t nelements = (size_t) ceil(pow(2.0, n_of_bits));
   int n_of_bytes = (int) ceil( (float)n_of_bits/8);
   
-  // size of  long_message + dict 
-  size_t memory_estimate = 64*n_of_blocks + sizeof(dict);
+  // size of  long_message (lazy evaluation) + dict 
+  double memory_estimate = 64 + sizeof(dict);
          memory_estimate += 2*n_of_blocks*sizeof(slot);
-	 memory_estimate = memory_estimate / 1000; //kb
+	 memory_estimate = memory_estimate / 1000.0; //kb
 
-  /// write it in a file
-	 fprintf(fp, "%lu, %d, NAN, %lukb, ", n_of_bits, (int) l, memory_estimate);
-  
-  
+  /// write it in a filep
+  fprintf(fp, "%lu, %d, NAN, %0.2fkb, ", n_of_bits, (int) l, memory_estimate);
+  printf("Memory estimates %0.2fkb, \n", memory_estimate);
+
   // we need to take into account also the various pointers in this program
   // printf("ESTIMATED MEMEORY %lukb\n", memory_estimate/1000);
   
@@ -94,14 +94,25 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   
 
   /// -------------- PHASE I ------------------------  ///
-  /// First phase hash an extremely long message 
-  // create a long message
-  BYTE* M = long_message_zeros(n_of_blocks*512);
+  /// First phase hash an extremely long message
+  // M0 M1 ... M_{2^l}
+  // Mi entry will evaluated on the fly
+
+
+  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
   // INIT SHA256 
   SHA256_CTX ctx;
   sha256_init(&ctx);
+
+
+  // hash a long message (for now it's a series of zeros)
+  for (size_t i=0; i<n_of_blocks; ++i){
+    sha256_transform(&ctx, M, n_of_bits);
+    dict_add_element_to(d, (dict_key *) ctx.state, i, n_of_bytes);
+  }
+
   // n_of_bits is the digest length in bits
-  sha256_update(&ctx, M, n_of_blocks*64, n_of_bits, d, dict_add_element_to);
+  // sha256_update(&ctx, M, n_of_blocks*64, n_of_bits, d, dict_add_element_to);
   
   /// proposal to save space by evaluating each item of M each time
   // since the message is just 0, we don't need to store all 0
@@ -146,7 +157,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
   
   int collision_found = 0;
-  BYTE* random_message = (BYTE *) malloc(sizeof(BYTE)*64); // 512 bits
+  BYTE random_message[64] = {0}; // (BYTE *) malloc(sizeof(BYTE)*64); // 512 bits
   SHA256_CTX ctx2;
   //  STATE intermediate; // union // @remove
   // we will zero the excessive zeros, don't edit
@@ -233,8 +244,8 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
 
   // free all the used memory 
-  free(M);
-  free(random_message);
+  // free(M); // no need for this :)
+  // free(random_message); // no need for that anymore
   free(d->slots);
   free(d);
   /* free(ctx); */
@@ -278,12 +289,14 @@ int main(int argc, char* argv []){
     // i is determined by the programmer 
     n = atoi(argv[1]);
 
-
     // variable file name
-    /* char file_name[26]; */
-    /* snprintf(file_name, sizeof(file_name), "statistics/%d_%d_stats.txt", (int) n, (int) l); */
+    char file_name[26];
+    snprintf(file_name, sizeof(file_name), "statistics/%d_stats.txt", (int) n);
 
-    FILE* fp = fopen("statistics/stats.txt", "w");
+
+    
+    
+    FILE* fp = fopen(file_name, "w");
     fprintf(fp, "n l estimated_time estimated_memory time_phase_i"
 	        " real_memory_usage virt_memory_usage time_all_attack"
 	        " #random_message\n");
@@ -295,7 +308,7 @@ int main(int argc, char* argv []){
       for (int l=1; (l<=l_max && l<= (n1>>1) ); ++l){
 	// printf("n=%d, l=%d\n", n1, l );
 	// opening file multiple time to results as soon we as we have it
-	FILE* fp = fopen("statistics/stats.txt", "a");
+	FILE* fp = fopen(file_name, "a");
 	long_message_attack(n1, l, fp);
 	fclose(fp);
 	// puts("");

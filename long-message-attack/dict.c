@@ -3,9 +3,8 @@
 // already hashed (context: long message attack)
 
 #include "dict.h"
-#include "sha256.h"
 #include "types.h"
-#include "util_char_arrays.h"
+//#include "util_char_arrays.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -52,7 +51,7 @@ dict* dict_new(size_t nelements, size_t key_size){
     // each key reserves `key_size` bytes, thus we need to move key_size steps
     // to go to the next slot key
      //d->slots[i].key.bytes;
-     d->slots[i].is_occupied = 0; // to be removed 
+     // d->slots[i].is_occupied = 0; // to be removed 
      d->slots[i].value = 0; // 0 if it is not occupied
   }
 
@@ -62,18 +61,19 @@ dict* dict_new(size_t nelements, size_t key_size){
 
 
 void dict_add_element_to(dict* d, dict_key* key, size_t value, size_t key_size){
-  // todo edit this 
-  // add (key, value) to the dictionary
+  // add (key, value) to the dictionary, 0 <= value. Since we use value:=0 to indicate
+  // that the associated slot in the dictionary is empty. In dictionary we store
+  // value + 1
   // in this primitive design key is an array of bytes, thus key_size is how many bytes
   // value is a value that represents an index of some array thus it has the type size_t
-  // todo if we entered a key twice, there will be two entries :(
+
 
   // dict = {slot1, slot2, ..., slot_n}
   // find which bin to put it in
   uint64_t h = key->_uint64[0]; // for now we assume indices don't need more than 64 bits 
   h = h & (d->nslots - 1); // assumption nslots = 2^m; 
   // locate where to place (key, value)
-  while (d->slots[h].is_occupied){
+  while (d->slots[h].value){ // value==0 means empty slot
     // linear probing
     // current = element with index (h+i mod nslots)
     // puts("collision at adding element has been detected, linear probing");
@@ -92,8 +92,8 @@ void dict_add_element_to(dict* d, dict_key* key, size_t value, size_t key_size){
   /// Found an empty slot, update its 
   // update current->key = key 
   // memcpy(current->key, key->bytes, key_size);
-  d->slots[h].is_occupied = 1;
-  d->slots[h].value = value;
+  // Ensure the entered value is strictly greate than 0
+  d->slots[h].value = value + 1;
   d->slots[h].key._uint64[0] = key->_uint64[0];
 
 }
@@ -107,14 +107,14 @@ size_t dict_get_value(dict* d, dict_key* key, size_t key_size){
   h = h & (d->nslots - 1); // assumption nslots = 2^m; 
 
   // find (key, value) after 
-  while (d->slots[h].is_occupied){
+  while (d->slots[h].value){// occupied slot
     // linear probing
     // current = element with index (h+i mod nslots)
     // puts("collision at adding element has been detected, linear probing");
     
     // check if key already exists
     if (key->_uint64[0] == d->slots[h].key._uint64[0])
-      return d->slots[h].value;
+      return d->slots[h].value - 1;
     
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
     h = (h+1) & (d->nslots - 1); // mod 2^nslots
@@ -132,7 +132,7 @@ void dict_print(dict* d, size_t key_size){
 
   for (size_t b=0; b<(d->nslots); ++b) {
 
-    printf("slot=%lu, value=%lu, occupied=%d, ", b, d->slots[b].value, d->slots[b].is_occupied);
+    printf("slot=%lu, value=%lu, ", b, d->slots[b].value);
     // print key
     printf("key=0x");
     for (size_t k=0; k<key_size; ++k)
@@ -154,14 +154,15 @@ int dict_has_key(dict* d, dict_key* key, size_t key_size){
   h = h & (d->nslots - 1); // assumption nslots = 2^m; 
 
   // find (key, value) after 
-  while (d->slots[h].is_occupied){
+  while (d->slots[h].value){ // value==0 means empty slot 
     // linear probing
     // current = element with index (h+i mod nslots)
     // puts("collision at adding element has been detected, linear probing");
     
     // check if key already exists
     if (key->_uint64[0] == d->slots[h].key._uint64[0])
-      return d->slots[h].value;
+      // revert it to the original entered value
+      return d->slots[h].value - 1;
     
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
     h = (h+1) & (d->nslots - 1); // mod 2^nslots

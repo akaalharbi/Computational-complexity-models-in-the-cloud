@@ -1,5 +1,6 @@
 compile:
-gcc -O3 -Wall -g long_message_attack.c sha256.c dict.c util_char_arrays.c util/memory.c -lm -o long_message_attack
+gcc -O3 -Wall -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack
+
 
 cost statistics:
 sudo perf stat -o stats.txt -a -r 2 -e power/energy-pkg/ ./long_message_attack 30 15
