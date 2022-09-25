@@ -53,4 +53,6 @@ void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
 		   int output_size_bits, dict* d, void (*add_to_dict)(dict*, dict_key*, size_t, size_t));
 void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits);
 void print_intermediate(SHA256_CTX* ctx);
+
+
 #endif   // SHA256_H

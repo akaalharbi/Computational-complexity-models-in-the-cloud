@@ -16,6 +16,18 @@
 ///                  data structure                     ///
 ///-----------------------------------------------------///
 
+
+
+typedef union {
+  /// the keys have fixed size
+  /// Wrap state type in a union for easier handling outside the sha256 function 
+  char bytes[16];
+  unsigned int _uint32[4];
+  uint64_t _uint64[2]; 
+
+}  dict_key; // 128 bit
+
+
 typedef struct {
   /// a slot can hold one element at most!
   /// This implementaion suggest that slot1's key and slot2's key are
@@ -31,7 +43,7 @@ typedef struct {
   // int is_occupied; // 1 bit. 0 if it is empty, 1 if slot has an element
   
 } slot;
-
+ 
 
 typedef struct {
   UINT nslots; // number of elements  in the dictionary
@@ -47,10 +59,10 @@ typedef struct {
 //                    functions                        //
 //-----------------------------------------------------//
 slot *slot_new();
-dict *dict_new(size_t nslots, size_t key_size);
-void dict_add_element_to(dict* d, dict_key* key,size_t value, size_t key_size);
-int dict_has_key(dict* d, dict_key* key, size_t key_size);
-size_t dict_get_value(dict* d, dict_key* key, size_t key_size);
-void dict_print(dict *d, size_t key_size);
+dict *dict_new(size_t nslots);
+void dict_add_element_to(dict* d, uint64_t* key,size_t value);
+int dict_has_key(dict* d, uint64_t* key);
+size_t dict_get_value(dict* d, uint64_t* key);
+void dict_print(dict *d);
 
 #endif

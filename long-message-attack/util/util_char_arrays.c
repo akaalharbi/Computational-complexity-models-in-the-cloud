@@ -76,3 +76,47 @@ void fill_radom_byte_array(unsigned char* A, int n_of_bytes){
   ++returned_bytes; // dummy operation to avoid not used warning
 
 }
+
+
+void truncate_array(unsigned char* A, size_t size_A, size_t total_out_bits){
+  // A = {B0, B1, ...,B_{size_A -1} }
+  // A has n=8*size_A bits
+  // We wish to return A with only total_out_bits
+  // excessive bits will be stored in memory but their value
+  // is 0.
+
+  // we order the bits of A[0], A[1], ..., etc as:
+  // b0 b1 ... b7    b8 b9 ... b15   b16 b17 ... b23
+  //   A[0]                A[1]           A[3] .....
+  // Goal: set all bits bi s.t. i>= total_out_bits to 0
+  // e.g. output_size_bits = 4
+  // b0 b1 b2 b3 0 ...0
+
+  // all blocks after ceil(output_size_bits/8) should be zero
+  // For the singular case when someone choses the output to be zero
+
+  // printf("output_size=%d\n", output_size_bits);
+  // see defintion of `rem` below. the extra term is to ensure that ceil adds one
+  // the division is exact which mean the last active block has all bits active
+  int i =  ceil((float)total_out_bits/8  + ((double) 1 / 16));
+  printf("we are going to truncate from i=%d\n", i);
+  printf("nbytes=%lu\n", size_A);
+  
+  for (int j = i; j<size_A; ++j){
+    printf("A[%d] was %x \n", j, A[i]);
+    A[j] = 0;
+    printf("A[%d] is %x \n", j, A[i]);
+  }
+  // and with output_size_bits ones
+  // this convluted formula to deal with the case when all the bits of the last should be active
+  // the mod 8 doesn't caputre 8 bits number
+  // another solution to add ε < (1/8) inside the ceil within the definiton of i
+  int rem = total_out_bits & 7;
+  printf("rem=%d bits\n", rem);
+  rem = ( 1<<rem) - 1; // 111...1 /
+  printf("2^rem - 1=%x\n", rem);
+  printf("before A[%d]=%d\n", i-1, A[i-1]);
+  A[i - 1] = A[i-1] & rem; // last byte
+  printf("after A[%d]=%x\n", i-1, A[i-1]);
+
+}

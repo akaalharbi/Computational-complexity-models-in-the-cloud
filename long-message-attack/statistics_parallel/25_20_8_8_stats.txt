@@ -1,0 +1,7 @@
+n l estimated_time estimated_memory time_phase_i real_memory_usage virt_memory_usage time_all_attack #random_message
+20, 8, NAN, 8.27kb, 0.000288sec, RES=1372kb, VmSize=3992kb, 0.002499sec, 6411
+21, 8, NAN, 8.27kb, 0.000268sec, RES=1372kb, VmSize=159716kb, 0.001572sec, 8446
+22, 8, NAN, 8.27kb, 0.000223sec, RES=1372kb, VmSize=159716kb, 0.000903sec, 5773
+23, 8, NAN, 8.27kb, 0.000065sec, RES=1372kb, VmSize=159716kb, 0.000162sec, 1680
+24, 8, NAN, 8.27kb, 0.000066sec, RES=1372kb, VmSize=159716kb, 0.000799sec, 17758
+25, 8, NAN, 8.27kb, 0.000065sec, RES=1372kb, VmSize=159716kb, 0.011247sec, 280475

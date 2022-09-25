@@ -137,7 +137,10 @@ void sha256_transform(SHA256_CTX *ctx, const BYTE data[], int output_size_bits)
 
 	/* puts("before truncation"); */
 	/* print_intermediate(ctx); */
-	truncate(ctx, output_size_bits);
+	// @note we are going truncate the internal
+	// state rather we will truncate outside the
+	// sha256 transform
+	// truncate(ctx, output_size_bits);
 }
 
 void sha256_init(SHA256_CTX *ctx)

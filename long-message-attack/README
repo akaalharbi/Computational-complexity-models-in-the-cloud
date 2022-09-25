@@ -1,11 +1,19 @@
 compile:
 - parallel
-gcc -O3 -fopenmp -Wall -g long_message_attack_parallel.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack_parallel
+gcc -fopenmp -O3 long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack_parallel
+
+// DEBUG
+gcc -DVERBOSE_LEVEL -fopenmp -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack_parallel
+
+
 
 
 
 - serial
-gcc -O3 -Wall -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack
+gcc -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack
+
+// with debug using
+gcc -DVERBOSE_LEVEL -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack
 
 
 cost statistics:

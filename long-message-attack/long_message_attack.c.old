@@ -28,7 +28,6 @@
 #include "shared.h" // shared variables for duplicate 
 #include "util/memory.h"
 #include <sys/time.h>
-#include <omp.h>
 
 /*---------------------------------------------------------*/
 ///                  UTILITY FUNCTIONS                   ///
@@ -157,63 +156,39 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   /// ------------------- ///
 
   
-  int collision_found = 0; // shared by all threads
-  size_t ctr = 0; // how many random messages we've tried
-  size_t idx = 0; // the index of the message to be removed
-
-  // parallel search which are independent of each other
-  // omp_set_num_threads( omp_get_max_threads() );
-  printf("Phase II: we will use %d threads\n", omp_get_max_threads());
-  // printf("Max nthreads=%d\n", omp_get_max_threads());
-  
-#pragma omp parallel num_threads( omp_get_max_threads() )
-  {
-    // each variable inside is private to each thread
-    BYTE random_message_priv[64] = {0}; // (BYTE *) malloc(sizeof(BYTE)*64); // 512 bits
-    SHA256_CTX ctx_priv;
-    //  STATE intermediate; // union // @remove
-    // we will zero the excessive zeros, don't edit
-    sha256_init(&ctx_priv);
-    size_t ctr_priv = 0;
-
+  int collision_found = 0;
+  BYTE random_message[64] = {0}; // (BYTE *) malloc(sizeof(BYTE)*64); // 512 bits
+  SHA256_CTX ctx2;
+  //  STATE intermediate; // union // @remove
+  // we will zero the excessive zeros, don't edit
+  sha256_init(&ctx2);
+  size_t ctr = 0;
+  size_t idx;
 
   
-    while (!collision_found) {
-      // create a random message of 64 bytes
-      fill_radom_byte_array(random_message_priv, 64);
+  while (!collision_found) {
+    // create a random message of 64 bytes
+    fill_radom_byte_array(random_message, 64);
 
 
 
-      sha256_init(&ctx_priv);
-      sha256_transform(&ctx_priv, random_message_priv, n_of_bits);
+    sha256_init(&ctx2);
+    sha256_transform(&ctx2, random_message, n_of_bits);
 
     
-      // test for collision and print the results if successful.
-      if (dict_has_key(d, (dict_key *) ctx_priv.state, n_of_bytes)){
-	#pragma omp critical
-	{ // update a shared values
-	  collision_found = 1;
-	  idx =  dict_get_value(d, (dict_key *) &ctx_priv.state, n_of_bytes);
-	}
-
-
-	/* puts("Found a collision with the following details:"); */
-	/* printf("#random message trials=%lu, index=%lu, M=",ctr, idx); */
-	/* dict_key* intermediate = (dict_key *) ctx2.state; */
-	/* print_char(intermediate->bytes, n_of_bytes); */
-	/* puts(""); */
-	break; // we don't care about the rest of the loop
-      }
-      ++ctr_priv;
-
+    // test for collision and print the results if successful.
+    if (dict_has_key(d, (dict_key *) ctx2.state, n_of_bytes)){
+      collision_found = 1;
+      idx = dict_get_value(d, (dict_key *) &ctx2.state, n_of_bytes);
+      /* puts("Found a collision with the following details:"); */
+      /* printf("#random message trials=%lu, index=%lu, M=",ctr, idx); */
+      /* dict_key* intermediate = (dict_key *) ctx2.state; */
+      /* print_char(intermediate->bytes, n_of_bytes); */
+      /* puts(""); */
+      break; // we don't care about the rest of the loop
     }
-    // record the number of trials
-    #pragma omp critical
-    {
-      ctr += ctr_priv;
-    }
-    
-    
+    ++ctr;
+
   }
   
   gettimeofday(&end, 0);
@@ -293,8 +268,8 @@ int main(int argc, char* argv []){
   l = atof(argv[2]);
 
   // variable file name
-  char file_name[36];
-  snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_stats.txt", (int) n, (int) l);
+  char file_name[26];
+  snprintf(file_name, sizeof(file_name), "statistics/%d_%d_stats.txt", (int) n, (int) l);
 
 
   /// todo write the value of n and l explicitly in the file 
@@ -315,8 +290,8 @@ int main(int argc, char* argv []){
     n = atoi(argv[1]);
 
     // variable file name
-    char file_name[36];
-    snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_stats.txt", (int) n);
+    char file_name[26];
+    snprintf(file_name, sizeof(file_name), "statistics/%d_stats.txt", (int) n);
 
 
     
@@ -354,8 +329,8 @@ int main(int argc, char* argv []){
 	   n_max, n_min, l_max, l_min);
     // variable file name
 
-    char file_name[43];
-    snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_%d_%d_stats.txt",
+    char file_name[32];
+    snprintf(file_name, sizeof(file_name), "statistics/%d_%d_%d_%d_stats.txt",
 	     n_max, n_min, l_max, l_min);
     FILE* fp = fopen(file_name, "w");
     fprintf(fp, "n l estimated_time estimated_memory time_phase_i"

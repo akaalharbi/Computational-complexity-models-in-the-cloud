@@ -19,13 +19,6 @@ typedef union {
   } digest;
 
 
-typedef union {
-  /// Wrap state type in a union for easier handling outside the sha256 function 
-  char bytes[8];
-  unsigned int _uint32[2]; // as used in sha256 cod
-  uint64_t _uint64[1];
-
-  } dict_key;
 
   
 #endif
