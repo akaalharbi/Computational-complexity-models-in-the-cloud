@@ -51,6 +51,7 @@ dict* dict_new(size_t nelements){
      d->slots[i].value = 0; // 0 if it is not occupied
      d->slots[i].key._uint64[0] = 0;
      d->slots[i].key._uint64[1] = 0;
+
   }  
    
    // printf("- Dictionary of size 0x%lx\n has been initialized\n", nslots);
@@ -83,6 +84,7 @@ void dict_add_element_to(dict* d, uint64_t* key, size_t value){
 	&& key[1] == d->slots[h].key._uint64[1]){
       // printf("a duplicated key has been detected at %lu\n", value);
       is_there_duplicate = 1;
+      idx_cycle = value;
       return;
     }
     //  ++i;

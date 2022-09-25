@@ -44,7 +44,8 @@
 
 
 // was there a cycle in PHASE I
-int is_there_duplicate = 0; 
+int is_there_duplicate = 0;
+int idx_cycle = -1;
 
 void nothing(dict *dictionary, dict_key* key, size_t value, size_t key_size){
   // literally do nothing;
@@ -59,16 +60,17 @@ void truncate_state_get_digest(uint64_t* dst, SHA256_CTX* ctx, int n_of_bits){
 
   dst[0] = ctx->state[0] + (((uint64_t) ctx->state[1])<<32);
   if (n_of_bits < 64){
+    uint64_t ones =   (((uint64_t) 1) << (n_of_bits)) - 1;
+    dst[0] = dst[0] & ones;
+    dst[1] = 0;
 
     #ifdef VERBOSE_LEVEL
-    uint64_t ones =  ( ((uint64_t) 1<<(n_of_bits)) - 1);
     printf("ones=%lu\n", ones);
     printf("state[0]=%x, state[1]=%x\n", ctx->state[0], ctx->state[1]);
     puts("");
     #endif // VERBOSE_LEVEL
 
-    dst[0] = dst[0] & ( ((uint64_t) 1<<(n_of_bits)) - 1);
-    dst[1] = 0;
+    
   } else if (n_of_bits < 128) {
     // since the number of bits is higher or equal 64
     // we need to work on the second element of the dst
@@ -225,35 +227,43 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   /// -------------- PHASE II --------------------  ///
   // Second phase: hash a random message till a collision is found
   /// check if we have a duplicate first
-  if (is_there_duplicate){
-    // this corresponds to having cycles while hashing the long message
-    // i.e. h(mi ... mj) = h(mi ... mk) where k>i
-    fprintf(fp, "%f, 0\n", elapsed);
-    return; // todo fill this section.
-  }
-  
-
-  /// ------------------- ///
-
   
   int collision_found = 0; // shared by all threads
   size_t ctr = 0; // how many random messages we've tried
   size_t idx = 0; // the index of the message to be removed
   BYTE random_message[64] = {0};
+
+  if (is_there_duplicate){
+    // this corresponds to having cycles while hashing the long message
+    // i.e. h(mi  ... mj) = h(mi ... mk) where k>i
+    fprintf(fp, "%f, 0, %d cycle\n", elapsed, idx_cycle);
+    collision_found = 1;
+    free(d->slots);
+    free(d);
+    return;
+
+
+  }
+  
+
+  /// ------------------- ///
+
  
   // parallel search which are independent of each other
   // omp_set_num_threads( omp_get_max_threads() );
-  
-  // printf("Phase II: we will use %d threads\n", omp_get_max_threads());
+  #ifdef _OPENMP
+  printf("Phase II: we will use %d threads, n=%lu, l=%d\n",
+	 omp_get_max_threads(), n_of_bits, (int) l);
   // printf("Max nthreads=%d\n", omp_get_max_threads());
-  
-#pragma omp parallel num_threads( omp_get_max_threads() )
+  #endif // _OPENMP
+
+  #pragma omp parallel num_threads( omp_get_max_threads() )
   {
     // each variable inside is private to each thread
     BYTE random_message_priv[64] = {0};
     uint64_t digest_priv[2] = {0, 0};
     SHA256_CTX ctx_priv;
-    
+    size_t idx_priv = 0;
     //  STATE intermediate; // union // @remove
     // we will zero the excessive zeros, don't edit
     sha256_init(&ctx_priv);
@@ -270,13 +280,16 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       sha256_transform(&ctx_priv, random_message_priv, n_of_bits);
       // extract the results
       truncate_state_get_digest(digest_priv, &ctx_priv, n_of_bits);
-    
+      
       // test for collision and print the results if successful.
-      if (dict_has_key(d, digest_priv)){
+      // idx_priv := 0 if digest_priv doesn't exist in the dictionary
+      idx_priv = dict_get_value(d, digest_priv);
+      //if (dict_has_key(d, digest_priv) ){ // maybe extra condition && !collision_found is needed
+      if (idx_priv ){ // 
 	#pragma omp critical
 	{ // update a shared values
 	  collision_found = 1;
-	  idx =  dict_get_value(d, digest);
+	  idx = idx_priv; 
 	  memcpy(random_message, random_message_priv, 64);
 	}
 
@@ -356,13 +369,15 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   /* /\* sha256_transform(&ctx2, M2, n_of_bits); *\/ */
   /* /\* print_char((char*) ctx2.state, n_of_bytes); *\/ */
   /* /\* printf("idx=%lu\n", idx); *\/ */
-
+ 
 
   // free all the used memory 
   // free(M); // no need for this :)
   // free(random_message); // no need for that anymore
   free(d->slots);
   free(d);
+  
+
   /* free(ctx); */
   /* free(ctx2); */
 
