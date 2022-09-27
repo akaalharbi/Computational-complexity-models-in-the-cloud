@@ -1,10 +1,39 @@
-compile:
+# Long message attack
+
+# Description
+
+# Summary:
+This folder has two main executable `long_message_attack_parallel` and `verify_hash' which generates two colliding messages and verifies the results, respectively.
+
+# definitions
+long message: a large message of zeros.
+
+## Usage:
+Basic usage:
+### Generate colliding messages
+./long_message_attack n l
+
+This will mount an attack of truncated sha256 to n-bits using a long message of length 2^l. The random message that collides with the long message can be found in `messages/n_l` in binary format (read it as unsigned char[64]). Also, you can find benchmark and the index where the collision occurs at `statistics_parallel/n_l.txt`.  Substitute n and l, if l>= n/2 then there is a high chance of having a cycle. In this case, you can only find a file in `statistics_parallel/n_l.txt`
+
+
+### Verifies the results
+./verify_hash "messages/n_l" n
+This will read the file n_l, truncate the output to n bits, and search for an index where the message found in `messages/n_l` collides with the long message. If it find an index, it will print it or it will continue the search forever.
+
+
+
+
+# compile:
+## Flags
+`-fopenmp` for parallel executable (only Phase II can be parallel)
+`-DVERBOSE_LEVEL` print intermediate information (it will flood the program use with care)
+
+
 - parallel
 gcc -fopenmp -O3 long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack_parallel
 
 // DEBUG
 gcc -DVERBOSE_LEVEL -fopenmp -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack_parallel
-
 
 
 
@@ -15,6 +44,10 @@ gcc -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/m
 // with debug using
 gcc -DVERBOSE_LEVEL -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack
 
+
+
+- verify hash
+gcc -g verify_hash.c sha256.c -lm -o verify_hash
 
 cost statistics:
 sudo perf stat -a  -e power/energy-pkg/ ./long_message_attack_parallel 63 29
@@ -33,8 +66,11 @@ l:float 2^l is the number of blocks
 
 
 files:
-- statistics/{n}bits.txt files contain the system power usage while the program was running.
+- 
+- statistics*/n_l_bits.txt files contain the system power usage while the program was running.
 - long_message_attack.c: main file that implements the attack
+- verify_hash.c: reads 64 bytes from a binary file then it hashes a long message till a collision is found.
+                 returns the index idx where the collision occurs.
 - dict.*: chained dictionary implementation using linked list
 - util_char_arrays.* : some useful functionalities
 - ignore the tmp file
@@ -44,34 +80,21 @@ files:
 taken from the internet: 
 - sha256.* (modified)
 - crypto-algorithms-master.zip
+- memory.c
 
 questions:
-- what are the objects that needed to be free?
+
 
 issues:
-- too many malloc calls for the random_byte, it should only fills the buffer not malloc
-- when there is a duplicate in the dictionary the program stops instead of writing the index of cycle
-  this has to be updated
-- creating two dictionaries d1 and d2 (in order), then d2 will have keys and values from d1!
-  however is_occupied seems to be correct.
-- with the code of linear probing, the collision always happends at index 0!
-- Duplicate keys would create two entries! fix that.
--- If there is a duplicate then we found a cylce that leads to collision.
--- This can be solved using a global variable: cycle_found, with minimal changes to the attack 
-
 
 
 future improvements:
-- optional printing if a flag has been passed
-- truncation and representing n-bits digest can be done more elegantly
-  using the introduced union digest.
-- fix naming convention n_of_blocks or nblocks?
-- should dictionary deals with key_size as bits?
-- no need to store the long message
-- 
+
 
 possible optimizations:
-- all arrays has to be contagious
-- arrays instead of linked list
 - profile the code
 
+
+Benchmarks:
+- Number of sha256 transforms ~2^21 calls / sec
+- Memory writes ~100MB/sec

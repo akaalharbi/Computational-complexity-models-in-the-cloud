@@ -28,7 +28,6 @@ typedef unsigned char BYTE;             // 8-bit byte
 typedef unsigned int  WORD;             // 32-bit word, change to "long" for 16-bit machines
 //@ahmed since the output will be tunrcate we migh opt for a small type
 typedef unsigned int OUTPUT_TYPE; // control the output type
-
 typedef struct {
 	BYTE data[64];
 	WORD datalen;
@@ -50,9 +49,9 @@ void sha256_init(SHA256_CTX *ctx);
 /* void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits); */
 void sha256_transform(SHA256_CTX *ctx, const BYTE data[], int output_size_bits);
 void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
-		   int output_size_bits, dict* d, void (*add_to_dict)(dict*, dict_key*, size_t, size_t));
+		   int output_size_bits);//, dict* d, void (*add_to_dict)(dict*, dict_key*, size_t, size_t));
 void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits);
 void print_intermediate(SHA256_CTX* ctx);
-
+void truncate_state_get_digest(uint64_t* dst, SHA256_CTX* ctx, int n_of_bits);
 
 #endif   // SHA256_H

@@ -163,8 +163,7 @@ void sha256_init(SHA256_CTX *ctx)
 
 // void sha256_update(SHA256_CTX *ctx, const BYTE data[], BYTE** intermediate,
 // size_t len, int output_size_bits)
-void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
-		   int output_size_bits, dict* d, void (*add_to_dict)(dict*, dict_key*, size_t, size_t))
+void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len, int output_size_bits)//, dict* d, void (*add_to_dict)(dict*, dict_key*, size_t, size_t))
 
 {
         
@@ -187,7 +186,7 @@ void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
 		  // print_intermediate(ctx);
 		  // add_element_to_dictionary(dict *dictionary, char *key, size_t value, size_t input_size)
 
-		  add_to_dict(d, (dict_key *) ctx->state,((int) i/64 )+ 1, output_size_bytes );
+		  //		  add_to_dict(d, (dict_key *) ctx->state,((int) i/64 )+ 1, output_size_bytes );
 		  if (is_there_duplicate)
 		    break;
 		  
@@ -254,4 +253,50 @@ void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits)
 	/* 	hash[i + 24] = (ctx->state[6] >> (24 - i * 8)) & 0x000000ff; */
 	/* 	hash[i + 28] = (ctx->state[7] >> (24 - i * 8)) & 0x000000ff; */
 	/* } */
+}
+
+
+// @ahmed
+void truncate_state_get_digest(uint64_t* dst, SHA256_CTX* ctx, int n_of_bits){
+  /// We extract the digest from ctx and save it in dst
+  // uint64_t dst[2] is fixed now // 128 bits, this is a limitation
+  // it should be 256 for sha256 :)
+  // n_of_bits is how many bits is the compression function output
+  
+
+  dst[0] = ctx->state[0] + (((uint64_t) ctx->state[1])<<32);
+  if (n_of_bits < 64){
+    uint64_t ones =   (((uint64_t) 1) << (n_of_bits)) - 1;
+    dst[0] = dst[0] & ones;
+    dst[1] = 0;
+
+    #ifdef VERBOSE_LEVEL
+    printf("ones=%lu\n", ones);
+    printf("state[0]=%x, state[1]=%x\n", ctx->state[0], ctx->state[1]);
+    puts("");
+    #endif // VERBOSE_LEVEL
+
+    
+  } else if (n_of_bits < 128) {
+    // since the number of bits is higher or equal 64
+    // we need to work on the second element of the dst
+    n_of_bits = n_of_bits - 64;
+
+    #ifdef VERBOSE_LEVEL
+    uint64_t ones =  ( ((uint64_t) 1<<(n_of_bits)) - 1);
+    printf("ones=%lu, n_of_bits=%d\n", ones, n_of_bits);
+    printf("state[0]=%x, state[1]=%x\n", ctx->state[0], ctx->state[1]);
+    printf("state[2]=%x, state[2]=%x\n", ctx->state[2], ctx->state[3]);
+    puts("");
+    #endif // VERBOSE_LEVEL
+
+    // copy 64bits from state
+    dst[1] = ctx->state[2] + (((uint64_t) ctx->state[3])<<32);
+    // truncate it if necessary
+    dst[1] = dst[1] & ( ((uint64_t) 1<<(n_of_bits)) - 1);
+  } else { // 128 bits limit
+    dst[1] = ctx->state[2] + (((uint64_t) ctx->state[3])<<32);
+  }
+    
+  
 }

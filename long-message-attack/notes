@@ -4,4 +4,10 @@ break line 160 in the file long_message_attack.c
 stats.txt format
 
 
-n l  (estimated time) (estimated memory) (time phase i ) (memory usage phase i ( res memory) (vmsize virtual) (time all attack) (memory usage all) 
+n l  (estimated time) (estimated memory) (time phase i ) (memory usage phase i ( res memory) (vmsize virtual) (time all attack) (memory usage all)
+
+
+benchmarks:
+Number of sha256 transforms ~2^21 calls / sec
+Memory writes ~100MB/sec
+

@@ -1,11 +1,6 @@
 // Long message attack on sha256
 // this program can't attack more than 128bits
 // we make the following modifications:
-// 1- The is simply 10*, i.e. no strengthening just add 1 and enough number of
-//    zeros to get a multiple of 512-bit input
-// 2- The output of a compression function is truncated to n-bit, i.e. in each
-//    block of Merkle-Damgard the the arrow to the right is n bit
-// 3- store intermediate values
 
 // TODO
 // 1- store intermediate values in  sha256.c fil
@@ -51,49 +46,6 @@ void nothing(dict *dictionary, dict_key* key, size_t value, size_t key_size){
   // literally do nothing;
 }
 
-void truncate_state_get_digest(uint64_t* dst, SHA256_CTX* ctx, int n_of_bits){
-  /// We extract the digest from ctx and save it in dst
-  // uint64_t dst[2] is fixed now // 128 bits, this is a limitation
-  // it should be 256 for sha256 :)
-  // n_of_bits is how many bits is the compression function output
-  
-
-  dst[0] = ctx->state[0] + (((uint64_t) ctx->state[1])<<32);
-  if (n_of_bits < 64){
-    uint64_t ones =   (((uint64_t) 1) << (n_of_bits)) - 1;
-    dst[0] = dst[0] & ones;
-    dst[1] = 0;
-
-    #ifdef VERBOSE_LEVEL
-    printf("ones=%lu\n", ones);
-    printf("state[0]=%x, state[1]=%x\n", ctx->state[0], ctx->state[1]);
-    puts("");
-    #endif // VERBOSE_LEVEL
-
-    
-  } else if (n_of_bits < 128) {
-    // since the number of bits is higher or equal 64
-    // we need to work on the second element of the dst
-    n_of_bits = n_of_bits - 64;
-
-    #ifdef VERBOSE_LEVEL
-    uint64_t ones =  ( ((uint64_t) 1<<(n_of_bits)) - 1);
-    printf("ones=%lu, n_of_bits=%d\n", ones, n_of_bits);
-    printf("state[0]=%x, state[1]=%x\n", ctx->state[0], ctx->state[1]);
-    printf("state[2]=%x, state[2]=%x\n", ctx->state[2], ctx->state[3]);
-    puts("");
-    #endif // VERBOSE_LEVEL
-
-    // copy 64bits from state
-    dst[1] = ctx->state[2] + (((uint64_t) ctx->state[3])<<32);
-    // truncate it if necessary
-    dst[1] = dst[1] & ( ((uint64_t) 1<<(n_of_bits)) - 1);
-  } else { // 128 bits limit
-    dst[1] = ctx->state[2] + (((uint64_t) ctx->state[3])<<32);
-  }
-    
-  
-}
 
 void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 //(size_t n_of_bits, size_t n_of_blocks){    
@@ -194,16 +146,6 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   #endif // VERBOSE_LEVEL
   /// --------------- END IF VERBOSE ENABLED ---------------- ///
 
-  // n_of_bits is the digest length in bits
-  // sha256_update(&ctx, M, n_of_blocks*64, n_of_bits, d, dict_add_element_to);
-  
-  /// proposal to save space by evaluating each item of M each time
-  // since the message is just 0, we don't need to store all 0
-  /*  BYTE* M = long_message_zeros(512); // todo */
-  /* for (size_t i=0; i<n_of_blocks; ++i) { */
-  /*   sha256_update(&ctx, M, 64, n_of_bits, d, dict_add_element_to); */
-  /* } */
-
 
 
   /// TIMING record PHASE I time elapsed ///
@@ -241,8 +183,6 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     free(d->slots);
     free(d);
     return;
-
-
   }
   
 
@@ -394,7 +334,11 @@ int main(int argc, char* argv []){
 
   char first_line[] =   "n l estimated_time estimated_memory time_phase_i real_memory_usage virt_memory_usage time_all_attack trials idx_message\n";
 
-
+  #ifdef _OPENMP
+  char directory_name[] = "statistics_parallel/";
+  #else
+  char directory_name[] = "statistics_parallel/";
+  #endif
 
     
   if (argc == 3){ // ./long_message_attack n l
@@ -404,7 +348,8 @@ int main(int argc, char* argv []){
 
   // variable file name
   char file_name[36];
-  snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_stats.txt", (int) n, (int) l);
+  
+  snprintf(file_name, sizeof(file_name), "%s%d_%d_stats.txt", directory_name, (int) n, (int) l);
 
 
   /// todo write the value of n and l explicitly in the file 
