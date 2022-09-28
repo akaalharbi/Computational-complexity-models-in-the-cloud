@@ -27,6 +27,9 @@
 #include <sys/time.h>
 #include <omp.h>
 
+// mask for distinguished point
+#define DIST_MASK 0x7 // test if the last three bits are zeros
+
 /*---------------------------------------------------------*/
 ///                  UTILITY FUNCTIONS                   ///
 
@@ -124,7 +127,19 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     // get the digest from the state
     truncate_state_get_digest(digest, &ctx, n_of_bits);
     // add it to the dicitonary
+    
+    /// ------------ DISTINGUISHED POINTS ------------------------- ///
+    /// If distinguished points feature was enabled  during compile ///
+    /// time. 
+    #ifdef DISTINGUISHED_POINTS
+    // we skip hashes
+    if ( (digest[0]&DIST_MASK) != 0) 
+      continue; // skip this element
+    #endif
+
     dict_add_element_to(d, digest, i);
+
+
     /// ----------------- IF VERBOSE ENABLED ------------------ ///
     #ifdef VERBOSE_LEVEL
     printf("value=%lu\n", i);
@@ -215,11 +230,22 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       // create a random message of 64 bytes
       fill_radom_byte_array(random_message_priv, 64);
 
+
       // hash
       sha256_init(&ctx_priv);
       sha256_transform(&ctx_priv, random_message_priv, n_of_bits);
       // extract the results
       truncate_state_get_digest(digest_priv, &ctx_priv, n_of_bits);
+
+      /// ------------ DISTINGUISHED POINTS (if enabled) ------------- ///
+      /// If distinguished points feature was enabled  during compile ///
+      /// time. 
+      #ifdef DISTINGUISHED_POINTS
+      // we skip hashes
+      if ( (digest_priv[0]&DIST_MASK) != 0) 
+	continue; // skip this element
+      #endif
+
       
       // test for collision and print the results if successful.
       // idx_priv := 0 if digest_priv doesn't exist in the dictionary
@@ -268,58 +294,10 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   FILE* fm = fopen(file_name, "w");
   fwrite(random_message, 1, 64, fm);
   fclose(fm);
-  //
-  // todo move this code to another functoin e.g. check collision
-  /* /// Saving the two colliding messages & testing they indeed collide */
-  /* // Phase verify we have collision */
-  /* // message 1 is the long message M */
-  /* // message 2 is random_message || (M after truncation after index idx) */
-  /* BYTE* M2 = long_message_zeros( (n_of_blocks - idx + 1)*512); */
-  /* memcpy(M2, random_message, 64); // first 64 bytes is the random message */
-  /* puts("M2="); */
-  /* print_char((char*)M2, 64); */
-  
-  /* // Save message1 to the file message 1 */
-  /* FILE * fp; */
-  /* fp = fopen("message1", "w"); */
-  /* fwrite(M , 1 , n_of_blocks*64 , fp ); */
-  /* fclose(fp); */
-  /* // Save message2 to the file message 1 */
-  /* fp = fopen("message2", "w"); */
-  /* fwrite(M2 , 1 , (n_of_blocks - idx)*64 , fp ); */
-  /* fclose(fp); */
-  
-  /* // hash message 1 and message2 and output their digest */
-  /* sha256_init(&ctx); */
-  /* sha256_update(&ctx, M, n_of_blocks*64, n_of_bits, d, nothing); */
-  /* sha256_init(&ctx2); */
-  /* sha256_update(&ctx2, M2, (n_of_blocks - idx + 1)*64, n_of_bits, d, nothing); */
 
-  /* puts("_______________________________________"); */
-  /* puts("Hash message 1:"); */
-  /* print_char((char*) ctx.state, n_of_bytes); */
-
-  /* puts("Hash message 2:"); */
-  /* print_char((char*) ctx2.state, n_of_bytes); */
-  /* puts("_______________________________________"); */
-
-  /* /\* // indivdually what M2 hashes to  *\/ */
-  /* /\* puts("last check M2 will be hashed to something none trivial"); *\/ */
-  /* /\* sha256_init(&ctx2); *\/ */
-  /* /\* sha256_transform(&ctx2, M2, n_of_bits); *\/ */
-  /* /\* print_char((char*) ctx2.state, n_of_bytes); *\/ */
-  /* /\* printf("idx=%lu\n", idx); *\/ */
- 
-
-  // free all the used memory 
-  // free(M); // no need for this :)
-  // free(random_message); // no need for that anymore
+  // Free memeory
   free(d->slots);
   free(d);
-  
-
-  /* free(ctx); */
-  /* free(ctx2); */
 
 }
 
@@ -337,7 +315,7 @@ int main(int argc, char* argv []){
   #ifdef _OPENMP
   char directory_name[] = "statistics_parallel/";
   #else
-  char directory_name[] = "statistics_parallel/";
+  char directory_name[] = "statistics/";
   #endif
 
     
