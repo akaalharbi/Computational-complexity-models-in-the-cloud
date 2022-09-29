@@ -2,7 +2,7 @@
 /// extracted while making the long message attack
 
 #include "util_char_arrays.h"
-#include <sys/random.h>
+
 
 int cmp_arrays(char* array1, char* array2, size_t len){
 
