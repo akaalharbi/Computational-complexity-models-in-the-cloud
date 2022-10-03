@@ -46,7 +46,7 @@ typedef struct {
  
 
 typedef struct {
-  UINT nslots; // number of elements  in the dictionary
+  size_t nslots; // number of elements  in the dictionary
   slot* slots; // == slot slots[nslots] but on the heap
 } dict;
 

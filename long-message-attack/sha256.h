@@ -47,7 +47,7 @@ typedef union {
 void sha256_init(SHA256_CTX *ctx);
 /* void sha256_update(SHA256_CTX *ctx, const BYTE data[], BYTE** intermediate, size_t len, int output_size_bits); */
 /* void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits); */
-void sha256_transform(SHA256_CTX *ctx, const BYTE data[], int output_size_bits);
+void sha256_transform(SHA256_CTX *ctx, const BYTE data[]);
 void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len,
 		   int output_size_bits);//, dict* d, void (*add_to_dict)(dict*, dict_key*, size_t, size_t));
 void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits);

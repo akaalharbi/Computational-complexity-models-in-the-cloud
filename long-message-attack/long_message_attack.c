@@ -45,9 +45,6 @@
 int is_there_duplicate = 0;
 int idx_cycle = -1;
 
-void nothing(dict *dictionary, dict_key* key, size_t value, size_t key_size){
-  // literally do nothing;
-}
 
 
 void long_message_attack(size_t n_of_bits, double l, FILE* fp){
@@ -123,7 +120,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
   // hash a long message (for now it's a series of zeros)
   for (size_t i=0; i<n_of_blocks; ++i){
-    sha256_transform(&ctx, M, n_of_bits);
+    sha256_transform(&ctx, M);
     // get the digest from the state
     truncate_state_get_digest(digest, &ctx, n_of_bits);
     // add it to the dicitonary
@@ -205,7 +202,6 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
  
   // parallel search which are independent of each other
-  // omp_set_num_threads( omp_get_max_threads() );
   #ifdef _OPENMP
   printf("Phase II: we will use %d threads, n=%lu, l=%d\n",
 	 omp_get_max_threads(), n_of_bits, (int) l);
@@ -233,7 +229,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
       // hash
       sha256_init(&ctx_priv);
-      sha256_transform(&ctx_priv, random_message_priv, n_of_bits);
+      sha256_transform(&ctx_priv, random_message_priv);
       // extract the results
       truncate_state_get_digest(digest_priv, &ctx_priv, n_of_bits);
 

@@ -7,7 +7,9 @@
 
 /// Add macro that control the output length of the digest
 
-#define UINT uint32_t
+// this caused the infinite loop when l >= 32, I have no idea what state of mind I had while writing it!
+// #define UINT uint32_t 
+#define UINT uint64_t // this 
 // #define UINT uint32_t
 
 typedef union {

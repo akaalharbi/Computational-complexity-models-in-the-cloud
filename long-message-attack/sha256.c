@@ -95,7 +95,8 @@ void truncate(SHA256_CTX* ctx, int output_size_bits){
 
 
 
-void sha256_transform(SHA256_CTX *ctx, const BYTE data[], int output_size_bits)
+//void sha256_transform(SHA256_CTX *ctx, const BYTE data[], int output_size_bits)
+void sha256_transform(SHA256_CTX *ctx, const BYTE data[])
 {
 	WORD a, b, c, d, e, f, g, h, i, j, t1, t2, m[64];
 
@@ -177,7 +178,7 @@ void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len, int output_si
 		ctx->datalen++;
 
 		if (ctx->datalen == 64) {
-		  sha256_transform(ctx, ctx->data, output_size_bits);
+		  sha256_transform(ctx, ctx->data);
 		  ctx->bitlen += 512;
 		  ctx->datalen = 0;
 		  // @ahmed check
@@ -238,7 +239,7 @@ void sha256_final(SHA256_CTX *ctx, BYTE hash[], int output_size_bits)
 	/* ctx->data[58] = ctx->bitlen >> 40; */
 	/* ctx->data[57] = ctx->bitlen >> 48; */
 	/* ctx->data[56] = ctx->bitlen >> 56; */
-	sha256_transform(ctx, ctx->data, output_size_bits);
+	sha256_transform(ctx, ctx->data);
 
 	// for now let's forget the big-endian conversion @ahmed
 	/* // Since this implementation uses little endian byte ordering and SHA uses big endian, */

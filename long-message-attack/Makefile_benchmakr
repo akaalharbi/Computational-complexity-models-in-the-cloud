@@ -1,0 +1,25 @@
+LDLIBS  = -lm
+CFLAGS  = -O3 -Ofast -Wall
+LDFLAGS = -fopenmp
+objects = benchmark.o sha256.o dict.o util/memory.o
+
+
+
+all: benchmark
+
+benchmark: $(objects)
+
+
+
+benchmark.o: sha256.h types.h util/util_char_arrays.h shared.h
+sha256.o: sha256.h
+benchmark.o:
+dict.o: dict.h types.h shared.h
+util/memory.o: util/memory.h
+
+
+
+.PHONY: clean
+clean:
+	rm -f $(objects)
+	rm -f long_message_attack

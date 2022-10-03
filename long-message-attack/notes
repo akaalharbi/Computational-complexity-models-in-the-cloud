@@ -18,6 +18,6 @@ n l  (estimated time) (estimated memory) (time phase i ) (memory usage phase i (
 
 
 benchmarks:
-Number of sha256 transforms ~2^21 calls / sec
+Number of sha256 transforms 5699239 ≈ 2^22.44 calls / sec
 Memory writes ~100MB/sec
-Tall1 Memory writes ~75MB/sex
+Tall1 Memory writes ~75MB/sec
