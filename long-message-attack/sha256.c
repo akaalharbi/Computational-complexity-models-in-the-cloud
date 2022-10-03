@@ -170,7 +170,7 @@ void sha256_update(SHA256_CTX *ctx, const BYTE data[], size_t len, int output_si
         // printf("update len = %lu bytes\n", len);
         WORD i;	
 	//  ctx->state;
-	int output_size_bytes = (int) ceil((double) output_size_bits/8);
+	// int output_size_bytes = (int) ceil((double) output_size_bits/8);
 	// printf("output size in bytes=%d\n", output_size_bytes);
 	for (i = 0; i < len; ++i) {
 		ctx->data[ctx->datalen] = data[i];

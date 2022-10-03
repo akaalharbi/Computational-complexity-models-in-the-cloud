@@ -65,7 +65,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   is_there_duplicate = 0; // global variable to detect cycles
   size_t n_of_blocks = (size_t) ceil(pow(2.0, l));
   //  size_t nelements = (size_t) ceil(pow(2.0, n_of_bits));
-  int n_of_bytes = (int) ceil( (float)n_of_bits/8);
+  // int n_of_bytes = (int) ceil( (float)n_of_bits/8);
   
   // size of  long_message (lazy evaluation) + dict 
   double memory_estimate = 64 + sizeof(dict);
@@ -332,8 +332,8 @@ int main(int argc, char* argv []){
     // supply n_max n_min l_max l_min
     int n_max = 100;
     int n_min = 71;
-    int l_max = 32;
-    int l_min = 32;
+    int l_max = 31;
+    int l_min = 31;
     // l = atof(argv[2]);
 
     printf("n_max=%d,  n_min=%d, l_max=%d, l_min=%d\n",

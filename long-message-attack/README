@@ -24,6 +24,8 @@ This will read the file n_l, truncate the output to n bits, and search for an in
 
 
 # compile:
+run `make` and the executable `long_message_attack` is the a parallel version of the attack, apologies for the confusion with what written below.
+
 ## Flags
 `-fopenmp` for parallel executable (only Phase II can be parallel)
 `-DVERBOSE_LEVEL` print intermediate information (it will flood the program use with care)

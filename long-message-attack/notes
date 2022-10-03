@@ -2,6 +2,8 @@
 issue with cluster.lip6.fr
 ./long_message_attack: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by ./long_message_attack)
 
+- allocating large memories 24GB becomes extremely slow. My explanation is that we have multiple memory slots and cpu access is not uniform 
+
 - how pin glibc version?
 Simple solution compile it on ubuntu 20.04 using multipass
 
@@ -18,4 +20,4 @@ n l  (estimated time) (estimated memory) (time phase i ) (memory usage phase i (
 benchmarks:
 Number of sha256 transforms ~2^21 calls / sec
 Memory writes ~100MB/sec
-
+Tall1 Memory writes ~75MB/sex

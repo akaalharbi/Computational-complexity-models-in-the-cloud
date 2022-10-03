@@ -17,3 +17,14 @@ List of codes:
 
 - benchmarking: Brend Gregg's blog (works at intel)
 -- source: https://www.brendangregg.com/blog/
+
+
+- MPI: I hope the following references are useful:
+1. (have fun with mpi in c language by Carmine Spagnuolo, Ph.D)
+   - https://spagnuolocarmine.github.io/havefunwithmpi.html
+2. Lecture notes and slides for the course "Parallel Programming" at Sorbonne University
+   - https://gitlab.lip6.fr/bouillaguet/HPC
+
+
+- Makefile: Official documentation `info make`
+  - Start from ch4.3 "4.3 Types of Prerequisites"
