@@ -66,16 +66,16 @@ float bench_mark_sha256(){
 }
 
 
-void filling_rate_time(size_t n_of_blocks, float alpha){
+void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
   // size_t n_of_blocks = 1<<25;
   // the dictionary has size 2^26
   dict* d = dict_new(n_of_blocks);
 
   size_t N = (size_t) (n_of_blocks<<1) * alpha;
-  printf("N=%lu=2^%f\n", N, log2(N));
-  printf("dict has %lu slots = 2^%f slots", d->nslots, log2(d->nslots));
-
-    struct timeval begin, end;
+  /* printf("N=%lu=2^%f\n", N, log2(N)); */
+  /* printf("dict has %lu slots = 2^%f slots", d->nslots, log2(d->nslots)); */
+  fprintf(fp, "%.2f, ", alpha);
+  struct timeval begin, end;
   long seconds = 0;
   long microseconds = 0;
   double elapsed = 0;
@@ -103,6 +103,7 @@ void filling_rate_time(size_t n_of_blocks, float alpha){
   
   printf("dictionary filling %lu elements took %fsec \n", N,  elapsed);
   printf("i.e. %f elm/sec≈2^%felm/sec\n", (float) N / elapsed, log2((float) N / elapsed));
+  fprintf(fp, "%fsec, ", (float) N / elapsed);
   puts("--------------------");
   // dummy variable so the compiler won't optimized the loop below
   size_t values = 0; 
@@ -118,14 +119,23 @@ void filling_rate_time(size_t n_of_blocks, float alpha){
   elapsed = seconds + microseconds*1e-6;
   printf("dictionary lookup %lu elements took %fsec \n", N,  elapsed);
   printf("i.e. %f elm/sec≈2^%felm/sec\n", (float) N / elapsed, log2((float) N / elapsed));
-
+  fprintf(fp, "%fsec\n", (float) N / elapsed);
   // 
 }
 
  
 int main(int argc, char* argv[]){
-  bench_mark_sha256();
-  filling_rate_time(1<<25, 0.95);
+  /// Planning
+  /// open file named dict_benchmark in log
+  FILE* fp = fopen("log/benchmark_dict", "w");
+  fprintf(fp, "nelments, alpha, insert, lookup\n");
+  fclose(fp);
+  
+  for (float i=0.5; i<0.99; i += 0.01){
+    FILE* fp = fopen("log/benchmark_dict", "a");
+    filling_rate_time(1 << 25, i, fp);
+    fclose(fp);
+  }
 }
 
 
