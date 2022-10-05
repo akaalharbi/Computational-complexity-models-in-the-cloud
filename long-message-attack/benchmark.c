@@ -103,7 +103,7 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
   
   printf("dictionary filling %lu elements took %fsec \n", N,  elapsed);
   printf("i.e. %f elm/sec≈2^%felm/sec\n", (float) N / elapsed, log2((float) N / elapsed));
-  fprintf(fp, "%fsec, ", (float) N / elapsed);
+  fprintf(fp, "%felm/sec, ", (float) N / elapsed);
   puts("--------------------");
   // dummy variable so the compiler won't optimized the loop below
   size_t values = 0; 
@@ -119,21 +119,25 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
   elapsed = seconds + microseconds*1e-6;
   printf("dictionary lookup %lu elements took %fsec \n", N,  elapsed);
   printf("i.e. %f elm/sec≈2^%felm/sec\n", (float) N / elapsed, log2((float) N / elapsed));
-  fprintf(fp, "%fsec\n", (float) N / elapsed);
-  // 
+  fprintf(fp, "%felm/sec\n", (float) N / elapsed);
+
+  free(d->slots);
+  free(d);
 }
 
  
 int main(int argc, char* argv[]){
   /// Planning
   /// open file named dict_benchmark in log
+  size_t nelements = 1<<28;
   FILE* fp = fopen("log/benchmark_dict", "w");
-  fprintf(fp, "nelments, alpha, insert, lookup\n");
+  fprintf(fp, "alpha, insert, lookup\n"
+	  "N=%lu\n", nelements);
   fclose(fp);
   
   for (float i=0.5; i<0.99; i += 0.01){
     FILE* fp = fopen("log/benchmark_dict", "a");
-    filling_rate_time(1 << 25, i, fp);
+    filling_rate_time(nelements, i, fp);
     fclose(fp);
   }
 }
