@@ -1,0 +1,702 @@
+check if it collides at the index 22
+collides at 7 it should collide on 22
+collides?  1
+collides at 7
+---------
+check if it collides at the index 21
+collides at 21 it should collide on 21
+collides?  1
+collides at 21
+---------
+check if it collides at the index 55
+collides at 21 it should collide on 55
+collides?  1
+collides at 21
+---------
+check if it collides at the index 15
+collides at 21 it should collide on 15
+collides?  1
+collides at 21
+---------
+check if it collides at the index 33
+collides at 21 it should collide on 33
+collides?  1
+collides at 21
+---------
+check if it collides at the index 17
+collides at 21 it should collide on 17
+collides?  1
+collides at 21
+---------
+check if it collides at the index 44
+collides at 21 it should collide on 44
+collides?  1
+collides at 21
+---------
+check if it collides at the index 32
+collides at 21 it should collide on 32
+collides?  1
+collides at 21
+---------
+check if it collides at the index 46
+collides at 21 it should collide on 46
+collides?  1
+collides at 21
+---------
+check if it collides at the index 101
+collides at 21 it should collide on 101
+collides?  1
+collides at 21
+---------
+check if it collides at the index 151
+collides at 21 it should collide on 151
+collides?  1
+collides at 21
+---------
+check if it collides at the index 55
+collides at 21 it should collide on 55
+collides?  1
+collides at 21
+---------
+check if it collides at the index 282
+collides at 290 it should collide on 282
+collides?  1
+collides at 290
+---------
+check if it collides at the index 55
+collides at 290 it should collide on 55
+collides?  1
+collides at 290
+---------
+check if it collides at the index 55
+collides at 290 it should collide on 55
+collides?  1
+collides at 290
+---------
+check if it collides at the index 55
+collides at 290 it should collide on 55
+collides?  1
+collides at 290
+---------
+check if it collides at the index 637
+collides at 290 it should collide on 637
+collides?  1
+collides at 290
+---------
+check if it collides at the index 264
+collides at 290 it should collide on 264
+collides?  1
+collides at 290
+---------
+check if it collides at the index 35
+collides?  0
+collides at 290
+---------
+check if it collides at the index 54
+collides at 290 it should collide on 54
+collides?  1
+collides at 290
+---------
+check if it collides at the index 549
+collides?  0
+collides at 11327
+---------
+check if it collides at the index 751
+collides?  0
+collides at 11327
+---------
+check if it collides at the index 74
+collides?  0
+collides at 11327
+---------
+check if it collides at the index 54
+collides?  0
+collides at 11327
+---------
+check if it collides at the index 321
+collides?  0
+collides at 11327
+---------
+check if it collides at the index 2389
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 188
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 410
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 1247
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 321
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 2183
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 773
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 178
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 285
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 428
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 16
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 25434
+collides at 19886 it should collide on 25434
+collides?  1
+collides at 19886
+---------
+check if it collides at the index 382
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 102
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 364
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 406
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 326
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 26153
+collides at 19886 it should collide on 26153
+collides?  1
+collides at 19886
+---------
+check if it collides at the index 7811
+collides at 19886 it should collide on 7811
+collides?  1
+collides at 19886
+---------
+check if it collides at the index 873
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 5653
+collides at 19886 it should collide on 5653
+collides?  1
+collides at 19886
+---------
+check if it collides at the index 253
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 236
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 193
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 104830
+collides at 19886 it should collide on 104830
+collides?  1
+collides at 19886
+---------
+check if it collides at the index 3690
+collides at 19886 it should collide on 3690
+collides?  1
+collides at 19886
+---------
+check if it collides at the index 16925
+collides at 19886 it should collide on 16925
+collides?  1
+collides at 19886
+---------
+check if it collides at the index 6773
+collides at 19886 it should collide on 6773
+collides?  1
+collides at 19886
+---------
+check if it collides at the index 2157
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 1085
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 1945
+collides?  0
+collides at 19886
+---------
+check if it collides at the index 172861
+collides at 394111 it should collide on 172861
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 26417
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 54176
+collides at 394111 it should collide on 54176
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 5053
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 176
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 67
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 1722
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 48
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 58514
+collides at 394111 it should collide on 58514
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 98338
+collides at 394111 it should collide on 98338
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 36333
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 30419
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 5466
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 4010
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 5635
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 174
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 124426
+collides at 394111 it should collide on 124426
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 34551
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 29696
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 42404
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 3532
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 1529
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 2655
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 1706
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 1838
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 401068
+collides at 394111 it should collide on 401068
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 899583
+collides at 394111 it should collide on 899583
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 88064
+collides at 394111 it should collide on 88064
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 43457
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 15709
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 13446
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 1189
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 2609
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 520
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 418829
+collides at 394111 it should collide on 418829
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 1368494
+collides at 394111 it should collide on 1368494
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 87222
+collides at 394111 it should collide on 87222
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 77394
+collides at 394111 it should collide on 77394
+collides?  1
+collides at 394111
+---------
+check if it collides at the index 10584
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 9245
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 20053
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 13853
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 7010
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 6687
+collides?  0
+collides at 394111
+---------
+check if it collides at the index 2833494
+collides at 4999575 it should collide on 2833494
+collides?  1
+collides at 4999575
+---------
+check if it collides at the index 627456
+collides at 4999575 it should collide on 627456
+collides?  1
+collides at 4999575
+---------
+check if it collides at the index 628954
+collides at 4999575 it should collide on 628954
+collides?  1
+collides at 4999575
+---------
+check if it collides at the index 203437
+collides?  0
+collides at 4999575
+---------
+check if it collides at the index 123269
+collides?  0
+collides at 4999575
+---------
+check if it collides at the index 34086
+collides?  0
+collides at 4999575
+---------
+check if it collides at the index 34634
+collides?  0
+collides at 4999575
+---------
+check if it collides at the index 40416
+collides?  0
+collides at 4999575
+---------
+check if it collides at the index 9699
+collides?  0
+collides at 4999575
+---------
+check if it collides at the index 2178
+collides?  0
+collides at 4999575
+---------
+check if it collides at the index 8944630
+collides at 28889844 it should collide on 8944630
+collides?  1
+collides at 28889844
+---------
+check if it collides at the index 1138440
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 486804
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 36325
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 85671
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 36670
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 58557
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 5046
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 7770
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 1198
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 1687
+collides?  0
+collides at 28889844
+---------
+check if it collides at the index 4397217
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 1325250
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 741310
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 968440
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 92384
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 645315
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 42685
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 9962
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 56855
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 6338
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 5022
+collides?  0
+collides at 54950432
+---------
+check if it collides at the index 8257845
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 6300912
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 16133412
+collides at 110137272 it should collide on 16133412
+collides?  1
+collides at 110137272
+---------
+check if it collides at the index 3973798
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 1832894
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 514832
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 252311
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 339315
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 59699
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 77569
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 7551
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 10920
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 38538460
+collides at 110137272 it should collide on 38538460
+collides?  1
+collides at 110137272
+---------
+check if it collides at the index 2275501
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 24773443
+collides at 110137272 it should collide on 24773443
+collides?  1
+collides at 110137272
+---------
+check if it collides at the index 550568
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 2914306
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 1639840
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 838820
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 553122
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 464469
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 26724
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 12436
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 32391
+collides?  0
+collides at 110137272
+---------
+check if it collides at the index 5464167
+collides?  0
+collides at 824194277
+---------
+check if it collides at the index 14754987
+collides?  0
+collides at 824194277
+---------
+check if it collides at the index 12287517
+collides?  0
+collides at 824194277
+---------
+check if it collides at the index 5072956
+collides?  0
+collides at 824194277
+---------
+check if it collides at the index 6163399
+collides?  0
+collides at 824194277
+---------
+check if it collides at the index 331215
+collides?  0
+collides at 824194277
+---------
+check if it collides at the index 52035
+collides?  0
+collides at 824194277
+---------
+check if it collides at the index 949095
+collides?  0
+collides at 824194277
+---------

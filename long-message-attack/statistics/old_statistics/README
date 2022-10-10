@@ -1,1 +1,0 @@
-These statistics corresponds to the case where we had oversized dictionary, it had extra entry for is_occupied, and huge message to be initialised and stored in space.

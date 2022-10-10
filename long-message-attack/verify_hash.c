@@ -75,11 +75,15 @@ size_t collides_at(const unsigned char rM[64], int output_size_bits, uint64_t id
   uint64_t digest_rM[2] = {0};
   truncate_state32bit_get_digest(digest_rM, state_rM, output_size_bits);
 
-  for (size_t i=0; i<idx; ++i){
+  for (size_t i=0; i<=8*idx; ++i){
     sha256_process_x86_single(state0, M0);
     truncate_state32bit_get_digest(digest_M0, state0, output_size_bits);
-    if (digest_M0[0] == digest_rM[0] && digest_M0[1] == digest_rM[1])
+    if (digest_M0[0] == digest_rM[0] && digest_M0[1] == digest_rM[1]){
+      printf("collides at %lu it should collide on %lu\n", i, idx);
       return 1;
+    }
+
+
   }
 
   return 0;
@@ -110,11 +114,18 @@ int main(int argc, char* argv[]){
   size_t at_index = atoi(argv[3]);
   unsigned char rM[64];
   fread(rM, 64, 1, fp);
-  
-  
+  fclose(fp);
+
+  FILE* fw = fopen("log/collision_checks", "a"); 
+
   printf("check if it collides at the index %lu\n", at_index);  
   int collides = collides_at(rM, output_size_bits, at_index);
+  fprintf(fp, "%d\n", collides);
+  fclose(fw);
   printf("collides?  %d\n", collides);
+  size_t idx = where_collides(rM, output_size_bits);
+  printf("collides at %lu\n", idx);
+  puts("---------");
   }
 
 

@@ -3,7 +3,7 @@
 /// dictionary adding and probing an element giving a load value in (0, 1)
 
 
-#include "sha256.h"
+
 #include "sha256-x86.h"
 #include <stddef.h>
 #include <stdio.h>
@@ -18,54 +18,6 @@
 int is_there_duplicate = 0;
 int idx_cycle = -1;
 
-
-
-float benchmark_sha256(){
-
-  size_t n_of_blocks = 1<<25;
-  
-  struct timeval begin, end;
-  long seconds = 0;
-  long microseconds = 0;
-  double elapsed = 0;
-
-  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
-  // store the hash value in this variable
-  // uint64_t digest[2] = {0, 0};
-  // INIT SHA256 
-  SHA256_CTX ctx;
-  sha256_init(&ctx);
-
-
-  // hash a long message (for now it's a series of zeros)
-  gettimeofday(&begin, 0);
-  for (size_t i=0; i<n_of_blocks; ++i){
-    sha256_transform(&ctx, M);
-    // truncate_state_get_digest(digest, &ctx, n_of_bits);
-
-    
-    /// ------------ DISTINGUISHED POINTS ------------------------- ///
-    /// If distinguished points feature was enabled  during compile ///
-    /// time. 
-    #ifdef DISTINGUISHED_POINTS
-    // we skip hashes
-    if ( (digest[0]&DIST_MASK) != 0) 
-      continue; // skip this element
-    #endif
-
-  }
-
-
-
-  gettimeofday(&end, 0);
-  seconds = end.tv_sec - begin.tv_sec;
-  microseconds = end.tv_usec - begin.tv_usec;
-  elapsed = seconds + microseconds*1e-6;
-
-  float hash_per_sec = (float) n_of_blocks / elapsed;
-  printf("normal sha256:\nelapsed=%fsec, %f hash/sec≈2^%f \n", elapsed, hash_per_sec, log2(hash_per_sec));
-  return hash_per_sec;
-}
 
 
 float benchmark_sha256_x86(){
