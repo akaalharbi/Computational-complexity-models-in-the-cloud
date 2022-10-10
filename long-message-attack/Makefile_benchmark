@@ -1,7 +1,7 @@
 LDLIBS  = -lm
-CFLAGS  = -O3 -Ofast -Wall
-LDFLAGS = -fopenmp
-objects = benchmark.o sha256.o dict.o util/memory.o
+CFLAGS  = -O3 -Ofast -Wall -march=native -msse4 -msha
+LDFLAGS = -fopenmp -msse4 -msha
+objects = benchmark.o sha256.o sha256-x86.o dict.o util/memory.o
 
 
 
@@ -11,9 +11,9 @@ benchmark: $(objects)
 
 
 
-benchmark.o: sha256.h types.h util/util_char_arrays.h shared.h
+benchmark.o: sha256.h types.h util/util_char_arrays.h shared.h sha256-x86.h
 sha256.o: sha256.h
-benchmark.o:
+sha256-x86.o: sha256-x86.h
 dict.o: dict.h types.h shared.h
 util/memory.o: util/memory.h
 
@@ -22,4 +22,3 @@ util/memory.o: util/memory.h
 .PHONY: clean
 clean:
 	rm -f $(objects)
-	rm -f long_message_attack
