@@ -60,7 +60,7 @@ dict* dict_new(size_t nelements){
 
 
 //void dict_add_element_to(dict* d, dict_key* key, size_t value, size_t key_size){
-void dict_add_element_to(dict* d, uint64_t* key, size_t value){
+void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
   // add (key, value) to the dictionary, 0 <= value. Since we use value:=0 to indicate
   // that the associated slot in the dictionary is empty. In dictionary we store
   // value + 1
@@ -78,15 +78,19 @@ void dict_add_element_to(dict* d, uint64_t* key, size_t value){
     // linear probing
     // current = element with index (h+i mod nslots)
     // puts("collision at adding element has been detected, linear probing");
-    
-    // check if key already exists
-    if (key[0] == d->slots[h].key._uint64[0]
-	&& key[1] == d->slots[h].key._uint64[1]){
-      // printf("a duplicated key has been detected at %lu\n", value);
-      is_there_duplicate = 1;
-      idx_cycle = value;
-      return;
-    }
+
+
+    /// no need to check that there is a cycle for now
+    /* // check if key already exists */
+    /* if (key[0] == d->slots[h].key._uint64[0] */
+    /* 	&& key[1] == d->slots[h].key._uint64[1]){ */
+    /*   // printf("a duplicated key has been detected at %lu\n", value); */
+    /*   is_there_duplicate = 1; */
+    /*   idx_cycle = value; */
+    /*   return; */
+    /* } */
+
+
     //  ++i;
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
     h = (h+1) & (d->nslots - 1);
@@ -104,7 +108,7 @@ void dict_add_element_to(dict* d, uint64_t* key, size_t value){
 
 
 
-size_t dict_get_value(dict* d, uint64_t* key){
+size_t dict_get_value(dict* d, uint64_t key[2]){
   // we first need to find where to start probing
 
   size_t h =  key[0];
@@ -117,9 +121,12 @@ size_t dict_get_value(dict* d, uint64_t* key){
     // puts("collision at adding element has been detected, linear probing");
     
     // check if key already exists
+
     if (key[0] == d->slots[h].key._uint64[0]
-	&& key[1] == d->slots[h].key._uint64[1])
+	&& key[1] == d->slots[h].key._uint64[1]) {
       return d->slots[h].value - 1;
+    }
+      
     
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
     h = (h+1) & (d->nslots - 1); // mod 2^nslots
@@ -152,7 +159,7 @@ void dict_print(dict* d){
 }
  
 
-int dict_has_key(dict* d, uint64_t* key){
+int dict_has_key(dict* d, uint64_t key[2]){
   /// 1 if the dictionary has `key`
   /// 0 otherwise
 

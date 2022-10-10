@@ -2,6 +2,7 @@
 /// extracted while making the long message attack
 
 #include "util_char_arrays.h"
+#include <stdint.h>
 
 
 int cmp_arrays(char* array1, char* array2, size_t len){
@@ -119,4 +120,50 @@ void truncate_array(unsigned char* A, size_t size_A, size_t total_out_bits){
   A[i - 1] = A[i-1] & rem; // last byte
   printf("after A[%d]=%x\n", i-1, A[i-1]);
 
+}
+
+
+// @ahmed
+void truncate_state32bit_get_digest(uint64_t* dst, uint32_t state[8], int n_of_bits){
+  /// We extract the digest from ctx and save it in dst
+  // uint64_t dst[2] is fixed now // 128 bits, this is a limitation
+  // it should be 256 for sha256 :)
+  // n_of_bits is how many bits is the compression function output
+  
+
+  dst[0] = state[0] + (((uint64_t) state[1])<<32);
+  if (n_of_bits < 64){
+    uint64_t ones =   (((uint64_t) 1) << (n_of_bits)) - 1;
+    dst[0] = dst[0] & ones;
+    dst[1] = 0;
+
+    #ifdef VERBOSE_LEVEL
+    printf("ones=%lu\n", ones);
+    printf("state[0]=%x, state[1]=%x\n", state[0], state[1]);
+    puts("");
+    #endif // VERBOSE_LEVEL
+
+    
+  } else if (n_of_bits < 128) {
+    // since the number of bits is higher or equal 64
+    // we need to work on the second element of the dst
+    n_of_bits = n_of_bits - 64;
+
+    #ifdef VERBOSE_LEVEL
+    uint64_t ones =  ( ((uint64_t) 1<<(n_of_bits)) - 1);
+    printf("ones=%lu, n_of_bits=%d\n", ones, n_of_bits);
+    printf("state[0]=%x, state[1]=%x\n", state[0], state[1]);
+    printf("state[2]=%x, state[2]=%x\n", state[2], state[3]);
+    puts("");
+    #endif // VERBOSE_LEVEL
+
+    // copy 64bits from state
+    dst[1] = state[2] + (((uint64_t) state[3])<<32);
+    // truncate it if necessary
+    dst[1] = dst[1] & ( ((uint64_t) 1<<(n_of_bits)) - 1);
+  } else { // 128 bits limit
+    dst[1] = state[2] + (((uint64_t) state[3])<<32);
+  }
+    
+  
 }

@@ -1,7 +1,7 @@
 LDLIBS  = -lm
-CFLAGS  = -O3 -Wall -g -fopenmp
-LDFLAGS = -fopenmp
-objects = long_message_attack.o sha256.o dict.o util/memory.o util/util_char_arrays.o
+CFLAGS  = -O3 -g -fopenmp -Wall -march=native -msse4 -msha
+LDFLAGS = -fopenmp -march=native -msse4 -msha
+objects = long_message_attack.o sha256-x86.o dict.o util/memory.o util/util_char_arrays.o
 
 
 
@@ -10,8 +10,8 @@ all: long_message_attack
 long_message_attack: $(objects)
 
 # objects and their dependencies
-long_message_attack.o: sha256.h types.h util/util_char_arrays.h shared.h
-sha256.o: sha256.h
+long_message_attack.o: sha256-x86.h types.h util/util_char_arrays.h shared.h
+sha256-x86.o: sha256-x86.h
 dict.o: dict.h types.h shared.h
 util/memory.o: util/memory.h
 util_char_arrays.o: util/util_char_arrays.h

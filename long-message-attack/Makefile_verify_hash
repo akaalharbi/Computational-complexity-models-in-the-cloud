@@ -1,0 +1,23 @@
+LDLIBS  = -lm
+CFLAGS  = -g -O3 -Wall -march=native -msse4 -msha
+LDFLAGS = -msse4 -msha
+objects = sha256-x86.o dict.o util/memory.o util/util_char_arrays.o
+
+
+
+all: verify_hash
+
+verify_hash: $(objects)
+
+
+
+benchmark.o: sha256.h types.h util/util_char_arrays.h shared.h sha256-x86.h
+sha256-x86.o: sha256-x86.h
+dict.o: dict.h types.h shared.h
+util/memory.o: util/memory.h
+util/char_arrays.o: util_char_array.h
+
+
+.PHONY: clean
+clean:
+	rm -f $(objects)

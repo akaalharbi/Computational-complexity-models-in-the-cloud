@@ -5,10 +5,12 @@
 /// later how to automate this.
 
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "sha256.h"
+#include "sha256-x86.h"
 #include "shared.h"
+#include "util/util_char_arrays.h"
 int is_there_duplicate = 0;
 
 size_t where_collides(const unsigned char rM[64], int output_size_bits){
@@ -17,24 +19,29 @@ size_t where_collides(const unsigned char rM[64], int output_size_bits){
   /// collision, then return the shortest length of M that collides with rM.
 
   size_t idx = 0;
-  int does_it_collide = 0;
+
 
   // for zero messages
   unsigned char M0[64] = {0};
   uint64_t digest_M0[2] = {0}; // store digest here
-  SHA256_CTX ctx;
-  sha256_init(&ctx);
 
-  
-  SHA256_CTX ctx2;
-  sha256_init(&ctx2);
-  sha256_transform(&ctx2, rM, output_size_bits);
+  uint32_t state0[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
+
+  uint32_t state_rM[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
   uint64_t digest_rM[2] = {0};
-  truncate_state_get_digest(digest_rM, &ctx2, output_size_bits);
+  truncate_state32bit_get_digest(digest_rM, state_rM, output_size_bits);
 
   while (1){
-    sha256_transform(&ctx, M0, output_size_bits);
-    truncate_state_get_digest(digest_M0, &ctx, output_size_bits);
+    sha256_process_x86_single(state0, M0);
+    truncate_state32bit_get_digest(digest_M0, state0, output_size_bits);
     if (digest_M0[0] == digest_rM[0] && digest_M0[1] == digest_rM[1])
       break;
     ++idx;
@@ -44,27 +51,84 @@ size_t where_collides(const unsigned char rM[64], int output_size_bits){
 }
 
 
+size_t collides_at(const unsigned char rM[64], int output_size_bits, uint64_t idx){
+  /// Method 1
+  /// Given any message rM, hash a long message of zeros M till we find a
+  /// collision, then return the shortest length of M that collides with rM.
+
+
+  // for zero messages
+  unsigned char M0[64] = {0};
+  uint64_t digest_M0[2] = {0}; // store digest here
+
+  uint32_t state0[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
+
+  uint32_t state_rM[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
+  uint64_t digest_rM[2] = {0};
+  truncate_state32bit_get_digest(digest_rM, state_rM, output_size_bits);
+
+  for (size_t i=0; i<idx; ++i){
+    sha256_process_x86_single(state0, M0);
+    truncate_state32bit_get_digest(digest_M0, state0, output_size_bits);
+    if (digest_M0[0] == digest_rM[0] && digest_M0[1] == digest_rM[1])
+      return 1;
+  }
+
+  return 0;
+}
+
 
 int main(int argc, char* argv[]){
   
 
-  if (argc  != 3){
-    puts("usage:\n"
-	 "./verify_hash message_path output_size_bits");
-    return 0;
-  }
-
+  if (argc == 3){
   char* file_name = argv[1];
   FILE* fp = fopen(file_name, "rb");
   int output_size_bits = atoi(argv[2]);
   unsigned char rM[64];
   fread(rM, 64, 1, fp);
-
+  
+  
   puts("searching for collision index");  
   size_t idx = where_collides(rM, output_size_bits);
 
   printf("collides at %lu\n", idx);
+  }
+
+  if (argc == 4) {
+  char* file_name = argv[1];
+  FILE* fp = fopen(file_name, "rb");
+  int output_size_bits = atoi(argv[2]);
+  size_t at_index = atoi(argv[3]);
+  unsigned char rM[64];
+  fread(rM, 64, 1, fp);
   
+  
+  printf("check if it collides at the index %lu\n", at_index);  
+  int collides = collides_at(rM, output_size_bits, at_index);
+  printf("collides?  %d\n", collides);
+  }
+
+
+  else {
+    puts("usage:\n1-\n"
+	 "./verify_hash message_path output_size_bits");
+
+    puts("2-:\n"
+	 "./verify_hash message_path output_size_bits collision_idx");
+    
+    return 0;
+  }
+
+
   return 0;
 }
 

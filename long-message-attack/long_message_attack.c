@@ -9,7 +9,7 @@
 
 
 
-#include "sha256.h"
+#include "sha256-x86.h"
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
 #include <endian.h>
@@ -111,8 +111,12 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   // store the hash value in this variable
   uint64_t digest[2] = {0, 0};
   // INIT SHA256 
-  SHA256_CTX ctx;
-  sha256_init(&ctx);
+
+  uint32_t state[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
   // we extract n_bits digest from ctx.state
   // digest is the output of the compression function after
   // truncation.
@@ -120,9 +124,9 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
   // hash a long message (for now it's a series of zeros)
   for (size_t i=0; i<n_of_blocks; ++i){
-    sha256_transform(&ctx, M);
+    sha256_process_x86_single(state, M);
     // get the digest from the state
-    truncate_state_get_digest(digest, &ctx, n_of_bits);
+    truncate_state32bit_get_digest(digest, state, n_of_bits);
     // add it to the dicitonary
     
     /// ------------ DISTINGUISHED POINTS ------------------------- ///
@@ -141,8 +145,8 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     #ifdef VERBOSE_LEVEL
     printf("value=%lu\n", i);
     printf("digest=0x%016lx%016lx\n", digest[1], digest[0]);
-    puts("ctx.stat=");
-    print_char((char*)ctx.state, 32);
+    puts("state=");
+    print_char((char*)state, 32);
     puts("\n");
     #endif // VERBOSE_LEVEL
     /// --------------- END IF VERBOSE ENABLED ---------------- ///
@@ -157,7 +161,6 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   puts("-----------------");
   #endif // VERBOSE_LEVEL
   /// --------------- END IF VERBOSE ENABLED ---------------- ///
-
 
 
   /// TIMING record PHASE I time elapsed ///
@@ -182,7 +185,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   // Second phase: hash a random message till a collision is found
   /// check if we have a duplicate first
   
-  int collision_found = 0; // shared by all threads
+  int collision_found = 0; // shared by all threads and dict.c file
   size_t ctr = 0; // how many random messages we've tried
   size_t idx = 0; // the index of the message to be removed
   BYTE random_message[64] = {0};
@@ -206,32 +209,30 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   printf("Phase II: we will use %d threads, n=%lu, l=%d\n",
 	 omp_get_max_threads(), n_of_bits, (int) l);
   // printf("Max nthreads=%d\n", omp_get_max_threads());
-  #endif // _OPENMP
 
-  #pragma omp parallel num_threads( omp_get_max_threads() )
+#endif // _OPENMP
+
+
+ 
+#pragma omp parallel shared(collision_found)
   {
     // each variable inside is private to each thread
     BYTE random_message_priv[64] = {0};
     uint64_t digest_priv[2] = {0, 0};
-    SHA256_CTX ctx_priv;
+    uint32_t state_priv[8] = {
+      0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    };
     size_t idx_priv = 0;
-    //  STATE intermediate; // union // @remove
-    // we will zero the excessive zeros, don't edit
-    sha256_init(&ctx_priv);
     size_t ctr_priv = 0;
 
-
-  
     while (!collision_found) {
       // create a random message of 64 bytes
       fill_radom_byte_array(random_message_priv, 64);
-
-
       // hash
-      sha256_init(&ctx_priv);
-      sha256_transform(&ctx_priv, random_message_priv);
+      sha256_process_x86_single(state_priv, random_message_priv);
       // extract the results
-      truncate_state_get_digest(digest_priv, &ctx_priv, n_of_bits);
+      truncate_state32bit_get_digest(digest_priv, state_priv, n_of_bits);
 
       /// ------------ DISTINGUISHED POINTS (if enabled) ------------- ///
       /// If distinguished points feature was enabled  during compile ///
@@ -246,6 +247,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       // test for collision and print the results if successful.
       // idx_priv := 0 if digest_priv doesn't exist in the dictionary
       idx_priv = dict_get_value(d, digest_priv);
+
       //if (dict_has_key(d, digest_priv) ){ // maybe extra condition && !collision_found is needed
       if (idx_priv ){ // 
 	#pragma omp critical
@@ -254,13 +256,6 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 	  idx = idx_priv; 
 	  memcpy(random_message, random_message_priv, 64);
 	}
-
-
-	/* puts("Found a collision with the following details:"); */
-	/* printf("#random message trials=%lu, index=%lu, M=",ctr, idx); */
-	/* dict_key* intermediate = (dict_key *) ctx2.state; */
-	/* print_char(intermediate->bytes, n_of_bytes); */
-	/* puts(""); */
 	break; // we don't care about the rest of the loop
       }
       ++ctr_priv;
@@ -364,7 +359,7 @@ int main(int argc, char* argv []){
   // variable file name
   char file_name[36];
   snprintf(file_name, sizeof(file_name), "%s%d_%d_stats.txt", directory_name, (int) n, (int) l);
-
+  printf("filename=%s\n", file_name);
 
   /// todo write the value of n and l explicitly in the file 
   //  FILE* fp = fopen("statistics/n_l_stats.txt", "w");

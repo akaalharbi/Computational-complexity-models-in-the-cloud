@@ -60,9 +60,9 @@ typedef struct {
 //-----------------------------------------------------//
 slot *slot_new();
 dict *dict_new(size_t nslots);
-void dict_add_element_to(dict* d, uint64_t* key,size_t value);
-int dict_has_key(dict* d, uint64_t* key);
-size_t dict_get_value(dict* d, uint64_t* key);
+void dict_add_element_to(dict* d, uint64_t key[2], size_t value);
+int dict_has_key(dict* d, uint64_t key[2]);
+size_t dict_get_value(dict* d, uint64_t key[2]);
 void dict_print(dict *d);
 
 #endif
