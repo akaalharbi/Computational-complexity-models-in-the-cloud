@@ -1,7 +1,7 @@
 import os
 
 
-file_path =  "statistics_parallel/20_10_10_4_stats.txt"
+file_path =  "statistics_parallel/30_3_15_4_stats.txt"
 with open(file_path, "r") as f:
 
      file_log = open("log/collision_checks", "w")

@@ -45,6 +45,7 @@ dict* dict_new(size_t nelements){
   d->nslots = nslots;
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
+
   // reserve space in memeory
   d->slots = malloc(sizeof(slot)*nslots);
   // Ensure the keys are next to each other
@@ -73,7 +74,7 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
   /// our dictionary can be indexed using 64 bits
   // find which bin to put it in
   uint64_t h = key[0]; // for now we assume indices don't need more than 64 bits 
-  h = h & (d->nslots - 1); // assumption nslots = 2^m; 
+  h = h % d->nslots; // assumption nslots = 2^m; 
   // locate where to place (key, value)
   while (d->slots[h].value){ // value==0 means empty slot
     // linear probing
@@ -94,8 +95,13 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
 
     //  ++i;
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
-    h = (h+1) & (d->nslots - 1);
+    ++h;
+    if (h >= d->nslots)
+      h = h - d->nslots;
+    
+    #ifdef NPROBES_COUNT
     ++(d->nprobes_insert);
+    #endif
   }
 
 
@@ -115,8 +121,8 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
   // we first need to find where to start probing
 
   size_t h =  key[0];
-  h = h & (d->nslots - 1); // assumption nslots = 2^m <= 2^64; 
-
+  // h = h & (d->nslots - 1); // assumption nslots = 2^m <= 2^64; 
+  h = h % d->nslots;
   // find (key, value) after 
   while (d->slots[h].value){// occupied slot
     // linear probing
@@ -132,8 +138,13 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
       
     
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
-    h = (h+1) & (d->nslots - 1); // mod 2^nslots
+    ++h; // mod 2^nslots
+    if (h >= d->nslots)
+      h = h - d->nslots;
+    
+    #ifdef NPROBES_COUNT
     ++(d->nprobes_lookup);
+    #endif
   }
 
   // update current->key = key 
@@ -171,8 +182,8 @@ int dict_has_key(dict* d, uint64_t key[2]){
  
   // we first need to find where to start probing
   size_t h =  key[0];
-  h = h & (d->nslots - 1); // assumption nslots = 2^m; 
-
+  // h = h & (d->nslots - 1); // assumption nslots = 2^m; 
+  h = h % d->nslots;
   // find (key, value) after 
   while (d->slots[h].value){ // value==0 means empty slot 
     // linear probing
@@ -187,7 +198,12 @@ int dict_has_key(dict* d, uint64_t key[2]){
       return d->slots[h].value - 1;
     
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
-    h = (h+1) & (d->nslots - 1); // mod 2^nslots
+    // h = (h+1) & (d->nslots - 1); // mod 2^nslots
+        // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    ++h;
+    if (h >= d->nslots)
+      h = h - d->nslots;
+
   }
 
   // update current->key = key 

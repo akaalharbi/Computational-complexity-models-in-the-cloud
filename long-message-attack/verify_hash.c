@@ -75,7 +75,7 @@ size_t collides_at(const unsigned char rM[64], int output_size_bits, uint64_t id
   uint64_t digest_rM[2] = {0, 0};
   sha256_process_x86_single(state_rM, rM);
   truncate_state32bit_get_digest(digest_rM, state_rM, output_size_bits);
-
+  
   for (size_t i=0; i<=idx; ++i){
     sha256_process_x86_single(state0, M0);
     truncate_state32bit_get_digest(digest_M0, state0, output_size_bits);
