@@ -1,0 +1,95 @@
+n_max=20,  n_min=10, l_max=10, l_min=4
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=10, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=10, l=5
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=11, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=11, l=5
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=12, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=12, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=12, l=6
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=13, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=13, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=13, l=6
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=14, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=14, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=14, l=6
+Memory estimates 6.22kb, 
+Phase II: we will use 20 threads, n=14, l=7
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=15, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=15, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=15, l=6
+Memory estimates 6.22kb, 
+Phase II: we will use 20 threads, n=15, l=7
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=16, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=16, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=16, l=6
+Memory estimates 6.22kb, 
+Phase II: we will use 20 threads, n=16, l=7
+Memory estimates 12.37kb, 
+Phase II: we will use 20 threads, n=16, l=8
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=17, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=17, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=17, l=6
+Memory estimates 6.22kb, 
+Phase II: we will use 20 threads, n=17, l=7
+Memory estimates 12.37kb, 
+Phase II: we will use 20 threads, n=17, l=8
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=18, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=18, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=18, l=6
+Memory estimates 6.22kb, 
+Phase II: we will use 20 threads, n=18, l=7
+Memory estimates 12.37kb, 
+Phase II: we will use 20 threads, n=18, l=8
+Memory estimates 24.66kb, 
+Phase II: we will use 20 threads, n=18, l=9
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=19, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=19, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=19, l=6
+Memory estimates 6.22kb, 
+Phase II: we will use 20 threads, n=19, l=7
+Memory estimates 12.37kb, 
+Phase II: we will use 20 threads, n=19, l=8
+Memory estimates 24.66kb, 
+Phase II: we will use 20 threads, n=19, l=9
+Memory estimates 0.85kb, 
+Phase II: we will use 20 threads, n=20, l=4
+Memory estimates 1.62kb, 
+Phase II: we will use 20 threads, n=20, l=5
+Memory estimates 3.15kb, 
+Phase II: we will use 20 threads, n=20, l=6
+Memory estimates 6.22kb, 
+Phase II: we will use 20 threads, n=20, l=7
+Memory estimates 12.37kb, 
+Phase II: we will use 20 threads, n=20, l=8
+Memory estimates 24.66kb, 
+Phase II: we will use 20 threads, n=20, l=9
+Memory estimates 49.23kb, 
+Phase II: we will use 20 threads, n=20, l=10

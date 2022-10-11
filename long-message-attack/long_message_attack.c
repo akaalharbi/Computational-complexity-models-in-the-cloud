@@ -1,4 +1,5 @@
 // Long message attack on sha256
+
 // this program can't attack more than 128bits
 // we make the following modifications:
 
@@ -127,7 +128,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     sha256_process_x86_single(state, M);
     // get the digest from the state
     truncate_state32bit_get_digest(digest, state, n_of_bits);
-    // add it to the dicitonary
+    
     
     /// ------------ DISTINGUISHED POINTS ------------------------- ///
     /// If distinguished points feature was enabled  during compile ///
@@ -137,7 +138,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     if ( (digest[0]&DIST_MASK) != 0) 
       continue; // skip this element
     #endif
-
+    // add it to the dicitonary
     dict_add_element_to(d, digest, i);
 
 
@@ -212,23 +213,29 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
 #endif // _OPENMP
 
+  /// init state for sha256
+  uint32_t state_init[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
 
- 
-#pragma omp parallel shared(collision_found)
+  #pragma omp parallel shared(collision_found)
   {
     // each variable inside is private to each thread
-    BYTE random_message_priv[64] = {0};
-    uint64_t digest_priv[2] = {0, 0};
-    uint32_t state_priv[8] = {
-      0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-    };
+    BYTE random_message_priv[64];
+    uint64_t digest_priv[2];
+    uint32_t state_priv[8];
     size_t idx_priv = 0;
     size_t ctr_priv = 0;
 
     while (!collision_found) {
       // create a random message of 64 bytes
       fill_radom_byte_array(random_message_priv, 64);
+      // clean previously used values
+      // digest_priv[0] = 0; // truncate will reset them 
+      // digest_priv[1] = 0;
+      memcpy(state_priv, state_init, sizeof(state_init));
+
       // hash
       sha256_process_x86_single(state_priv, random_message_priv);
       // extract the results
@@ -249,25 +256,31 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       idx_priv = dict_get_value(d, digest_priv);
 
       //if (dict_has_key(d, digest_priv) ){ // maybe extra condition && !collision_found is needed
-      if (idx_priv ){ // 
+      if (idx_priv ){ //
+	// if other threads found a collision, go home
+	
 	#pragma omp critical
 	{ // update a shared values
 	  collision_found = 1;
 	  idx = idx_priv; 
 	  memcpy(random_message, random_message_priv, 64);
+          #ifdef VERBOSE_LEVEL
+	  printf("digest_rand=0x%016lx%016lx\n", digest_priv[1], digest_priv[0]);
+	  printf("ctr_priv=%lu\n", ctr_priv);
+	  print_char((char*)random_message_priv, 64);
+          puts("---end---\n\n");
+          #endif
+	  
 	}
 	break; // we don't care about the rest of the loop
       }
       ++ctr_priv;
-
     }
     // record the number of trials
     #pragma omp critical
     {
       ctr += ctr_priv;
     }
-    
-    
   }
   
   gettimeofday(&end, 0);

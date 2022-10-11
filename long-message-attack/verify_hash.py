@@ -1,7 +1,7 @@
 import os
 
 
-file_path =  "statistics_parallel/37_3_29_2_stats.txt"
+file_path =  "statistics_parallel/20_10_10_4_stats.txt"
 with open(file_path, "r") as f:
 
      file_log = open("log/collision_checks", "w")
@@ -12,8 +12,9 @@ with open(file_path, "r") as f:
      f.readline()
      for line in f.readlines():
         line_split = line.split(",")
-        n, l, idx = int(line_split[0]), int(line_split[1]), int(line_split[-2])
+        n, l, idx = int(line_split[0]), int(line_split[1]), int(line_split[-1])
         path = f"messages/{n}_{l}"
+        print(path)
         file_log = open("log/collision_checks", "a")
         file_log.write(f"n={n} l={l}, collides=")
         file_log.close()
