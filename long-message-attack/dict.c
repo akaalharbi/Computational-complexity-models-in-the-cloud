@@ -43,7 +43,8 @@ dict* dict_new(size_t nelements){
   // also guarantees that nslots is a power of 2 
   size_t nslots = (size_t) 1 << ( (size_t) ceil(log2( nelements) + 1 ) );
   d->nslots = nslots;
-  
+  d->nprobes_insert=0;
+  d->nprobes_lookup=0;
   // reserve space in memeory
   d->slots = malloc(sizeof(slot)*nslots);
   // Ensure the keys are next to each other
@@ -94,7 +95,9 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
     //  ++i;
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
     h = (h+1) & (d->nslots - 1);
+    ++(d->nprobes_insert);
   }
+
 
   /// Found an empty slot, update its 
   // update current->key = key 
@@ -130,6 +133,7 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
     
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
     h = (h+1) & (d->nslots - 1); // mod 2^nslots
+    ++(d->nprobes_lookup);
   }
 
   // update current->key = key 

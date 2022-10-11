@@ -47,7 +47,10 @@ typedef struct {
 
 typedef struct {
   size_t nslots; // number of elements  in the dictionary
+  size_t nprobes_insert;
+  size_t nprobes_lookup;
   slot* slots; // == slot slots[nslots] but on the heap
+  
 } dict;
 
 

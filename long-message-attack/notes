@@ -1,4 +1,14 @@
 
+
+Tue 11 oct 2022:
+- watch simd lecture
+- fix the wrong message bug
+- counter for the number of probes
+- distinguished points in a better way
+- dictionary that takes arbitary size
+- fast index calculation (Knuth suggests multiplication)
+
+_______
 issue with cluster.lip6.fr
 ./long_message_attack: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by ./long_message_attack)
 

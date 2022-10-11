@@ -1,2 +1,10 @@
-alpha, insert, lookup
+alpha, insert, nprobes_insert,  lookup, nprobes_lookup, total_gain
 N=268435456
+0.50, 4697202.668068elm/sec, 0.500033probes/elm, 4178407.250000elm/sec, 1.500456probes/elm, 0.000000bits
+0.51, 4817474.340499elm/sec, 0.520477probes/elm, 4093283.500000elm/sec, 1.583034probes/elm, -0.001125bits
+0.52, 4952506.737943elm/sec, 0.541752probes/elm, 4122716.750000elm/sec, 1.670670probes/elm, 0.037226bits
+0.53, 4524997.448385elm/sec, 0.563927probes/elm, 4097021.000000elm/sec, 1.764078probes/elm, 0.055686bits
+0.54, 4716234.705556elm/sec, 0.587088probes/elm, 4067347.250000elm/sec, 1.863555probes/elm, 0.072166bits
+0.55, 4699747.984703elm/sec, 0.611233probes/elm, 4035532.250000elm/sec, 1.969843probes/elm, 0.087309bits
+0.56, 4612595.668859elm/sec, 0.636476probes/elm, 3999158.500000elm/sec, 2.083314probes/elm, 0.100242bits
+0.57, 4677380.356340elm/sec, 0.662892probes/elm, 3967102.500000elm/sec, 2.204794probes/elm, 0.114166bits

@@ -213,11 +213,6 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
 #endif // _OPENMP
 
-  /// init state for sha256
-  uint32_t state_init[8] = {
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-  };
 
   #pragma omp parallel shared(collision_found)
   {
@@ -228,13 +223,21 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     size_t idx_priv = 0;
     size_t ctr_priv = 0;
 
+
+    /// init state for sha256
+    // closer to each thread
+    uint32_t state_init_priv[8] = {
+      0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+    };
+
     while (!collision_found) {
       // create a random message of 64 bytes
       fill_radom_byte_array(random_message_priv, 64);
       // clean previously used values
       // digest_priv[0] = 0; // truncate will reset them 
       // digest_priv[1] = 0;
-      memcpy(state_priv, state_init, sizeof(state_init));
+      memcpy(state_priv, state_init_priv, sizeof(state_init_priv));
 
       // hash
       sha256_process_x86_single(state_priv, random_message_priv);

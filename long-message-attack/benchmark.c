@@ -18,6 +18,9 @@
 int is_there_duplicate = 0;
 int idx_cycle = -1;
 
+float base_alpha = 0;
+float base_lookup_rate = 0;
+
 
 
 float benchmark_sha256_x86(){
@@ -86,48 +89,81 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
   long seconds = 0;
   long microseconds = 0;
   double elapsed = 0;
-
+  double elapsed_total=0;
   BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
   // store the hash value in this variable
   uint64_t digest[2] = {0, 0};
-  // INIT SHA256 
-  SHA256_CTX ctx;
-  sha256_init(&ctx);
+  // INIT SHA256
+  uint32_t state[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
 
 
-  // hash a long message (for now it's a series of zeros)
-  gettimeofday(&begin, 0);
+  // --------------------------------------///
+  //// INSERTION TIMING FINE TUNED
   for (size_t i=0; i<N; ++i){
-    sha256_transform(&ctx, M);
-    truncate_state_get_digest(digest, &ctx, 128);
-    dict_add_element_to(d, digest, i);  
-  }
-  gettimeofday(&end, 0);
-  seconds = end.tv_sec - begin.tv_sec;
-  microseconds = end.tv_usec - begin.tv_usec;
-  elapsed = seconds + microseconds*1e-6;
+    sha256_process_x86_single(state, M);
+    truncate_state32bit_get_digest(digest, state, 128);
 
+    gettimeofday(&begin, 0);
+    dict_add_element_to(d, digest, i);
+    gettimeofday(&end, 0);    
+    seconds = end.tv_sec - begin.tv_sec;
+    microseconds = end.tv_usec - begin.tv_usec;
+    elapsed = seconds + microseconds*1e-6;
+    elapsed_total += elapsed;
+
+  }
+
+  // how wasteful !
+  elapsed = elapsed_total;
+  elapsed_total = 0;
   
   printf("dictionary filling %lu elements took %fsec \n", N,  elapsed);
   printf("i.e. %f elm/sec≈2^%felm/sec\n", (float) N / elapsed, log2((float) N / elapsed));
-  fprintf(fp, "%felm/sec, ", (float) N / elapsed);
-  puts("--------------------");
-  // dummy variable so the compiler won't optimized the loop below
-  size_t values = 0; 
-  gettimeofday(&begin, 0);
-  for (size_t i=0; i<N; ++i){
-    sha256_transform(&ctx, M);
-    truncate_state_get_digest(digest, &ctx, 128);
-    values += dict_get_value(d, digest);
-  }
-  gettimeofday(&end, 0);
-  seconds = end.tv_sec - begin.tv_sec;
-  microseconds = end.tv_usec - begin.tv_usec;
-  elapsed = seconds + microseconds*1e-6;
-  printf("dictionary lookup %lu elements took %fsec \n", N,  elapsed);
-  printf("i.e. %f elm/sec≈2^%felm/sec\n", (float) N / elapsed, log2((float) N / elapsed));
-  fprintf(fp, "%felm/sec\n", (float) N / elapsed);
+  fprintf(fp, "%felm/sec, %fprobes/elm, ", (float) N / elapsed, ((float)d->nprobes_insert)/N);
+  // edit base_alpha only in the first call of the function
+  if (base_alpha == 0)
+    base_alpha = alpha;
+ 
 
+
+  /// LOOKUP TIMING FINE TUNED
+  size_t values = 0; 
+
+  for (size_t i=0; i<N; ++i){
+    // random numbers
+    sha256_process_x86_single(state, M);
+
+    truncate_state32bit_get_digest(digest, state, 128);
+
+    gettimeofday(&begin, 0);
+    values += dict_get_value(d, digest);
+    gettimeofday(&end, 0);
+    seconds = end.tv_sec - begin.tv_sec;
+    microseconds = end.tv_usec - begin.tv_usec;
+    elapsed = seconds + microseconds*1e-6;
+    elapsed_total += elapsed;
+  }
+
+  // how wasteful !
+  elapsed = elapsed_total;
+  elapsed_total = 0;
+
+  printf("dictionary lookup %lu elements took %fsec \n", N,  elapsed);
+  // fill base_lookup_rate only in the first call
+  if (base_lookup_rate==0)
+    base_lookup_rate = ((float) N) / elapsed;
+
+  float new_lookup_rate = ((float) N) / elapsed;
+  // how many bits have we gain in memory
+  float gain = log2(alpha/base_alpha);
+  // how many bits have we lost in performance
+  float loss = log2(new_lookup_rate/base_lookup_rate);
+  printf("i.e. %f elm/sec≈2^%felm/sec\n", new_lookup_rate, log2((float) new_lookup_rate));
+  fprintf(fp, "%felm/sec, %fprobes/elm, %fbits\n", new_lookup_rate, ((float) d->nprobes_lookup)/N, gain+loss);
+  puts("--------end---------");
   free(d->slots);
   free(d);
 }
@@ -138,18 +174,18 @@ int main(int argc, char* argv[]){
   /// open file named dict_benchmark in log
   size_t nelements = 1<<28;
   FILE* fp = fopen("log/benchmark_dict", "w");
-  fprintf(fp, "alpha, insert, lookup\n"
+  fprintf(fp, "alpha, insert, nprobes_insert,  lookup, nprobes_lookup, total_gain\n"
 	  "N=%lu\n", nelements);
   fclose(fp);
 
   benchmark_sha256_x86();
-  benchmark_sha256();
+
   
-  /* for (float i=0.5; i<0.99; i += 0.01){ */
-  /*   FILE* fp = fopen("log/benchmark_dict", "a"); */
-  /*   filling_rate_time(nelements, i, fp); */
-  /*   fclose(fp); */
-  /* } */
+  for (float i=0.5; i<0.99; i += 0.01){
+    FILE* fp = fopen("log/benchmark_dict", "a");
+    filling_rate_time(nelements, i, fp);
+    fclose(fp);
+  }
 }
 
 
