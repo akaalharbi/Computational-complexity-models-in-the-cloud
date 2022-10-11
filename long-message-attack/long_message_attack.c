@@ -11,6 +11,7 @@
 
 
 #include "sha256-x86.h"
+//#include "sha256.h"
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
 #include <endian.h>
@@ -34,6 +35,41 @@
 /*---------------------------------------------------------*/
 ///                  UTILITY FUNCTIONS                   ///
 
+size_t collides_at(const unsigned char rM[64], int output_size_bits, uint64_t idx){
+  /// Check if we have a false positive, that is the dictionary returned
+  /// the digest exist but it is not true because some information was
+  /// truncated
+
+  // for zero messages
+  unsigned char M0[64] = {0};
+  uint64_t digest_M0[2] = {0}; // store digest here
+
+  uint32_t state0[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
+  /// random message hash state
+  uint32_t state_rM[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
+  uint64_t digest_rM[2] = {0, 0};
+  sha256_process_x86_single(state_rM, rM);
+  truncate_state32bit_get_digest(digest_rM, state_rM, output_size_bits);
+  
+  for (size_t i=0; i<=idx; ++i){
+    sha256_process_x86_single(state0, M0);
+    truncate_state32bit_get_digest(digest_M0, state0, output_size_bits);
+  }
+  if (digest_M0[0] == digest_rM[0] && digest_M0[1] == digest_rM[1]){
+
+    return 1;
+  }
+
+  return 0;
+}
 
 
 
@@ -58,7 +94,6 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   ///      it will write in the first line it encounters then 
   /// todo nblocks instead of n_of_blocks!
 
-
   /// PROCESS THE PRARAMETERS
   is_there_duplicate = 0; // global variable to detect cycles
   size_t n_of_blocks = (size_t) ceil(pow(2.0, l));
@@ -67,9 +102,10 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   
   // size of  long_message (lazy evaluation) + dict 
   double memory_estimate = 64 + sizeof(dict);
-         memory_estimate += 2*n_of_blocks*sizeof(slot); // dictionary size
+  memory_estimate += (1/FILLING_RATE)*n_of_blocks*sizeof(slot); // dictionary size
 	 memory_estimate = memory_estimate / 1000.0; //kb
 
+  printf("sizeof(dict)=%lubytes, sizeof(slot)=%lubytes\n", sizeof(dict), sizeof(slot));
   /// write it in a filep
   fprintf(fp, "%lu, %d, NAN, %0.2fkb, ",
 	  n_of_bits, (int) l, memory_estimate);
@@ -211,25 +247,29 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 	 omp_get_max_threads(), n_of_bits, (int) l);
   // printf("Max nthreads=%d\n", omp_get_max_threads());
 
-#endif // _OPENMP
+  #endif // _OPENMP
 
 
   #pragma omp parallel shared(collision_found)
   {
     // each variable inside is private to each thread
-    BYTE random_message_priv[64];
-    uint64_t digest_priv[2];
-    uint32_t state_priv[8];
-    size_t idx_priv = 0;
-    size_t ctr_priv = 0;
-
-
-    /// init state for sha256
-    // closer to each thread
+    // openmp leaks these variables !
     uint32_t state_init_priv[8] = {
       0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
       0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
     };
+    BYTE random_message_priv[64] = {0};
+    uint64_t digest_priv[2] = {0};
+    uint32_t state_priv[8] = {0};
+    size_t idx_priv = 0;
+    size_t ctr_priv = 0;
+    
+    /* BYTE* random_message_priv = (BYTE*) malloc(sizeof(BYTE)*64); */
+    /* uint64_t* digest_priv = (uint64_t*) malloc((sizeof(uint64_t)*2)); */
+    /* uint32_t* state_priv = (uint32_t*) malloc(sizeof(uint32_t)*8); */
+
+    /// init state for sha256
+    // closer to each thread
 
     while (!collision_found) {
       // create a random message of 64 bytes
@@ -245,14 +285,13 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       truncate_state32bit_get_digest(digest_priv, state_priv, n_of_bits);
 
       /// ------------ DISTINGUISHED POINTS (if enabled) ------------- ///
-      /// If distinguished points feature was enabled  during compile ///
+       /// If distinguished points feature was enabled  during compile ///
       /// time. 
       #ifdef DISTINGUISHED_POINTS
       // we skip hashes
       if ( (digest_priv[0]&DIST_MASK) != 0) 
 	continue; // skip this element
       #endif
-
       
       // test for collision and print the results if successful.
       // idx_priv := 0 if digest_priv doesn't exist in the dictionary
@@ -260,25 +299,29 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
       //if (dict_has_key(d, digest_priv) ){ // maybe extra condition && !collision_found is needed
       if (idx_priv ){ //
-	// if other threads found a collision, go home
-	
-	#pragma omp critical
-	{ // update a shared values
-	  collision_found = 1;
-	  idx = idx_priv; 
-	  memcpy(random_message, random_message_priv, 64);
-          #ifdef VERBOSE_LEVEL
-	  printf("digest_rand=0x%016lx%016lx\n", digest_priv[1], digest_priv[0]);
-	  printf("ctr_priv=%lu\n", ctr_priv);
-	  print_char((char*)random_message_priv, 64);
-          puts("---end---\n\n");
-          #endif
-	  
+	/// this might be a false positive
+	int does_it_collide = collides_at(random_message_priv, n_of_bits, idx_priv);
+	if (does_it_collide){
+          #pragma omp critical
+	  { // update a shared values
+	    collision_found = 1;
+	    idx = idx_priv; 
+	    memcpy(random_message, random_message_priv, 64);
+
+            #ifdef VERBOSE_LEVEL
+	    printf("digest_rand=0x%016lx%016lx\n", digest_priv[1], digest_priv[0]);
+	    printf("ctr_priv=%lu\n", ctr_priv);
+	    print_char((char*)random_message_priv, 64);
+	    puts("---end---\n\n");
+           #endif
+	  }
+	  // collision found
+	  break; // we don't care about the rest of the loop
 	}
-	break; // we don't care about the rest of the loop
       }
       ++ctr_priv;
     }
+
     // record the number of trials
     #pragma omp critical
     {

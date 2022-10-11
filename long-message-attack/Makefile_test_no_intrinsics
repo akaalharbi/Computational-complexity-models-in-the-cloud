@@ -1,0 +1,23 @@
+LDLIBS  = -lm
+CFLAGS  = -O3 -g -Wall -fopenmp
+LDFLAGS = -fopenmp
+objects = long_message_attack.o sha256.o dict.o util/memory.o util/util_char_arrays.o
+
+
+
+all: long_message_attack
+
+long_message_attack: $(objects)
+
+# objects and their dependencies
+long_message_attack.o: sha256.h types.h util/util_char_arrays.h shared.h
+sha256.o: sha256.h
+dict.o: dict.h types.h shared.h
+util/memory.o: util/memory.h
+util_char_arrays.o: util/util_char_arrays.h
+
+
+.PHONY: clean
+clean:
+	rm -f $(objects)
+	rm -f long_message_attack

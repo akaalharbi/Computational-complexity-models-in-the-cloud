@@ -27,7 +27,37 @@ stats.txt format
 n l  (estimated time) (estimated memory) (time phase i ) (memory usage phase i ( res memory) (vmsize virtual) (time all attack) (memory usage all)
 
 
-benchmarks:
-Number of sha256 transforms 5699239 ≈ 2^22.44 calls / sec
+benchmarks: 
+-Hash rate:(dictionary lookup is the bottleneck here)
+Number of sha256 transforms, 32731912.000000 hash/sec≈2^24.964195 
+
+(parallel 14 cores)Number of sha256 transforms(with dictionary lookup) 19657603.90765326 = ≈ 2^24.228584144526017 calls / sec
+
+(parallel 14 cores)Number of sha256 transforms(with dictionary lookup) 5699239 ≈ 2^22.44 calls / sec
 Memory writes ~100MB/sec
 Tall1 Memory writes ~75MB/sec
+
+Dictionary:
+Number of elements can be checked in a second
+5419065elm/sec (this is not the probing number)
+8.962088probes/elm
+false positives and filling rate (alpha) = 0.77
+filename=statistics_parallel/66_29_stats.txt
+sizeof(dict)=32bytes, sizeof(slot)=16bytes
+Memory estimates 11155759.31kb, 
+
+------------------------------------
+
+latest dictionary (with false positives)
+filename=statistics_parallel/66_29_stats.txt
+sizeof(dict)=32bytes, sizeof(slot)=16bytes
+l=29, 2^29
+Memory estimates 17179869.28kb, 
+
+
+-------------------------------
+filename=statistics_parallel/66_29_stats.txt
+sizeof(dict)=16bytes, sizeof(slot)=24bytes
+l=29, 2^29
+Memory estimates 25769803.86kb, 
+

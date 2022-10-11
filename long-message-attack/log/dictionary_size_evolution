@@ -1,0 +1,20 @@
+false positives and filling rate (alpha) = 0.77
+filename=statistics_parallel/66_29_stats.txt
+sizeof(dict)=32bytes, sizeof(slot)=16bytes
+Memory estimates 11155759.31kb, 
+
+------------------------------------
+
+latest dictionary (with false positives)
+filename=statistics_parallel/66_29_stats.txt
+sizeof(dict)=32bytes, sizeof(slot)=16bytes
+l=29, 2^29
+Memory estimates 17179869.28kb, 
+
+
+-------------------------------
+filename=statistics_parallel/66_29_stats.txt
+sizeof(dict)=16bytes, sizeof(slot)=24bytes
+l=29, 2^29
+Memory estimates 25769803.86kb, 
+

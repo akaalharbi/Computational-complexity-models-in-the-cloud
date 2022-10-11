@@ -172,7 +172,7 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
 int main(int argc, char* argv[]){
   /// Planning
   /// open file named dict_benchmark in log
-  size_t nelements = 1<<28;
+  size_t nelements = 1<<25;
   FILE* fp = fopen("log/benchmark_dict", "w");
   fprintf(fp, "alpha, insert, nprobes_insert,  lookup, nprobes_lookup, total_gain\n"
 	  "N=%lu\n", nelements);

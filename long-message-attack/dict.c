@@ -40,8 +40,10 @@ dict* dict_new(size_t nelements){
   // E[#probing] = 1.5 hits
   // E[#probing] = 2.5 misses
   
-  // also guarantees that nslots is a power of 2 
-  size_t nslots = (size_t) 1 << ( (size_t) ceil(log2( nelements) + 1 ) );
+  // Use a defined filling rate type.h, empiricall data shows 0.77
+  // is the best
+  size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
+
   d->nslots = nslots;
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
@@ -51,11 +53,8 @@ dict* dict_new(size_t nelements){
   // Ensure the keys are next to each other
    for (size_t i = 0; i < nslots; ++i) {
      d->slots[i].value = 0; // 0 if it is not occupied
-     d->slots[i].key._uint64[0] = 0;
-     d->slots[i].key._uint64[1] = 0;
-
+     d->slots[i].key = 0;
   }  
-   
    // printf("- Dictionary of size 0x%lx\n has been initialized\n", nslots);
   return d;
 }
@@ -73,6 +72,7 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
 
   /// our dictionary can be indexed using 64 bits
   // find which bin to put it in
+  // apologies: only store 64 bit 
   uint64_t h = key[0]; // for now we assume indices don't need more than 64 bits 
   h = h % d->nslots; // assumption nslots = 2^m; 
   // locate where to place (key, value)
@@ -110,16 +110,14 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
   // memcpy(current->key, key->bytes, key_size);
   // Ensure the entered value is strictly greate than 0
   d->slots[h].value = value + 1;
-  d->slots[h].key._uint64[0] = key[0];
-  d->slots[h].key._uint64[1] = key[1];
-
+  d->slots[h].key = key[0];
 }
 
 
 
 size_t dict_get_value(dict* d, uint64_t key[2]){
   // we first need to find where to start probing
-
+  // apologies: only check 64
   size_t h =  key[0];
   // h = h & (d->nslots - 1); // assumption nslots = 2^m <= 2^64; 
   h = h % d->nslots;
@@ -131,8 +129,7 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
     
     // check if key already exists
 
-    if (key[0] == d->slots[h].key._uint64[0]
-	&& key[1] == d->slots[h].key._uint64[1]) {
+    if (key[0] == d->slots[h].key) {
       return d->slots[h].value - 1;
     }
       
@@ -160,9 +157,9 @@ void dict_print(dict* d){
   for (size_t b=0; b<(d->nslots); ++b) {
 
     printf("slot=%lu, value=%lu, "
-	   "key[1]key[0] = 0x%016lx%016lx\n",
+	   "key = 0x%016lx\n",
 	   b, d->slots[b].value,
-	   d->slots[b].key._uint64[1], d->slots[b].key._uint64[0]);
+	   d->slots[b].key);
     
     /* // print key */
     /* printf("key=0x"); */
@@ -173,42 +170,42 @@ void dict_print(dict* d){
   
 }
  
-
-int dict_has_key(dict* d, uint64_t key[2]){
-  /// 1 if the dictionary has `key`
-  /// 0 otherwise
+/// legacy code 
+/* int dict_has_key(dict* d, uint64_t key[2]){ */
+/*   /// 1 if the dictionary has `key` */
+/*   /// 0 otherwise */
 
   
  
-  // we first need to find where to start probing
-  size_t h =  key[0];
-  // h = h & (d->nslots - 1); // assumption nslots = 2^m; 
-  h = h % d->nslots;
-  // find (key, value) after 
-  while (d->slots[h].value){ // value==0 means empty slot 
-    // linear probing
-     // current = element with index (h+i mod nslots)
-    // puts("collision at adding element has been detected, linear probing");
+/*   // we first need to find where to start probing */
+/*   size_t h =  key[0]; */
+/*   // h = h & (d->nslots - 1); // assumption nslots = 2^m;  */
+/*   h = h % d->nslots; */
+/*   // find (key, value) after  */
+/*   while (d->slots[h].value){ // value==0 means empty slot  */
+/*     // linear probing */
+/*      // current = element with index (h+i mod nslots) */
+/*     // puts("collision at adding element has been detected, linear probing"); */
     
-    // check if key already exists
+/*     // check if key already exists */
     
-    if (key[0] == d->slots[h].key._uint64[0]
-	&& key[1] == d->slots[h].key._uint64[1])
-      // revert it to the original entered value
-      return d->slots[h].value - 1;
+/*     if (key[0] == d->slots[h].key */
+/* 	&& key[1] == d->slots[h].key._uint64[1]) */
+/*       // revert it to the original entered value */
+/*       return d->slots[h].value - 1; */
     
-    // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
-    // h = (h+1) & (d->nslots - 1); // mod 2^nslots
-        // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
-    ++h;
-    if (h >= d->nslots)
-      h = h - d->nslots;
+/*     // current = &d->slots[  (h+i) & (d->nslots - 1)  ]; */
+/*     // h = (h+1) & (d->nslots - 1); // mod 2^nslots */
+/*         // current = &d->slots[  (h+i) & (d->nslots - 1)  ]; */
+/*     ++h; */
+/*     if (h >= d->nslots) */
+/*       h = h - d->nslots; */
 
-  }
+/*   } */
 
-  // update current->key = key 
-  // memcpy(current->key, key->bytes, key_size);
-  return 0; // no element is found
+/*   // update current->key = key  */
+/*   // memcpy(current->key, key->bytes, key_size); */
+/*   return 0; // no element is found */
  
-}
+/* } */
 
