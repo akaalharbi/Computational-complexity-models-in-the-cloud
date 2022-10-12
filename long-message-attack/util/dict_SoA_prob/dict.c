@@ -14,7 +14,6 @@
 #include <math.h>
 #include "shared.h"
 #define ALIGNMENT 32
-#include <immintrin.h>
 
 
 /* //-----------------------------------------------------// */
@@ -151,35 +150,23 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
   size_t h =  key[0];
   // h = h & (d->nslots - 1); // assumption nslots = 2^m <= 2^64; 
   h = h % d->nslots;
-  // min(h, nslots - alignement) so we can get #alignement*bytes 
-  h = (h > d->nslots - ALIGNMENT) ? d->nslots - ALIGNMENT : h;
-  
-  __m256i dict_keys_simd = _mm256_load_si256((__m256i*)  &(d->keys[h]));
-  __m256i lookup_key_simd = _mm256_setr_epi64x(key[0], key[0], key[0], key[0]);
-
-  // check if there is zero in the vector (i.e. empty slot)
-  // this idea is taken from
-  // https://stackoverflow.com/questions/34155897/simd-sse-how-to-check-that-all-vector-elements-are-non-zero
-  __m256i comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd,
-					      _mm256_setzero_si256());
-  int has_empty_slot = _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
   // find (key, value) after 
-  while (!has_empty_slot){// occupied slot,
+  while (d->keys[h]){// occupied slot,
     // we are relying that the key != 0, this is a negligible event
     // linear probing
     // current = element with index (h+i mod nslots)
     // puts("collision at adding element has been detected, linear probing");
+    
+    // check if key already exists
 
-    // does key equal one of the slots 
-    comp_vect_simd = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd);
-    // todo start here                                  
     if (key[0] == d->keys[h]) {
       return d->values[h] - 1;
     }
+      
     
-
-    h += ALIGNMENT/8; 
-    if (h >= d->nslots - ALIGNMENT)
+    // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    ++h; // mod 2^nslots
+    if (h >= d->nslots)
       h = h - d->nslots;
     
     #ifdef NPROBES_COUNT
