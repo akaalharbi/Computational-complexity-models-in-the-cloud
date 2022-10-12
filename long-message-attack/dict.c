@@ -47,16 +47,22 @@ dict* dict_new(size_t nelements){
   
   // the number of slots is multiple of alignment
   // this is for SIMD. Don't confuse it with sha256 padding
-  int padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - nelements%( (ALIGNMENT/sizeof(uint64_t)) );
-  nslots = nslots + padding_alignment;
+  // multiple of ALIGNMENT BYTES
+  int padding_alignment =   nslots %  (ALIGNMENT/sizeof(uint64_t)) ;
+  padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - padding_alignment ;
+  //nslots = nslots + padding_alignment;
   d->nslots = nslots;
-  printf("padding=%d\n", padding_alignment);
+  printf("nslots=%lu, padding=%d, alignmen/sizeof(uint64)=%lu\n",
+	 d->nslots, padding_alignment, (ALIGNMENT/sizeof(uint64_t)));
 
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
-  d->keys = (uint64_t*) aligned_alloc(ALIGNMENT, nslots*(sizeof(uint64_t)));// (uint64_t*) malloc(d->nslots*(sizeof(uint64_t)));
-  d->values = (uint64_t*) aligned_alloc(ALIGNMENT, nslots*(sizeof(uint64_t)));// (uint64_t*) malloc(d->nslots*(sizeof(uint64_t)));
-
+  d->keys = (uint64_t*) aligned_alloc(ALIGNMENT,
+		         (padding_alignment + nslots)*(sizeof(uint64_t)));
+  // (uint64_t*) malloc(d->nslots*(sizeof(uint64_t)));
+  d->values = (uint64_t*) aligned_alloc(ALIGNMENT,
+			  (padding_alignment + nslots)*(sizeof(uint64_t)));
+				
   d->memory_estimates = d->nslots*(sizeof(uint64_t)) // keys
                       + d->nslots*(sizeof(uint64_t)) // values
                       + sizeof(dict);
@@ -108,26 +114,13 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
   // locate where to place (key, value)
   while (d->values[h]){ // value==0 means empty slot
     // linear probing
-    // current = element with index (h+i mod nslots)
-    // puts("collision at adding element has been detected, linear probing");
-
-
-    /// no need to check that there is a cycle for now
-    /* // check if key already exists */
-    /* if (key[0] == d->slots[h].key._uint64[0] */
-    /* 	&& key[1] == d->slots[h].key._uint64[1]){ */
-    /*   // printf("a duplicated key has been detected at %lu\n", value); */
-    /*   is_there_duplicate = 1; */
-    /*   idx_cycle = value; */
-    /*   return; */
-    /* } */
-
-
     //  ++i;
     // current = &d->slots[  (h+i) & (d->nslots - 1)  ];
+    // reference: The art of simd programming, Sergey Slotin
     ++h;
     if (h >= d->nslots)
       h = h - d->nslots;
+    
     
     #ifdef NPROBES_COUNT
     ++(d->nprobes_insert);
@@ -145,6 +138,18 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
 
 
 
+void print_m25i(__m256i a, char* text){
+  uint64_t A[4] = {0};
+  _mm256_storeu_si256((__m256i*)A, a);
+  printf("%s = ", text);
+  for (int i = 0; i<4; ++i) {
+    printf("%016lx, ", A[i]);
+  }
+  puts("");
+}
+
+
+
 size_t dict_get_value(dict* d, uint64_t key[2]){
   // we first need to find where to start probing
   // apologies: only check 64
@@ -153,38 +158,89 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
   h = h % d->nslots;
   // min(h, nslots - alignement) so we can get #alignement*bytes 
   h = (h > d->nslots - ALIGNMENT) ? d->nslots - ALIGNMENT : h;
+  int step = ALIGNMENT/8; // for the while loop
+  int is_key_found = 0;
+  int has_empty_slot = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
   
-  __m256i dict_keys_simd = _mm256_load_si256((__m256i*)  &(d->keys[h]));
+  __m256i dict_keys_simd = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
   __m256i lookup_key_simd = _mm256_setr_epi64x(key[0], key[0], key[0], key[0]);
+  __m256i zero_vect = _mm256_setzero_si256();
+  __m256i comp_vect_simd;
 
-  // check if there is zero in the vector (i.e. empty slot)
-  // this idea is taken from
-  // https://stackoverflow.com/questions/34155897/simd-sse-how-to-check-that-all-vector-elements-are-non-zero
-  __m256i comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd,
-					      _mm256_setzero_si256());
-  int has_empty_slot = _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
-  // find (key, value) after 
+    
+    
+  
+  // find (key, value) after
+  // 1, 1, 0, 1
+  // 1, 1, 0, 1
+  
   while (!has_empty_slot){// occupied slot,
     // we are relying that the key != 0, this is a negligible event
     // linear probing
-    // current = element with index (h+i mod nslots)
-    // puts("collision at adding element has been detected, linear probing");
-
+    
+    ///                   TEST 1                      ///
+    ///----------------------------------------------///
     // does key equal one of the slots 
     comp_vect_simd = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd);
-    // todo start here                                  
-    if (key[0] == d->keys[h]) {
-      return d->values[h] - 1;
-    }
-    
+    is_key_found = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
 
-    h += ALIGNMENT/8; 
-    if (h >= d->nslots - ALIGNMENT)
-      h = h - d->nslots;
+    #ifdef VERBOSE_LEVEL
+    printf("step=%d, h=%lu, nslots=%lu\n", step, h, d->nslots);
+    print_m25i(dict_keys_simd, "dict_keys_simd");
+    print_m25i(lookup_key_simd, "lookup_key_simd");
+    print_m25i(comp_vect_simd, "compare with keys");
+    printf("is_key_found? %d\n", is_key_found);
+    #endif
+    
+    // todo start here                                  
+    if (is_key_found) {
+      puts("hurray!");
+      // movemask_ps(a) will return 4 bytes m, where m[i] := some mask with ith 64 bit entry
+      int loc = _mm256_movemask_epi8(comp_vect_simd);
+      printf("loc_mask=%x\n", loc);
+      printf("ctz=%d\n", __builtin_ctz(loc));
+      // some magical formula, too tired to explain it's 00:12am
+      size_t idx_val = (__builtin_ctz(loc)>>3) + h;
+      printf("ajusted ctz=%d\n", (__builtin_ctz(loc)>>3));
+      printf("val=%lu\n", idx_val);
+      // since we deal with values of size 64 will be repeated twice
+      return d->values[idx_val];
+    }
+
+    ///                   TEST 2                           ///
+    ///----------------------------------------------------///
+    /// is one the slots empty? then no point of probing
+    comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
+    // _mm256_testz_si256 will return if comp_vect_simd AND comp_vect_simd = 0 as int
+    has_empty_slot = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
+
+
+
+
+    // update the index for keys load
+    h += step;
+    if (h >= d->nslots)
+      h = 0;
+
+    #ifdef VERBOSE_LEVEL
+    print_m25i(dict_keys_simd, "dict_keys_simd");
+    print_m25i(zero_vect, "zero_vect");
+    print_m25i(comp_vect_simd, "compare with zeros");
+    printf("has empty slot? %d\n", has_empty_slot);
+    #endif
+
+    // get new fresh keys
+    dict_keys_simd = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
+
+    #ifdef VERBOSE_LEVEL
+    print_m25i(dict_keys_simd, "fresh dict_keys_simd");
+    printf("has empty slot? %d\n", has_empty_slot);
+    #endif
     
     #ifdef NPROBES_COUNT
     ++(d->nprobes_lookup);
     #endif
+    //printf("inside next: step=%d, h=%lu, nslots=%lu\n", step, h, d->nslots);
   }
 
   // update current->key = key 
