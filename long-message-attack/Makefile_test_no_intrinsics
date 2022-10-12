@@ -1,6 +1,6 @@
 LDLIBS  = -lm
-CFLAGS  = -O3 -g -Wall -fopenmp
-LDFLAGS = -fopenmp
+CFLAGS  = -O3 -g -Wall #-fopenmp
+#LDFLAGS = -fopenmp
 objects = long_message_attack.o sha256.o dict.o util/memory.o util/util_char_arrays.o
 
 

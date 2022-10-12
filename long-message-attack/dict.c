@@ -1,3 +1,4 @@
+// SoA dictionary
 // Simple dictionary implementation using open addresing, linear probing
 // the input values are not hashed since we assume that keys have been
 // already hashed (context: long message attack)
@@ -12,7 +13,7 @@
 #include <string.h>
 #include <math.h>
 #include "shared.h"
-
+#define ALIGNMENT 32
 
 
 /* //-----------------------------------------------------// */
@@ -23,7 +24,6 @@
 //-----------------------------------------------------//
 //                       methods                       //
 //-----------------------------------------------------//
-
 
 
 dict* dict_new(size_t nelements){
@@ -43,23 +43,52 @@ dict* dict_new(size_t nelements){
   // Use a defined filling rate type.h, empiricall data shows 0.77
   // is the best
   size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
-
+  
+  // the number of slots is multiple of alignment
+  // this is for SIMD. Don't confuse it with sha256 padding
+  int padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - nelements%( (ALIGNMENT/sizeof(uint64_t)) );
+  nslots = nslots + padding_alignment;
   d->nslots = nslots;
+  printf("padding=%d\n", padding_alignment);
+
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
+  d->keys = (uint64_t*) aligned_alloc(ALIGNMENT, nslots*(sizeof(uint64_t)));// (uint64_t*) malloc(d->nslots*(sizeof(uint64_t)));
+  d->values = (uint64_t*) aligned_alloc(ALIGNMENT, nslots*(sizeof(uint64_t)));// (uint64_t*) malloc(d->nslots*(sizeof(uint64_t)));
 
+  d->memory_estimates = d->nslots*(sizeof(uint64_t)) // keys
+                      + d->nslots*(sizeof(uint64_t)) // values
+                      + sizeof(dict);
+  
   // reserve space in memeory
-  d->slots = malloc(sizeof(slot)*nslots);
   // Ensure the keys are next to each other
    for (size_t i = 0; i < nslots; ++i) {
-     d->slots[i].value = 0; // 0 if it is not occupied
-     d->slots[i].key = 0;
+     d->keys[i] = 0; // 0 if it is not occupied
+     d->values[i] = 0;
   }  
    // printf("- Dictionary of size 0x%lx\n has been initialized\n", nslots);
   return d;
 }
 
+void dict_free(dict* d){
+  free(d->keys);
+  free(d->values);
+  //free(d);
+}
 
+
+int dict_memory(size_t nelements){
+  /// return memory estimation of the dictionary size
+  int estimate = (size_t)  ceil((1/FILLING_RATE)*nelements);
+  int padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - nelements%( (ALIGNMENT/sizeof(uint64_t)) );
+  // how many slots in the dictionary
+  estimate = estimate + padding_alignment;
+
+  estimate = estimate*(sizeof(uint64_t)) // keys
+                      + estimate*(sizeof(uint64_t)) // values
+                      + sizeof(dict);
+   return estimate;
+}
 //void dict_add_element_to(dict* d, dict_key* key, size_t value, size_t key_size){
 void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
   // add (key, value) to the dictionary, 0 <= value. Since we use value:=0 to indicate
@@ -76,7 +105,7 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
   uint64_t h = key[0]; // for now we assume indices don't need more than 64 bits 
   h = h % d->nslots; // assumption nslots = 2^m; 
   // locate where to place (key, value)
-  while (d->slots[h].value){ // value==0 means empty slot
+  while (d->values[h]){ // value==0 means empty slot
     // linear probing
     // current = element with index (h+i mod nslots)
     // puts("collision at adding element has been detected, linear probing");
@@ -109,8 +138,8 @@ void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
   // update current->key = key 
   // memcpy(current->key, key->bytes, key_size);
   // Ensure the entered value is strictly greate than 0
-  d->slots[h].value = value + 1;
-  d->slots[h].key = key[0];
+  d->values[h] = value + 1;
+  d->keys[h] = key[0];
 }
 
 
@@ -122,15 +151,16 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
   // h = h & (d->nslots - 1); // assumption nslots = 2^m <= 2^64; 
   h = h % d->nslots;
   // find (key, value) after 
-  while (d->slots[h].value){// occupied slot
+  while (d->keys[h]){// occupied slot,
+    // we are relying that the key != 0, this is a negligible event
     // linear probing
     // current = element with index (h+i mod nslots)
     // puts("collision at adding element has been detected, linear probing");
     
     // check if key already exists
 
-    if (key[0] == d->slots[h].key) {
-      return d->slots[h].value - 1;
+    if (key[0] == d->keys[h]) {
+      return d->values[h] - 1;
     }
       
     
@@ -158,8 +188,8 @@ void dict_print(dict* d){
 
     printf("slot=%lu, value=%lu, "
 	   "key = 0x%016lx\n",
-	   b, d->slots[b].value,
-	   d->slots[b].key);
+	   b, d->values[b],
+	   d->keys[b]);
     
     /* // print key */
     /* printf("key=0x"); */

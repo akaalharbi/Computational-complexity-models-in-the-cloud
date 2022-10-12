@@ -14,7 +14,7 @@ with open(file_path, "r") as f:
         line_split = line.split(",")
         n, l, idx = int(line_split[0]), int(line_split[1]), int(line_split[-1])
         path = f"messages/{n}_{l}"
-        print(path)
+        #print(path)
         file_log = open("log/collision_checks", "a")
         file_log.write(f"n={n} l={l}, collides=")
         file_log.close()

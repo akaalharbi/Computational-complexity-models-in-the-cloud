@@ -100,12 +100,11 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   //  size_t nelements = (size_t) ceil(pow(2.0, n_of_bits));
   // int n_of_bytes = (int) ceil( (float)n_of_bits/8);
   
-  // size of  long_message (lazy evaluation) + dict 
-  double memory_estimate = 64 + sizeof(dict);
-  memory_estimate += (1/FILLING_RATE)*n_of_blocks*sizeof(slot); // dictionary size
-	 memory_estimate = memory_estimate / 1000.0; //kb
+  // size of  long_message (lazy evaluation) + dict
+  int my_nthreads = 1;
+  double memory_estimate = (64  + 32)*my_nthreads + dict_memory(n_of_blocks); // edit me
 
-  printf("sizeof(dict)=%lubytes, sizeof(slot)=%lubytes\n", sizeof(dict), sizeof(slot));
+
   /// write it in a filep
   fprintf(fp, "%lu, %d, NAN, %0.2fkb, ",
 	  n_of_bits, (int) l, memory_estimate);
@@ -232,7 +231,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     // i.e. h(mi  ... mj) = h(mi ... mk) where k>i
     fprintf(fp, "%f, 0, %d cycle\n", elapsed, idx_cycle);
     collision_found = 1;
-    free(d->slots);
+    dict_free(d);
     free(d);
     return;
   }
@@ -346,8 +345,9 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   fclose(fm);
 
   // Free memeory
-  free(d->slots);
-  free(d);
+  dict_free(d);
+  //free(d);
+
 
 }
 
@@ -382,33 +382,33 @@ int main(int argc, char* argv []){
     // supply n_max n_min l_max l_min
     int n_max = 100;
     int n_min = 71;
-    int l_max = 31;
-    int l_min = 31;
+    float l = 33.5;
     // l = atof(argv[2]);
 
-    printf("n_max=%d,  n_min=%d, l_max=%d, l_min=%d\n",
- 	   n_max, n_min, l_max, l_min);
+    printf("n_max=%d,  n_min=%d, l_max=%f, l_min=%f\n",
+ 	   n_max, n_min, l, l);
     // variable file name
 
     char file_name[43];
-    snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_%d_%d_stats.txt",
-	     n_max, n_min, l_max, l_min);
+    snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_one_l_stats.txt",
+	     n_max, n_min);
     FILE* fp = fopen(file_name, "w");
     fprintf(fp, "%s", first_line);    fclose(fp);
     
     /// loop over n_min <= n <= n_max, l_min <= l <= l_max
-    for (int n1=n_min; n1 <= n_max; ++n1){
-      // when l > n/2 then the we expect to be a cylce in phase I
-      for (int l=l_min; (l<=l_max && l<= (n1>>1) ); ++l){
-	// opening file multiple time to results as soon we as we have it
-	FILE* fp = fopen(file_name, "a");
-	long_message_attack(n1, l, fp);
-	fclose(fp);
-	// puts("");
-      }
+    // opening file multiple time to results as soon we as we have it
+   
+    for (int n1=n_min; n1<=n_max; ++n1){
+      FILE* fp = fopen(file_name, "a");
+      long_message_attack(n1, l, fp);
+      fclose(fp);      
     }
 
+
+	// puts("");
   }
+    
+
   
   else if (argc == 3){ // ./long_message_attack n l
   // get the input from the user

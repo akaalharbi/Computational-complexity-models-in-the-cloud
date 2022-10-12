@@ -79,8 +79,9 @@ size_t collides_at(const unsigned char rM[64], int output_size_bits, uint64_t id
   for (size_t i=0; i<=idx; ++i){
     sha256_process_x86_single(state0, M0);
     truncate_state32bit_get_digest(digest_M0, state0, output_size_bits);
+    #ifdef VERBOSE_LEVEL
     printf("n=%d, digestrM[0]=%lx, digestM0=%lx, i=%lu\n",output_size_bits, digest_rM[0], digest_M0[0], i);
-   
+    #endif
 
   }
   if (digest_M0[0] == digest_rM[0] && digest_M0[1] == digest_rM[1]){
@@ -130,8 +131,8 @@ int main(int argc, char* argv[]){
   fprintf(fp, "%d\n", collides);
   fclose(fw);
   printf("collides?  %d\n", collides);
-  size_t idx = where_collides(rM, output_size_bits);
-  printf("collides at %lu\n", idx);
+  // size_t idx = where_collides(rM, output_size_bits);
+  // printf("collides at %lu\n", idx);
   puts("---------");
   }
 

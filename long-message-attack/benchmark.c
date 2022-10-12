@@ -1,7 +1,8 @@
 /// The purpose of this file is to benchmark
 /// sha256 calls
 /// dictionary adding and probing an element giving a load value in (0, 1)
-
+/// todo generic code that works with predefined FILLING_RATE
+/// the current code works with FILLING_RATE = 0.5
 
 
 #include "sha256-x86.h"
@@ -164,7 +165,7 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
   printf("i.e. %f elm/sec≈2^%felm/sec\n", new_lookup_rate, log2((float) new_lookup_rate));
   fprintf(fp, "%felm/sec, %fprobes/elm, %fbits\n", new_lookup_rate, ((float) d->nprobes_lookup)/N, gain+loss);
   puts("--------end---------");
-  free(d->slots);
+  dict_free(d);
   free(d);
 }
 
