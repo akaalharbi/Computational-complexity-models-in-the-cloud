@@ -33,13 +33,15 @@
 
  
 
-typedef struct {
+typedef struct  __attribute__((aligned(32))) {
+  uint64_t* keys   __attribute__((aligned(32)));
+  uint64_t* values __attribute__((aligned(32)));
   size_t nslots; // number of elements  in the dictionary
   size_t nprobes_insert;
   size_t nprobes_lookup;
   size_t memory_estimates;
-  uint64_t* keys;
-  uint64_t* values;
+  size_t dummy1;
+  size_t dummy2;
 } dict;
 
 

@@ -13,7 +13,7 @@
 #define BYTE unsigned char
 /// From our experiments this number gives the best tradeoff
 /// between memory and cpu time
-#define FILLING_RATE 0.77
+//#define FILLING_RATE 0.77
 #endif
 
 

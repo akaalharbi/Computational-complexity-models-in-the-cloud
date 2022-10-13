@@ -71,42 +71,6 @@ size_t collides_at(const unsigned char rM[64], int output_size_bits, uint64_t id
   return 0;
 }
 
-size_t where_collides(const unsigned char rM[64], int output_size_bits){
-  /// Method 1
-  /// Given any message rM, hash a long message of zeros M till we find a
-  /// collision, then return the shortest length of M that collides with rM.
-
-  size_t idx = 0;
-
-
-  // for zero messages
-  unsigned char M0[64] = {0};
-  uint64_t digest_M0[2] = {0}; // store digest here
-
-  uint32_t state0[8] = {
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-  };
-
-
-  uint32_t state_rM[8] = {
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-  };
-
-  uint64_t digest_rM[2] = {0};
-  truncate_state32bit_get_digest(digest_rM, state_rM, output_size_bits);
-
-  while (1){
-    sha256_process_x86_single(state0, M0);
-    truncate_state32bit_get_digest(digest_M0, state0, output_size_bits);
-    if (digest_M0[0] == digest_rM[0] && digest_M0[1] == digest_rM[1])
-      break;
-    ++idx;
-  }
-
-  return idx;
-}
 
 
 // int (*functionPtr)(int,int);
@@ -251,7 +215,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   get_memory_usage_kb(&res_mem, &virt_mem);
   fprintf(fp, "RES=%lukb, VmSize=%lukb, ", res_mem, virt_mem);
   ///---------------------///
-  puts("phase i done");
+
 
   /// -------------- PHASE II --------------------  ///
   // Second phase: hash a random message till a collision is found
@@ -305,7 +269,6 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
     /// init state for sha256
     // closer to each thread
-    puts("no collision found");
     while (!collision_found) {
       // create a random message of 64 bytes
       fill_radom_byte_array(random_message_priv, 64);
@@ -330,17 +293,12 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       
       // test for collision and print the results if successful.
       // idx_priv := 0 if digest_priv doesn't exist in the dictionary
-      puts("we're going to ask the dictionary");
       idx_priv = dict_get_value(d, digest_priv);
-      puts("done with the dictionary");
       //if (dict_has_key(d, digest_priv) ){ // maybe extra condition && !collision_found is needed
       if (idx_priv ){ //
 	/// this might be a false positive
+	idx_priv = idx_priv - 1; // the dictionary by default adds one
 	int does_it_collide = collides_at(random_message_priv, n_of_bits, idx_priv);
-	size_t collision_loc = where_collides(random_message_priv, n_of_bits);
-	printf("the collision should be at %lu\n", collision_loc);
-	printf("does it collide at idx=%lu? %d\n", idx_priv, does_it_collide );
-	
 	if (does_it_collide){
           #pragma omp critical
 	  { // update a shared values
