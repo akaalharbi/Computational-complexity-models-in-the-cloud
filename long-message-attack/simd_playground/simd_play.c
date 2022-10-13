@@ -2,7 +2,10 @@
 #include <immintrin.h>
 #include <stdint.h>
 #include <stdio.h>
+#define KEY_TYPE uint64_t
 #define ALIGNMENT 32
+#define NVECT 2
+#define STEP (NVECT*ALIGNMENT/sizeof(KEY_TYPE)) // for the while loop
 
 void print_array(uint64_t* a, int nelements){
   for (int i = 0; i<nelements; ++i)
@@ -12,6 +15,7 @@ void print_array(uint64_t* a, int nelements){
 
 int main(int argc, char* argv[]){
   int nelements = 8;
+  printf("step=%lu\n", STEP);
   uint64_t* A = (uint64_t*) aligned_alloc(ALIGNMENT, nelements*(sizeof(uint64_t)));
   uint64_t* B = (uint64_t*) aligned_alloc(ALIGNMENT, nelements*(sizeof(uint64_t)));
   uint64_t* C = (uint64_t*) aligned_alloc(ALIGNMENT, nelements*(sizeof(uint64_t)));
