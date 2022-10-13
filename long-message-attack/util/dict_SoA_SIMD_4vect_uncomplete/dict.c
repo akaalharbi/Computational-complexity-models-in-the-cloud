@@ -13,7 +13,18 @@
 #include <string.h>
 #include <math.h>
 #include "shared.h"
+
+// AVX256 uses 32 bytes
+#define KEY_TYPE uint64_t
 #define ALIGNMENT 32
+// Increase performance by doing more than 1 simd load per loop
+// also use this to pad non-used zeros at the end of array
+#define NSIMD_VECT 4                  // how many simd load do we do per loop
+#define STEP (NSIMD_VECT*ALIGNMENT/sizeof(KEY_TYPE)) // for the while loop
+// -----------------------------------
+
+
+
 #include <immintrin.h>
 
 
@@ -45,12 +56,23 @@ dict* dict_new(size_t nelements){
   // Use a defined filling rate type.h, empiricall data shows 0.77
   // is the best
   size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
-  
+
+
+// AVX256 uses 32 bytes
+#define KEY_TYPE uint64_t
+#define ALIGNMENT 32
+// Increase performance by doing more than 1 simd load per loop
+// also use this to pad non-used zeros at the end of array
+#define NSIMD_VECT 2                    // how many simd load do we do per loop
+#define STEP (NSIMD_VECT*ALIGNMENT/sizeof(KEY_TYPE)) // for the while loop
+
+
   // the number of slots is multiple of alignment
   // this is for SIMD. Don't confuse it with sha256 padding
   // multiple of ALIGNMENT BYTES
-  int padding_alignment =   nslots %  (ALIGNMENT/sizeof(uint64_t)) ;
-  padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - padding_alignment ;
+  
+  int padding_alignment =   nslots %  STEP;
+  padding_alignment = STEP - padding_alignment ;
   //nslots = nslots + padding_alignment;
   d->nslots = nslots;
   printf("nslots=%lu, padding=%d, alignmen/sizeof(uint64)=%lu\n",
@@ -70,7 +92,7 @@ dict* dict_new(size_t nelements){
   
   // reserve space in memeory
   // Ensure the keys are next to each other
-   for (size_t i = 0; i < nslots; ++i) {
+   for (size_t i = 0; i < nslots+padding_alignment; ++i) {
      d->keys[i] = 0; // 0 if it is not occupied
      d->values[i] = 0;
   }  
@@ -95,7 +117,7 @@ int dict_memory(size_t nelements){
   estimate = estimate*(sizeof(uint64_t)) // keys
                       + estimate*(sizeof(uint64_t)) // values
                       + sizeof(dict);
-   return estimate/1000;
+   return estimate;
 }
 //void dict_add_element_to(dict* d, dict_key* key, size_t value, size_t key_size){
 void dict_add_element_to(dict* d, uint64_t key[2], size_t value){
@@ -155,31 +177,34 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
   // we first need to find where to start probing
   // apologies: only check 64
   //int step = ALIGNMENT/sizeof(d->keys[0]); // for the while loop
-  int step = ALIGNMENT/sizeof(uint64_t); // for the while loop
+  // in our case it's two:  __m256i dict_keys_simd{1,2};
+
+  // nsimd_vectors
   size_t h =  key[0];
   // h = h & (d->nslots - 1); // assumption nslots = 2^m <= 2^64; 
   h = h % d->nslots;
   // to access an element with memory address that is multiple of ALIGNMENT
   //h = h - (h%step);
-  h = h - (h&(step-1)); // since step = 2^r for some r 
+  h = h - (h&(STEP-1)); // since step = 2^r for some r 
   // min(h, nslots - alignement) so we can get #alignement*bytes 
   // h = (h > d->nslots - ALIGNMENT) ? d->nslots - ALIGNMENT : h;
   // no need for this 
 
   int is_key_found = 0;
   int has_empty_slot = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
-  
-  __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
-  __m256i lookup_key_simd = _mm256_setr_epi64x(key[0], key[0], key[0], key[0]);
-  __m256i zero_vect = _mm256_setzero_si256();
+
+  // Trick: do lookups twice as per The Art of SIMD programming
+  // by Sergey 
+  __m256i dict_keys_simd1;
+  __m256i dict_keys_simd2;
+  __m256i comp_vect_simd1;
+  __m256i comp_vect_simd2;
+  // store a compact comparison between comp_vect_simd{1, 2}
   __m256i comp_vect_simd;
 
+  __m256i lookup_key_simd = _mm256_setr_epi64x(key[0], key[0], key[0], key[0]);
+  __m256i zero_vect = _mm256_setzero_si256();
   
-    
-  
-  // find (key, value) after
-  // 1, 1, 0, 1
-  // 1, 1, 0, 1
   
   while (!has_empty_slot){// occupied slot,
     // we are relying that the key != 0, this is a negligible event
@@ -188,12 +213,21 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
     // get new fresh keys
     //printf("keys=%p\n", &d->keys[h]);
     
-    dict_keys_simd = _mm256_load_si256((__m256i*)  &(d->keys[h]));
+    dict_keys_simd1 = _mm256_load_si256((__m256i*)  &(d->keys[h]));
+    dict_keys_simd2 = _mm256_load_si256((__m256i*)  &(d->keys[h+STEP]));
+
       /// -----------------------------------------------///
      ///                   TEST 1                       ///
     ///------------------------------------------------///
     /* does key equal one of the slots */
-    comp_vect_simd = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd);
+    comp_vect_simd1 = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd1);
+    comp_vect_simd2 = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd2);
+    comp_vect_simd3 = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd3);
+    comp_vect_simd4 = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd4);
+
+    comp_vect_simd12 = _mm256_or_si256(comp_vect_simd1, comp_vect_simd2);
+    comp_vect_simd34 = _mm256_or_si256(comp_vect_simd3, comp_vect_simd4);
+    comp_vect_simd   = _mm256_or_si256(comp_vect_simd12, comp_vect_simd34);
     is_key_found = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
 
     #ifdef VERBOSE_LEVEL
@@ -217,7 +251,11 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
     ///                   TEST 2                           ///
     ///----------------------------------------------------///
     /// is one the slots empty? then no point of probing
-    comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
+    comp_vect_simd1 = _mm256_cmpeq_epi64(dict_keys_simd1, zero_vect);
+    comp_vect_simd2 = _mm256_cmpeq_epi64(dict_keys_simd2, zero_vect);
+    comp_vect_simd3 = _mm256_cmpeq_epi64(dict_keys_simd3, zero_vect);
+    comp_vect_simd4 = _mm256_cmpeq_epi64(dict_keys_simd4, zero_vect);
+    comp_vect_simd = _mm256_or_si256(comp_vect_simd1, comp_vect_simd2);
     // _mm256_testz_si256 will return if comp_vect_simd AND comp_vect_simd = 0 as int
     has_empty_slot = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
 
@@ -225,7 +263,7 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
 
 
     // update the index for keys load
-    h += step;
+    h += STEP;
     if (h >= d->nslots)
       h = 0;
 

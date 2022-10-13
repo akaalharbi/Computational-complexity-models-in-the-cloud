@@ -188,7 +188,7 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
     // get new fresh keys
     //printf("keys=%p\n", &d->keys[h]);
     
-    dict_keys_simd = _mm256_stream_load_si256((__m256i*)  &(d->keys[h]));
+    dict_keys_simd = _mm256_load_si256((__m256i*)  &(d->keys[h]));
       /// -----------------------------------------------///
      ///                   TEST 1                       ///
     ///------------------------------------------------///

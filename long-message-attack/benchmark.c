@@ -13,7 +13,7 @@
 #include <sys/time.h>
 #include "shared.h"
 #include <math.h>
-
+#include <omp.h>
 
 // was there a cycle in PHASE I
 int is_there_duplicate = 0;
@@ -72,6 +72,48 @@ float benchmark_sha256_x86(){
 
   float hash_per_sec = (float) n_of_blocks / elapsed;
   printf("sha256-x86\nelapsed=%fsec, %f hash/sec≈2^%f \n", elapsed, hash_per_sec, log2(hash_per_sec));
+  return hash_per_sec;
+}
+
+
+float benchmark_sha256_x86_parallel(){
+
+  
+  size_t n_of_blocks = 1<<25;
+  int nthreads = omp_get_max_threads();
+  struct timeval begin, end;
+  long seconds = 0;
+  long microseconds = 0;
+  double elapsed = 0;
+  
+  #pragma omp parallel
+  {
+  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
+  // store the hash value in this variable
+  // uint64_t digest[2] = {0, 0};
+  // INIT SHA256 
+  
+  uint32_t state[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
+
+
+  // hash a long message (for now it's a series of zeros)
+  gettimeofday(&begin, 0);
+  for (size_t i=0; i<n_of_blocks; ++i){
+    sha256_process_x86_single(state, M);
+     }
+  }
+
+  gettimeofday(&end, 0);
+  seconds = end.tv_sec - begin.tv_sec;
+  microseconds = end.tv_usec - begin.tv_usec;
+  elapsed = seconds + microseconds*1e-6;
+
+  float hash_per_sec = (float) (nthreads*n_of_blocks) / elapsed;
+  printf("parallel sha256-x86\nelapsed=%fsec, %f hash/sec≈2^%f \n", elapsed, hash_per_sec, log2(hash_per_sec));
   return hash_per_sec;
 }
 
@@ -173,20 +215,26 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
 int main(int argc, char* argv[]){
   /// Planning
   /// open file named dict_benchmark in log
-  size_t nelements = 1<<25;
-  FILE* fp = fopen("log/benchmark_dict", "w");
-  fprintf(fp, "alpha, insert, nprobes_insert,  lookup, nprobes_lookup, total_gain\n"
-	  "N=%lu\n", nelements);
-  fclose(fp);
+  
 
   benchmark_sha256_x86();
 
+  // benchmark parallel sha256
+  benchmark_sha256_x86_parallel();
+
   
-  for (float i=0.5; i<0.99; i += 0.01){
-    FILE* fp = fopen("log/benchmark_dict", "a");
-    filling_rate_time(nelements, i, fp);
-    fclose(fp);
-  }
+  /* // benchmark filling rate */
+  /* size_t nelements = 1<<25; */
+  /* FILE* fp = fopen("log/benchmark_dict", "w"); */
+  /* fprintf(fp, "alpha, insert, nprobes_insert,  lookup, nprobes_lookup, total_gain\n" */
+  /* 	  "N=%lu\n", nelements); */
+  /* fclose(fp); */
+  
+  /* for (float i=0.5; i<0.99; i += 0.01){ */
+  /*   FILE* fp = fopen("log/benchmark_dict", "a"); */
+  /*   filling_rate_time(nelements, i, fp); */
+  /*   fclose(fp); */
+  /* } */
 }
 
 

@@ -1,6 +1,6 @@
 LDLIBS  = -lm
-CFLAGS  = -O3 -Wall -march=native -msse4 -msha -DNPROBES_COUNT -std=c11
-LDFLAGS = -msse4 -msha
+CFLAGS  = -O3 -Wall -march=native -msse4 -msha -DNPROBES_COUNT -std=c11 -fopenmp
+LDFLAGS = -msse4 -msha -fopenmp
 objects = benchmark.o sha256-x86.o dict.o util/memory.o util/util_char_arrays.o
 
 
