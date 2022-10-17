@@ -33,6 +33,7 @@ attack time (n=62, l=29) (we count only phase II for legacy reasons)
 13 oct 2022: 159.12sec (ɑ=0.90, sha256-x86, simd)
 13 oct 2022: 152.78sec (ɑ=0.85, sha256-x86, simd, best alpha)
 13 oct 2022: 301.50sec (ɑ=0.50, sha256-x86, simd)
+
 27 sep 2022: 541.93sec (ɑ=0.50, sha256)
 
 13 oct 2022: 28248819.67 trials/sec (phase II) (ɑ=0.50, sha256-x86, simd)
