@@ -48,13 +48,13 @@ unsigned char* create_radom_byte_array(int n_of_bytes){
   ///         the last entry doesn't necessarily use all the 8 bits
   unsigned char* A = (unsigned char *)malloc(sizeof(unsigned char)*n_of_bytes);
 
-  /* int d = 0; */
-  /* for (size_t i=0; i<n_of_bytes; ++i){ */
-  /*   d = 0 + rand() / (RAND_MAX / (255 - 0 + 1) + 1);    */
-  /*   A[i] = (unsigned char) d; */
-  /* } */
-  int returned_bytes = getrandom(A, n_of_bytes, 1);
-  ++returned_bytes; // dummy operation to avoid not used warning
+  int d = 0;
+  for (size_t i=0; i<n_of_bytes; ++i){
+    d = 0 + rand() / (RAND_MAX / (255 - 0 + 1) + 1);
+    A[i] = (unsigned char) d;
+  }
+  // int returned_bytes = getrandom(A, n_of_bytes, 1);
+  // ++returned_bytes; // dummy operation to avoid not used warning
 
   return A;
 }
