@@ -110,7 +110,7 @@ int main(int argc, char* argv[]){
   printf("collides at %lu\n", idx);
   }
 
-  if (argc == 4) {
+  if (argc == 4) { // path to message, nbits, collision index
   char* file_name = argv[1];
   FILE* fp = fopen(file_name, "rb");
   int output_size_bits = atoi(argv[2]);

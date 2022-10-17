@@ -1,16 +1,36 @@
 # Long message attack
 
-# Description
+# Performance Evolution
+In these measurements, we used a predictable prng in order to test the same numbers on all variants. Also, all parameters below have no cycle in Phase I. We believe this is realistic model.
+
+## n=52, l=25
+- 13 oct 2022:  13.16 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
+- 27 sep 2022: 976.07 sec (ɑ=0.50, sha256, openmp)
+
+## n=51, l=25
+- 13 oct 2022:   7.41 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
+- 27 sep 2022: 322.98 sec (ɑ=0.50, sha256, openmp)
+
+## n=50, l=25
+- 13 oct 2022:  4.22 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
+- 27 sep 2022: 51.15 sec (ɑ=0.50, sha256, openmp)
+
+
+## n=44, l=18
+- 13 oct 2022:   3.20 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
+- 27 sep 2022: 103.01 sec (ɑ=0.50, sha256, openmp)
+
 
 # Summary:
-This folder has two main executable `long_message_attack_parallel` and `verify_hash' which generates two colliding messages and verifies the results, respectively.
+This folder has three main executables `long_message_attack`, `verify_hash', `bench_mark` which generate two colliding messages, verifies the results, and benchmark the dictionary and sha256 respectively. 
 
 # definitions
 long message: a large message of zeros.
 
 ## Usage:
 Basic usage:
-### Generate colliding messages
+make clean && make
+
 ./long_message_attack n l
 
 This will mount an attack of truncated sha256 to n-bits using a long message of length 2^l. The random message that collides with the long message can be found in `messages/n_l` in binary format (read it as unsigned char[64]). Also, you can find benchmark and the index where the collision occurs at `statistics_parallel/n_l.txt`.  Substitute n and l, if l>= n/2 then there is a high chance of having a cycle. In this case, you can only find a file in `statistics_parallel/n_l.txt`
@@ -18,7 +38,7 @@ This will mount an attack of truncated sha256 to n-bits using a long message of 
 
 ### Verifies the results
 ./verify_hash "messages/n_l" n
-This will read the file n_l, truncate the output to n bits, and search for an index where the message found in `messages/n_l` collides with the long message. If it find an index, it will print it or it will continue the search forever.
+This will read the file n_l, truncate the output to n bits, and search for an index where the message found in `messages/n_l` collides with the long message. If the index mentioned in "messages/n_l" doesn't produce a collision it will indicate that they are not colliding.
 
 
 
