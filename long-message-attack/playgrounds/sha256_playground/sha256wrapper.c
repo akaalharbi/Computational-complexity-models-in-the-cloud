@@ -11,7 +11,7 @@ int main(int argc, char* argv[]){
   sha256_block_avx(data, state);
 
   for (int i=0; i<32; i++) {
-    printf("%2x", state[i]);
+    printf("%02x", state[i]);
   }
   puts("");
 }

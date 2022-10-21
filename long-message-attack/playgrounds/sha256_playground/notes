@@ -1,0 +1,8 @@
+compiling:
+- make in intel original folder
+- copy related .o files (sha256_one_block.o)
+- gcc -c sha256wrapper.c
+- gcc -o sha256 ha256wrapper.o sha256_one_block.o
+- ./sha256
+
+
