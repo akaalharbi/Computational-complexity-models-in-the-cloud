@@ -1,5 +1,12 @@
+Vrendredi 21 oct 2022:
+Chasing intel code dependency:
+- one block sha256 - AVX -> use sha256_one_block(inp, digest)
+- sha256_one_block uses assembley :(
+- sha256_mult_* (evaluates 4 sha256 blocks)
 
+- how to mix assembley and c code
 
+_______________
 Tue 11 oct 2022:
 - watch simd lecture
 - fix the wrong message bug
@@ -21,8 +28,6 @@ Number of sha256 transforms, 32731912.000000 hash/sec≈2^24.964195
 
 (parallel 14 cores)Number of sha256 transforms(with dictionary lookup) 19657603.90765326 = ≈ 2^24.228584144526017 calls / sec
 
-(parallel 14 cores)Number of sha256 transforms(with dictionary lookup) 5699239 ≈ 2^22.44 calls / sec
-Memory writes ~100MB/sec
 Tall1 Memory writes ~75MB/sec
 
 Dictionary:

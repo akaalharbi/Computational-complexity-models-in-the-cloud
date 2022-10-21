@@ -1,3 +1,4 @@
+CC=g++
 LDLIBS  = -lm
 CFLAGS  = -O3 -g -fopenmp -Wall -march=native -msse4 -msha -std=c11 -fopt-info-vec -fopt-info-omp-vec-optimized-missed
 LDFLAGS = -fopenmp -march=native -msse4 -msha
