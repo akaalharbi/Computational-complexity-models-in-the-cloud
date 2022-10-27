@@ -1,6 +1,6 @@
 CC=g++
 LDLIBS  = -lm
-CFLAGS  = -O3 -g -fopenmp -Wall -march=native -msse4 -msha -std=c11 -fopt-info-vec -fopt-info-omp-vec-optimized-missed
+CFLAGS  = -Ofast -g -fopenmp -Wall -march=native -msse4 -msha -std=c11 -fopt-info-vec #-fopt-info-omp-vec-optimized-missed
 LDFLAGS = -fopenmp -march=native -msse4 -msha
 objects = long_message_attack.o sha256-x86.o dict.o util/memory.o util/util_char_arrays.o
 

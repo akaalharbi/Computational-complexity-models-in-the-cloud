@@ -1,2 +1,6 @@
 n l estimated_time estimated_memory time_phase_i real_memory_usage virt_memory_usage time_all_attack trials idx_message
+<<<<<<< HEAD
 52, 25, NAN, 596619.00kb, 4.015953sec, RES=585144kb, VmSize=586540kb, 6.268988sec, 63690302, 26738636
+=======
+52, 25, NAN, 596619.00kb, 3.928149sec, RES=585052kb, VmSize=586556kb, 5.589665sec, 31339680, 29707541
+>>>>>>> ee9e904d094e00f0eed3e7d8a76a593c3a25f3bc

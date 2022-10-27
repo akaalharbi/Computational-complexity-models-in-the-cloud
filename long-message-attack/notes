@@ -19,8 +19,16 @@ _______
 issue with cluster.lip6.fr
 - sha256 intrinsics
 
-- hash rate:  377473088 hash/sec≈2^28.491799 (parallel)
-               32712382 hash/sec≈2^24.963333 (sequential)
+
+- hash rate(intrinsics):
+  * 377 473 088 hash/sec≈2^28.491799 (parallel)
+  *  32 712 382 hash/sec≈2^24.963333 (sequential)
+
+- hash rate(intel implementation)
+sha256-intel
+elapsed=4.516080sec,   7 429 990.5 hash/sec≈2^22.824929 
+parallel sha256-intel
+elapsed=4.493925sec, 149 332 400 hash/sec≈2^27.153952 
 
 
 -Hash rate:(dictionary lookup is the bottleneck here)

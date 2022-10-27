@@ -123,7 +123,7 @@ void truncate_array(unsigned char* A, size_t size_A, size_t total_out_bits){
 }
 
 
-// @ahmed
+#pragma omp declare simd uniform( n_of_bits )
 void truncate_state32bit_get_digest(uint64_t* dst, uint32_t state[8], int n_of_bits){
   /// We extract the digest from ctx and save it in dst
   // uint64_t dst[2] is fixed now // 128 bits, this is a limitation

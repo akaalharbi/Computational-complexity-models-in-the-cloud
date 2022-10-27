@@ -150,7 +150,7 @@ void print_m25i(__m256i a, char* text){
 }
 
 
-
+#pragma omp declare simd uniform( d )
 size_t dict_get_value(dict* d, uint64_t key[2]){
   // we first need to find where to start probing
   // apologies: only check 64

@@ -257,15 +257,12 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
       0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
     };
-#define NSIMD_SHA 8
-    // use simd to create 8 hashes simultanously
-    BYTE random_message_priv[NSIMD_SHA][64] = {0};
-    uint64_t digest_priv[NSIMD_SHA][2] = {0};
-    uint32_t state_priv[NSIMD_SHA][8] = {0};
-    size_t idx_priv[NSIMD_SHA] = {0};
+    BYTE random_message_priv[64] = {0};
+    uint64_t digest_priv[2] = {0};
+    uint32_t state_priv[8] = {0};
+    size_t idx_priv = 0;
     size_t ctr_priv = 0;
-    size_t j = 0;
-
+    
     /* BYTE* random_message_priv = (BYTE*) malloc(sizeof(BYTE)*64); */
     /* uint64_t* digest_priv = (uint64_t*) malloc((sizeof(uint64_t)*2)); */
     /* uint32_t* state_priv = (uint32_t*) malloc(sizeof(uint32_t)*8); */
@@ -274,99 +271,45 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     // closer to each thread
     while (!collision_found) {
       // create a random message of 64 bytes
-      fill_radom_byte_array(random_message_priv[0], 64);
-      fill_radom_byte_array(random_message_priv[1], 64);
-      fill_radom_byte_array(random_message_priv[2], 64);
-      fill_radom_byte_array(random_message_priv[3], 64);
-      fill_radom_byte_array(random_message_priv[4], 64);
-      fill_radom_byte_array(random_message_priv[5], 64);
-      fill_radom_byte_array(random_message_priv[6], 64);
-      fill_radom_byte_array(random_message_priv[7], 64);
-
-
-
+      fill_radom_byte_array(random_message_priv, 64);
       // clean previously used values
-      memcpy(state_priv[0], state_init_priv, sizeof(state_init_priv));
-      memcpy(state_priv[1], state_init_priv, sizeof(state_init_priv));
-      memcpy(state_priv[2], state_init_priv, sizeof(state_init_priv));
-      memcpy(state_priv[3], state_init_priv, sizeof(state_init_priv));
-      memcpy(state_priv[4], state_init_priv, sizeof(state_init_priv));
-      memcpy(state_priv[5], state_init_priv, sizeof(state_init_priv));
-      memcpy(state_priv[6], state_init_priv, sizeof(state_init_priv));
-      memcpy(state_priv[7], state_init_priv, sizeof(state_init_priv));
+      // digest_priv[0] = 0; // truncate will reset them 
+      // digest_priv[1] = 0;
+      memcpy(state_priv, state_init_priv, sizeof(state_init_priv));
 
-      sha256_process_x86_single(state_priv[0], random_message_priv[0]);
-      sha256_process_x86_single(state_priv[7], random_message_priv[1]);
-      sha256_process_x86_single(state_priv[1], random_message_priv[2]);
-      sha256_process_x86_single(state_priv[2], random_message_priv[3]);
-      sha256_process_x86_single(state_priv[3], random_message_priv[4]);
-      sha256_process_x86_single(state_priv[4], random_message_priv[5]);
-      sha256_process_x86_single(state_priv[5], random_message_priv[6]);
-      sha256_process_x86_single(state_priv[6], random_message_priv[7]);
+      // hash
+      sha256_process_x86_single(state_priv, random_message_priv);
+      // extract the results
+      truncate_state32bit_get_digest(digest_priv, state_priv, n_of_bits);
 
-
-      truncate_state32bit_get_digest(digest_priv[0], state_priv[0], n_of_bits);
-      truncate_state32bit_get_digest(digest_priv[1], state_priv[1], n_of_bits);
-      truncate_state32bit_get_digest(digest_priv[2], state_priv[2], n_of_bits);
-      truncate_state32bit_get_digest(digest_priv[3], state_priv[3], n_of_bits);
-      truncate_state32bit_get_digest(digest_priv[4], state_priv[4], n_of_bits);
-      truncate_state32bit_get_digest(digest_priv[5], state_priv[5], n_of_bits);
-      truncate_state32bit_get_digest(digest_priv[6], state_priv[6], n_of_bits);
-      truncate_state32bit_get_digest(digest_priv[7], state_priv[7], n_of_bits);	
-
-
-
-
-
+      /// ------------ DISTINGUISHED POINTS (if enabled) ------------- ///
+       /// If distinguished points feature was enabled  during compile ///
+      /// time. 
+      #ifdef DISTINGUISHED_POINTS
+      // we skip hashes
+      if ( (digest_priv[0]&DIST_MASK) != 0) 
+	continue; // skip this element
+      #endif
+      
       // test for collision and print the results if successful.
       // idx_priv := 0 if digest_priv doesn't exist in the dictionary
-      // return 0 if slot is empty, otherwise a nonzero number 
-      idx_priv[0] = dict_get_value(d, digest_priv[0]);
-      idx_priv[1] = dict_get_value(d, digest_priv[1]);
-      idx_priv[2] = dict_get_value(d, digest_priv[2]);
-      idx_priv[3] = dict_get_value(d, digest_priv[3]);
-      idx_priv[4] = dict_get_value(d, digest_priv[4]);
-      idx_priv[5] = dict_get_value(d, digest_priv[5]);
-      idx_priv[6] = dict_get_value(d, digest_priv[6]);
-      idx_priv[7] = dict_get_value(d, digest_priv[7]);
-      j += idx_priv[0];
-      j += idx_priv[1];
-      j += idx_priv[2];
-      j += idx_priv[3];
-      j += idx_priv[4];
-      j += idx_priv[5];
-      j += idx_priv[6];
-      j += idx_priv[7];
-
-
-
-
-      
-
-      
-      // j>0 if dict_get_value(.) was nonzero for some input 
-      if (j){ //
+      idx_priv = dict_get_value(d, digest_priv);
+      //if (dict_has_key(d, digest_priv) ){ // maybe extra condition && !collision_found is needed
+      if (idx_priv ){ //
 	/// this might be a false positive
-	for (int i=0; i<NSIMD_SHA; ++i) {
-	  if (idx_priv[i]){
-	    j = i;
-	    break;
-	  }
-	}
-	size_t idx_maybe = idx_priv[j];
-	idx_maybe = idx_maybe - 1; // the dictionary by default adds one
-	int does_it_collide = collides_at(random_message_priv[j], n_of_bits, idx_maybe);
+	idx_priv = idx_priv - 1; // the dictionary by default adds one
+	int does_it_collide = collides_at(random_message_priv, n_of_bits, idx_priv);
 	if (does_it_collide){
           #pragma omp critical
 	  { // update a shared values
 	    collision_found = 1;
-	    idx = idx_maybe; 
-	    memcpy(random_message, random_message_priv[j], 64);
+	    idx = idx_priv; 
+	    memcpy(random_message, random_message_priv, 64);
 
             #ifdef VERBOSE_LEVEL
-	    printf("digest_rand=0x%016lx%016lx\n", digest_priv[j][1], digest_priv[j][0]);
+	    printf("digest_rand=0x%016lx%016lx\n", digest_priv[1], digest_priv[0]);
 	    printf("ctr_priv=%lu\n", ctr_priv);
-	    print_char((char*)random_message_priv[j], 64);
+	    print_char((char*)random_message_priv, 64);
 	    puts("---end---\n\n");
            #endif
 	  }
@@ -374,11 +317,8 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 	  break; // we don't care about the rest of the loop
 	}
       }
-      ctr_priv += NSIMD_SHA;
-      j = 0;
+      ++ctr_priv;
     }
-
-    
 
     // record the number of trials
     #pragma omp critical
