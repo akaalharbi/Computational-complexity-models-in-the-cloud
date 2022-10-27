@@ -150,10 +150,10 @@ void print_m25i(__m256i a, char* text){
 }
 
 
-#pragma omp declare simd uniform( d )
+
+
 size_t dict_get_value(dict* d, uint64_t key[2]){
   // we first need to find where to start probing
-  // apologies: only check 64
   //int step = ALIGNMENT/sizeof(d->keys[0]); // for the while loop
   int step = ALIGNMENT/sizeof(uint64_t); // for the while loop
   size_t h =  key[0];
@@ -183,11 +183,14 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
   
   while (!has_empty_slot){// occupied slot,
     // we are relying that the key != 0, this is a negligible event
-    // linear probing
+    // linear probing: get k1, k2, ..., kl, check if k1 == key
+    //  no, chekc k2 == key, ..., check kl == key
+    // return true if one of the above equalities hold
+    // when ki == 0, i.e. it's an empty slot, thus key has is not
+    // in the dictionary
 
-    // get new fresh keys
+    // get new fresh kes
     //printf("keys=%p\n", &d->keys[h]);
-    
     dict_keys_simd = _mm256_load_si256((__m256i*)  &(d->keys[h]));
       /// -----------------------------------------------///
      ///                   TEST 1                       ///
@@ -216,7 +219,7 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
 
     ///                   TEST 2                           ///
     ///----------------------------------------------------///
-    /// is one the slots empty? then no point of probing
+    /// is one of the slots empty? 
     comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
     // _mm256_testz_si256 will return if comp_vect_simd AND comp_vect_simd = 0 as int
     has_empty_slot = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
@@ -225,6 +228,133 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
 
 
     // update the index for keys load
+    h += step;
+    if (h >= d->nslots)
+      h = 0;
+
+    #ifdef VERBOSE_LEVEL
+    print_m25i(dict_keys_simd, "dict_keys_simd");
+    print_m25i(zero_vect, "zero_vect");
+    print_m25i(comp_vect_simd, "compare with zeros");
+    printf("has empty slot? %d\n", has_empty_slot);
+    #endif
+
+
+    #ifdef VERBOSE_LEVEL
+    print_m25i(dict_keys_simd, "fresh dict_keys_simd");
+    printf("has empty slot? %d\n", has_empty_slot);
+    #endif
+    
+    #ifdef NPROBES_COUNT
+    ++(d->nprobes_lookup);
+    #endif
+    //printf("inside next: step=%d, h=%lu, nslots=%lu\n", step, h, d->nslots);
+  }
+
+  // update current->key = key 
+  // memcpy(current->key, key->bytes, key_size);
+  return 0; // no element is found
+  
+}
+
+
+
+size_t dict_get_values_simd(dict* d, __m256i keys){
+  /// input dict* d,
+  /// keys = {k0, k1, k2, ..., kl}
+  /// l is an argument depends on the largest vector lenght available in simd
+  /// also, alignment has to be adjusted according to l, in our case 64*l
+  ///
+  /// output:
+  /// values = {v0, v1, v2, ..., vl}
+  /// vi = 0 if keys doesn't exist in the dictionary, otherwise return ki!
+  /// @todo write about dictionary
+  /// comments that have the prefix //+ indicates add programming lines
+  /// that correspond to this psuedo-code 
+
+  // ALIGNMENT depends on simd vector length
+  int step = ALIGNMENT/sizeof(uint64_t); // for the while loop
+  
+  /// Get places to probe the dictionary
+  //+ h_i = key_i mod (d->nslots);
+  
+  // to access an element with memory address that is multiple of ALIGNMENT
+  //+ vector versin 
+  //+ h_i = h_i - (h_i mod (step));
+  // the same computation can be done as following
+  //+ h = h - (h&(step-1)); // since step = 2^r for some r 
+  // The following step should be done if the above results a negative value
+  // it doesn't seem to be the case here since h >= h&(step - 1)
+  //- min(h, nslots - alignement) so we can get #alignement*bytes 
+  
+
+  //+ vector of is_key_found 
+  int is_key_found = 0;
+  //+ vector of has_empty slot
+  int has_empty_slot = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
+
+  //+ how to interpret these vectors differs from before
+  __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
+  __m256i lookup_key_simd = _mm256_setr_epi64x(key[0], key[0], key[0], key[0]);
+  __m256i zero_vect = _mm256_setzero_si256();
+  __m256i comp_vect_simd;
+
+  
+    
+  //- orphan comment, @todo remove me
+  // find (key, value) after
+  // 1, 1, 0, 1
+  // 1, 1, 0, 1
+  // end of removal
+
+  //+ rewirte the codition to suit the vectorized version
+  while (!has_empty_slot){// occupied slot,
+    // linear probing
+
+    // get new fresh keys
+
+    //+ change load to be consistent with idx vector 
+    dict_keys_simd = _mm256_load_si256((__m256i*)  &(d->keys[h]));
+      /// -----------------------------------------------///
+     ///                   TEST 1                       ///
+    ///------------------------------------------------///
+    /* for some i, does ki == dict_keys_simd[i] */
+    //+ also this has to be adjusted to with loadded different keys
+    comp_vect_simd = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd);
+    is_key_found = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
+    
+
+    #ifdef VERBOSE_LEVEL
+    printf("step=%d, h=%lu, nslots=%lu\n", step, h, d->nslots);
+    print_m25i(dict_keys_simd, "dict_keys_simd");
+    print_m25i(lookup_key_simd, "lookup_key_simd");
+    print_m25i(comp_vect_simd, "compare with keys");
+    printf("is_key_found? %d\n", is_key_found);
+    #endif
+    
+    //+ update this codition according if a some key found
+    if (is_key_found) {
+      // movemask_ps(a) will return 4 bytes m, where m[i] := some mask with ith 64 bit entry
+      int loc = _mm256_movemask_epi8(comp_vect_simd);
+      // some magical formula, too tired to explain it's 00:12am
+      size_t idx_val = (__builtin_ctz(loc)>>3) + h;
+      // since we deal with values of size 64 will be repeated twice
+      return d->values[idx_val];// - 1; // let caller deal with correcting the offset
+    }
+    
+    ///----------------------------------------------------///
+    ///                   TEST 2                           ///
+    ///----------------------------------------------------///
+    //+ edit this section 
+    /// is one the slots empty? then no point of probing
+    comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
+    // _mm256_testz_si256 will return if comp_vect_simd AND comp_vect_simd = 0 as int
+    has_empty_slot = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
+
+
+
+
+    //+ update the indices for keys load
     h += step;
     if (h >= d->nslots)
       h = 0;
