@@ -1,7 +1,7 @@
 /// we define here how large uint
 
-#ifndef DICT_ELM_TYPE
-#define DICT_ELM_TYPE
+#ifndef LONG_MESSAGE_CONFIG
+#define LONG_MESSAGE_CONFIG
 #include <stdint.h>
 
 

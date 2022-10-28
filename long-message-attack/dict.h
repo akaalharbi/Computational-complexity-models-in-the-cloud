@@ -4,7 +4,7 @@
 #define DICT_LINEAR_PROBING
 
 
-#include "types.h"
+#include "config.h"
 // #include "sha256.h" // dict_key 
 #include <stddef.h>  // size_t
 #include <stdint.h> // uintXY_t

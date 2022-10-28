@@ -4,8 +4,9 @@
 // already hashed (context: long message attack)
 
 #include "dict.h"
-#include "types.h"
+#include "config.h"
 //#include "util_char_arrays.h"
+#include <emmintrin.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -259,7 +260,8 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
 
 
 
-size_t dict_get_values_simd(dict* d, __m256i keys){
+//size_t dict_get_values_simd(dict* d, __m256i keys){
+size_t dict_get_values_simd(dict* d, uint64_t keys[4]){
   /// input dict* d,
   /// keys = {k0, k1, k2, ..., kl}
   /// l is an argument depends on the largest vector lenght available in simd
@@ -271,43 +273,34 @@ size_t dict_get_values_simd(dict* d, __m256i keys){
   /// @todo write about dictionary
   /// comments that have the prefix //+ indicates add programming lines
   /// that correspond to this psuedo-code 
-
-  // ALIGNMENT depends on simd vector length
-  int step = ALIGNMENT/sizeof(uint64_t); // for the while loop
   
-  /// Get places to probe the dictionary
-  //+ h_i = key_i mod (d->nslots);
-  
-  // to access an element with memory address that is multiple of ALIGNMENT
-  //+ vector versin 
-  //+ h_i = h_i - (h_i mod (step));
-  // the same computation can be done as following
-  //+ h = h - (h&(step-1)); // since step = 2^r for some r 
-  // The following step should be done if the above results a negative value
-  // it doesn't seem to be the case here since h >= h&(step - 1)
-  //- min(h, nslots - alignement) so we can get #alignement*bytes 
-  
-
-  //+ vector of is_key_found 
-  int is_key_found = 0;
-  //+ vector of has_empty slot
-  int has_empty_slot = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
-
-  //+ how to interpret these vectors differs from before
-  __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
-  __m256i lookup_key_simd = _mm256_setr_epi64x(key[0], key[0], key[0], key[0]);
+  // -------------------- VARIBLES SETUP ------------------------ //
+  //+ set component i: 64 bit to be the key passed from input
+  __m256i lookup_key_simd = _mm256_setr_epi64x(keys[0], keys[1], keys[2], keys[3]);
+  //+ vector of is found_keys: component i: 64 bit ==  key i, if it has
+  //  been found, 0 otherwise
+  __m256i found_keys = _mm256_setzero_si256();
+  //+ component i: 64 bit loads  k_i from the dictionary
+  __m256i dict_keys_simd; // use gather
   __m256i zero_vect = _mm256_setzero_si256();
   __m256i comp_vect_simd;
+  //+ indices to load from the memeory
+  __m256i indices; // they can't be aligned since they should behave as random
 
-  
-    
-  //- orphan comment, @todo remove me
-  // find (key, value) after
-  // 1, 1, 0, 1
-  // 1, 1, 0, 1
-  // end of removal
-
+  //+ if we found key i, or we hit an empty slot in the linear probing then there is
+  // no point to search further inside the dictionary. In this case, it is same as
+  // saying we move 0 step. Thus, component i: 32 bit of steps == 1 if no key nor
+  // empty were encountered, 0 otherwise.
+  __m128i steps = _mm_setzero_si128();
+  // Note: we can use steps as a stopping indicator
+  int should_stop = 0;
+  // @TODO start from here
+  // @todo modular arithmetic Barret's reduction maybe
+  // @todo load from memory using indices
+  // @todo update should_stop depending on steps vector 
+  // @todo extract keys for return
   //+ rewirte the codition to suit the vectorized version
+  
   while (!has_empty_slot){// occupied slot,
     // linear probing
 
