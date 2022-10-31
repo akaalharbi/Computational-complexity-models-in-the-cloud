@@ -9,7 +9,7 @@
 
 void print_array(uint64_t* a, int nelements){
   for (int i = 0; i<nelements; ++i)
-    printf("%lx, ", a[i]);
+    printf("0x%lx, ", a[i]);
   puts("");
 }
 
@@ -32,7 +32,23 @@ int main(int argc, char* argv[]){
 
   print_array(C, nelements);
 
-  
-  
+  // test gather
+  puts("GATHER TEST: I give up on using gather x)");
+  nelements = 9; // we write only on the first 4, the others are for testing
+  uint64_t data[9] ={0x29, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19};
+  uint64_t* loaded = (uint64_t*) aligned_alloc(ALIGNMENT, nelements*(sizeof(uint64_t)));
+
+  __m256i indices = _mm256_set_epi64x(3,
+				      2,
+				      1,
+				      0);
+  __m256i array = _mm256_i64gather_epi64(data, indices, 2); 
+  puts("hi"); 
+
+  //_mm256_store_si256((void*)loaded, array);
+  _mm256_store_si256((void*)loaded, array);
+  puts("loaded:");
+  print_array(loaded, nelements);
+
   
 }

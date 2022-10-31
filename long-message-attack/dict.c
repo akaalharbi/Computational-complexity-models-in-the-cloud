@@ -263,7 +263,7 @@ size_t dict_get_value(dict* d, uint64_t key[2]){
 //size_t dict_get_values_simd(dict* d, __m256i keys){
 size_t dict_get_values_simd(dict* d, uint64_t keys[4]){
   /// input dict* d,
-  /// keys = {k0, k1, k2, ..., kl}
+  /// keys = {k0, k1, k2, ..., kl} 
   /// l is an argument depends on the largest vector lenght available in simd
   /// also, alignment has to be adjusted according to l, in our case 64*l
   ///
@@ -276,32 +276,57 @@ size_t dict_get_values_simd(dict* d, uint64_t keys[4]){
   
   // -------------------- VARIBLES SETUP ------------------------ //
   //+ set component i: 64 bit to be the key passed from input
-  __m256i lookup_key_simd = _mm256_setr_epi64x(keys[0], keys[1], keys[2], keys[3]);
-  //+ vector of is found_keys: component i: 64 bit ==  key i, if it has
-  //  been found, 0 otherwise
-  __m256i found_keys = _mm256_setzero_si256();
-  //+ component i: 64 bit loads  k_i from the dictionary
-  __m256i dict_keys_simd; // use gather
+  __m256i lookup_keys_simd = _mm256_setr_epi64x(keys[0],
+					       keys[1],
+					       keys[2],
+					       keys[3]);
+
+  //+ indices to load from the memory:
+  uint64_t indices[4] = {
+      keys[0] % d->nslots,
+      keys[1] % d->nslots,
+      keys[2] % d->nslots,
+      keys[3] % d->nslots
+    };
+
+
+  // Load keys from dictionary according to indices: (is gather better?)
+  // they will be compared against lookup_keys_simd
+  __m256i dict_keys_simd = _mm256_set_epi64x(d->keys[indices[0]],
+					     d->keys[indices[1]],
+					     d->keys[indices[2]],
+					     d->keys[indices[3]]);
+
   __m256i zero_vect = _mm256_setzero_si256();
-  __m256i comp_vect_simd;
-  //+ indices to load from the memeory
-  __m256i indices; // they can't be aligned since they should behave as random
+
+  __m256i comp_keys_simd  = _mm256_cmpeq_epi64(lookup_keys_simd, dict_keys_simd);
+  __m256i comp_empty_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
+  
 
   //+ if we found key i, or we hit an empty slot in the linear probing then there is
   // no point to search further inside the dictionary. In this case, it is same as
   // saying we move 0 step. Thus, component i: 32 bit of steps == 1 if no key nor
   // empty were encountered, 0 otherwise.
-  __m128i steps = _mm_setzero_si128();
+  
+  __m256i ones = _mm256_set1_epi64x(1); /*=(1, 1, 1, 1)*/
+  
+  __m256i steps = _mm256_or_si256(comp_keys_simd, comp_empty_simd);
+  // bi = 0 if a key is found or if an empty entry is found
+  steps = _mm256_and_si256(steps, ones);/*(b0, b1, b2, b3)*/
+  
+  
+  
+  
   // Note: we can use steps as a stopping indicator
-  int should_stop = 0;
-  // @TODO start from here
+  int should_stop = _mm256_testz_si256(steps, steps);
+
   // @todo modular arithmetic Barret's reduction maybe
   // @todo load from memory using indices
   // @todo update should_stop depending on steps vector 
   // @todo extract keys for return
   //+ rewirte the codition to suit the vectorized version
-  
-  while (!has_empty_slot){// occupied slot,
+  // @TODO start from here  
+  while (!should_stop){// occupied slo,tmul
     // linear probing
 
     // get new fresh keys
