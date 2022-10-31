@@ -1,4 +1,22 @@
 # Long message attack
+- Phase I  : Construct a long message
+- Phase II : Find sufficient number of potentiall collisions. 
+- Phase III: Filter all false positives, record messages the produces collisions.
+
+# Known Bugs:
+- Phase II: doesn't work
+
+## todo (Techincally not bugs):
+- Rewrite the format of the files
+- restructure files in the folder
+- add time stamp for the files
+- compute how many potentiall collisions should be computed in phase ii
+- write phase iii
+- edit benchmark
+- edit verifyo
+- when writing the long message, we might record several internal states of it wiht index in a file. This allows parallel execution in phase iii
+- `log/` folder is for statistics and testing output
+- `messages/` there should be a distinction between potential messages and messages the leads to collisions
 
 # Performance Evolution
 In these measurements, we used a predictable prng in order to test the same numbers on all variants. Also, all parameters below have no cycle in Phase I. We believe this is realistic model.

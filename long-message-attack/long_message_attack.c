@@ -11,7 +11,6 @@
 
 
 #include "sha256-x86.h"
-//#include "sha256.h"
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
 #include <endian.h>
