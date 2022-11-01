@@ -138,9 +138,11 @@ void truncate_state32bit_get_digest(uint64_t* dst, uint32_t state[8], int n_of_b
     dst[1] = 0;
 
     #ifdef VERBOSE_LEVEL
+    #if VERBOSE_LEVEL == 3
     printf("ones=%lu\n", ones);
     printf("state[0]=%x, state[1]=%x\n", state[0], state[1]);
     puts("");
+    #endif // VERBOSE_LEVEL
     #endif // VERBOSE_LEVEL
 
     

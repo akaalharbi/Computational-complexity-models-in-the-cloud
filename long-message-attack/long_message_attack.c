@@ -246,7 +246,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   // printf("Max nthreads=%d\n", omp_get_max_threads());
 
   #endif // _OPENMP
-
+  omp_set_num_threads(1);
 
   #pragma omp parallel shared(collision_found)
   {
@@ -256,7 +256,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
       0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
     };
-#define NSIMD_SHA 8
+    #define NSIMD_SHA 8
     // use simd to create 8 hashes simultanously
     BYTE random_message_priv[NSIMD_SHA][64] = {0};
     uint64_t digest_priv[NSIMD_SHA][2] = {0};

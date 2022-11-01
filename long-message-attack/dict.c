@@ -151,12 +151,14 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
 						keys[2],
 						keys[3]);
   //+ indices to load from the memory:
-  uint64_t indices[4] = {
+  uint64_t indices[4] __attribute__((aligned(32))) = {
       keys[0] % d->nslots,
       keys[1] % d->nslots,
       keys[2] % d->nslots,
       keys[3] % d->nslots
-    };
+    } ;
+  __m256i indices_simd = _mm256_loadu_epi64(indices);
+  
   // Load keys from dictionary according to indices: (is gather better?)
   // they will be compared against lookup_keys_simd
   __m256i dict_keys_simd = _mm256_set_epi64x(d->keys[indices[0]],
@@ -174,12 +176,17 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
   // empty were encountered, 0 otherwise.
 
   __m256i ones = _mm256_set1_epi64x(1); /* (1, 1, 1, 1) */
-  // 0xfffffffff if no key were found nor an empty hole, i.e. probe the next element
+
+  // Currently: 0 if no key were found nor an empty hole,
+  // i.e. probe the next element. The 0 will become 1, just be patient
   __m256i steps = _mm256_or_si256(comp_keys_simd, comp_empty_simd);
   // bi = 0 if a key is found or if an empty entry is found
   // bi = 1 if a key were not found nor an empty slot
-  steps = _mm256_and_si256(steps, ones);/* (b0, b1, b2, b3) */  
-  
+  // Note:
+  // First converts 0 to 1 and vice versa, then AND it with 1
+  steps = _mm256_andnot_si256(steps, ones);  ;/* (b0, b1, b2, b3) */  
+  indices_simd = _mm256_add_epi64(indices_simd, steps);
+  _mm256_storeu_epi64(indices, indices_simd);
   // Note: we can use steps as a stopping indicator
   // If all values are zeros, then it will return 1
   int should_stop = _mm256_testz_si256(steps, steps);
@@ -190,18 +197,41 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
   // @todo extract keys for return
   //+ rewirte the codition to suit the vectorized version
   // @TODO start from here
+
+
+
+#ifdef VERBOSE_LEVEL
+  #if VERBOSE_LEVEL == 2
+  puts("-----------------------");
+  puts("Inside dict_get_value ");
+  for (int i=0; i<4; i++) 
+    printf("k%d=%016lx\n", i, keys[i]);
+
+  for (int i=0; i<4; i++) 
+    printf("idx%d=%ld\n", i, indices[i]);
   
+  printf("nslots=%lu\n",  d->nslots);
+  print_m25i(lookup_keys_simd, "lookup_key_simd");
+  print_m25i(comp_keys_simd, "comp_keys_simd");
+  print_m25i(dict_keys_simd, "dict_keys_simd");
+  print_m25i(comp_empty_simd, "comp_empty_simd");
+  print_m25i(steps, "steps");
+  printf("should stop=%d\n", should_stop);
+  puts("ENTERING WHILE LOOP");
+  #endif
+#endif
   while (!should_stop){// occupied slo,tmul
     // linear probing
     // get new fresh keys
     //+ change load to be consistent with idx vector
 
     // update indices according to steps @todo this is ugly
-    // for loop does not work here because extract requires const int 
-    indices[0] += _mm256_extract_epi64(steps,  0);
-    indices[1] += _mm256_extract_epi64(steps,  1);
-    indices[2] += _mm256_extract_epi64(steps,  2);
-    indices[3] += _mm256_extract_epi64(steps,  3);
+    // for loop does not work here because extract requires const int
+
+    /* indices[0] += _mm256_extract_epi64(steps,  0); */
+    /* indices[1] += _mm256_extract_epi64(steps,  1); */
+    /* indices[2] += _mm256_extract_epi64(steps,  2); */
+    /* indices[3] += _mm256_extract_epi64(steps,  3); */
     // if an index passes the end of the array, go back to the beginning
     #pragma omp simd
     for (int i = 4; i<4; ++i) {
@@ -239,8 +269,10 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
 
     // bi = 0 if a key is found or if an empty entry is found
     // bi = 1 if a key were not found nor an empty slot
-    steps = _mm256_and_si256(steps, ones);/* (b0, b1, b2, b3) */  
-  
+    // First converts 0 to 1 and vice versa, then AND it with 1
+    steps = _mm256_andnot_si256(steps, ones);  ;/* (b0, b1, b2, b3) */  
+    indices_simd = _mm256_add_epi64(indices_simd, steps);
+    _mm256_storeu_epi64(indices, indices_simd);  
     // Note: we can use steps as a stopping indicator
     // If all values are zeros, then it will return 1
     should_stop = _mm256_testz_si256(steps, steps);
@@ -248,11 +280,19 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     
 
 #ifdef VERBOSE_LEVEL
+    #if VERBOSE_LEVEL == 2
     printf("nslots=%lu\n",  d->nslots);
-    print_m25i(steps, "steps");
-    print_m25i(dict_keys_simd, "dict_keys_simd");
     print_m25i(lookup_keys_simd, "lookup_key_simd");
+    print_m25i(comp_keys_simd, "comp_keys_simd");
+    print_m25i(dict_keys_simd, "dict_keys_simd");
+    print_m25i(comp_empty_simd, "comp_empty_simd");
+    print_m25i(steps, "steps");
     printf("should stop=%d\n", should_stop);
+    for (int i=0; i<4; i++) 
+      printf("idx%d=%ld\n", i, indices[i]);
+    print_m25i(indices_simd, "indices_simd");
+    puts("");
+    #endif
 #endif
     
     
