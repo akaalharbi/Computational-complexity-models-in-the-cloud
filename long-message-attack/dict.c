@@ -157,7 +157,7 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
       keys[2] % d->nslots,
       keys[3] % d->nslots
     } ;
-  __m256i indices_simd = _mm256_loadu_epi64(indices);
+  __m256i indices_simd = _mm256_load_si256((__m256i*) indices);
   
   // Load keys from dictionary according to indices: (is gather better?)
   // they will be compared against lookup_keys_simd
@@ -186,7 +186,7 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
   // First converts 0 to 1 and vice versa, then AND it with 1
   steps = _mm256_andnot_si256(steps, ones);  ;/* (b0, b1, b2, b3) */  
   indices_simd = _mm256_add_epi64(indices_simd, steps);
-  _mm256_storeu_epi64(indices, indices_simd);
+  _mm256_store_si256((__m256i*) indices, indices_simd);
   // Note: we can use steps as a stopping indicator
   // If all values are zeros, then it will return 1
   int should_stop = _mm256_testz_si256(steps, steps);
@@ -239,9 +239,9 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
         indices[i] = 0; // reduction mod d->nslots, since the largest step is 1
       }
     }
-    
 
-    // Load fresh new keys
+ 
+    // Load fresh new keys // use load instead
     dict_keys_simd = _mm256_set_epi64x(d->keys[indices[0]],
 				       d->keys[indices[1]],
 				       d->keys[indices[2]],
@@ -272,7 +272,7 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     // First converts 0 to 1 and vice versa, then AND it with 1
     steps = _mm256_andnot_si256(steps, ones);  ;/* (b0, b1, b2, b3) */  
     indices_simd = _mm256_add_epi64(indices_simd, steps);
-    _mm256_storeu_epi64(indices, indices_simd);  
+    _mm256_store_si256((__m256i*)indices, indices_simd);  
     // Note: we can use steps as a stopping indicator
     // If all values are zeros, then it will return 1
     should_stop = _mm256_testz_si256(steps, steps);
@@ -301,11 +301,12 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     #endif
   }
 
-  // update found_keys 
-  found_keys[0] += _mm256_extract_epi64(dict_keys_simd,  0);
-  found_keys[1] += _mm256_extract_epi64(dict_keys_simd,  1);
-  found_keys[2] += _mm256_extract_epi64(dict_keys_simd,  2);
-  found_keys[3] += _mm256_extract_epi64(dict_keys_simd,  3);
+  // update found_keys
+  _mm256_storeu_si256((__m256i*)indices, dict_keys_simd);
+  /* found_keys[0] = _mm256_extract_epi64(dict_keys_simd,  0); */
+  /* found_keys[1] = _mm256_extract_epi64(dict_keys_simd,  1); */
+  /* found_keys[2] = _mm256_extract_epi64(dict_keys_simd,  2); */
+  /* found_keys[3] = _mm256_extract_epi64(dict_keys_simd,  3); */
 
 }
 
