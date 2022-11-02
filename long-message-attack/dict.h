@@ -51,7 +51,7 @@ typedef struct  __attribute__((aligned(32))) {
 dict *dict_new(size_t nslots);
 void dict_init(dict* d);
 void dict_free(dict* d);
-int  dict_memory(size_t nelements);
+size_t  dict_memory(size_t nelements);
 void dict_add_element_to(dict* d, uint64_t key[2]);
 #pragma omp declare simd uniform( d )
 void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]);

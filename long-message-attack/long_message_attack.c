@@ -234,7 +234,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     free(d);
     return;
   }
-  
+
 
   /// ------------------- ///
 
@@ -248,7 +248,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   #endif // _OPENMP
 
   #ifdef VERBOSE_LEVEL
-  omp_set_num_threads(1); // for debugging only 1 thread
+  omp_set_num_threads(1); // for debugging only 1 thread 
   #endif
   #pragma omp parallel shared(collision_found)
   {

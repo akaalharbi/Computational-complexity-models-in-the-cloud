@@ -77,7 +77,7 @@ inline void dict_free(dict* d){
 }
 
 
-int dict_memory(size_t nelements){
+size_t dict_memory(size_t nelements){
   /// return memory estimation of the dictionary size
   int estimate = (size_t)  ceil((1/FILLING_RATE)*nelements);
   int padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - nelements%( (ALIGNMENT/sizeof(uint64_t)) );
@@ -87,7 +87,7 @@ int dict_memory(size_t nelements){
   estimate = estimate*(sizeof(uint64_t)) /* keys */
            + sizeof(dict);
 
-  return estimate/1000.0;
+  return estimate/100.0;
 }
 
 
@@ -180,6 +180,7 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
 
   __m256i zero_vect = _mm256_setzero_si256();
   __m256i ones = _mm256_set1_epi64x(1); /* (1, 1, 1, 1) */
+  __m256i nslots_simd = _mm256_set1_epi64x(d->nslots); /* (1, 1, 1, 1) */
   
 
   //+ if we found key i, or we hit an empty slot in the linear probing then there is
@@ -201,10 +202,7 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
   //+ rewirte the codition to suit the vectorized version
   // @TODO start from here
 
-
-
-
-
+  indices_simd = _mm256_load_si256((__m256i*) indices);
   while (!should_stop){// occupied slo,tmul
     // linear probing
     // get new fresh keys
@@ -220,12 +218,12 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     #endif
     #endif
     
-    dict_keys_simd = _mm256_set_epi64x(d->keys[indices[3]],
-				       d->keys[indices[2]],
-				       d->keys[indices[1]],
-				       d->keys[indices[0]]);
-
-    indices_simd = _mm256_load_si256((__m256i*) indices);
+    /* dict_keys_simd = _mm256_set_epi64x(d->keys[indices[3]], */
+    /* 				       d->keys[indices[2]], */
+    /* 				       d->keys[indices[1]], */
+    /* 				       d->keys[indices[0]]); */
+    dict_keys_simd = _mm256_i64gather_epi64(d->keys, indices_simd, 8);
+    // indices_simd = _mm256_load_si256((__m256i*) indices);
     /* test1: compare found key from dict with input key */
     comp_keys_simd = _mm256_cmpeq_epi64(lookup_keys_simd, dict_keys_simd);
     /* test2: compare found key from dict with zeor, i.e. empty slot */
@@ -242,24 +240,14 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     indices_simd = _mm256_add_epi64(indices_simd, steps);
 
 
+    indices_simd = _mm256_and_si256(indices_simd,
+				    _mm256_cmpgt_epi64(nslots_simd, indices_simd));
+
     _mm256_store_si256((__m256i*) indices, indices_simd);
-    #pragma omp simd /* reduction mod d->nslots if necessary */
-    for (int i = 4; i<4; ++i) {
-      if (indices[i] >= d->nslots) {
-        indices[i] = 0; // reduction mod d->nslots, since the largest step is 1
-	puts("reduction done");
-      }
-    }
-    // @todo there is surely a better way to reduce mod d->nslots
-    // on the simd variable
-    indices_simd = _mm256_load_si256((__m256i*) indices);
-    // Note: we can use steps as a stopping indicator
-    // If all values are zeros, then it will return 1
     should_stop =  _mm256_testz_si256(steps, steps);
 
     #ifdef VERBOSE_LEVEL
      #if VERBOSE_LEVEL == 2
-
      printf("nslots=%lu\n",  d->nslots);
      print_m25i(lookup_keys_simd, "lookup_key_simd");
      print_m25i(comp_keys_simd, "comp_keys_simd");
@@ -281,7 +269,7 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     ++(d->nprobes_lookup);
     #endif
   }
-  _mm256_store_si256((__m256i*) found_keys, dict_keys_simd);
+  _mm256_storeu_si256((__m256i*) found_keys, dict_keys_simd);
 }
 
 
