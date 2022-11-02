@@ -246,8 +246,10 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   // printf("Max nthreads=%d\n", omp_get_max_threads());
 
   #endif // _OPENMP
-  omp_set_num_threads(1);
 
+  #ifdef VERBOSE_LEVEL
+  omp_set_num_threads(1); // for debugging only 1 thread
+  #endif
   #pragma omp parallel shared(collision_found)
   {
     // each variable inside is private to each thread
