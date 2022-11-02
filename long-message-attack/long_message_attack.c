@@ -262,7 +262,9 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     // use simd to create 8 hashes simultanously
     BYTE random_message_priv[NSIMD_SHA][64] = {0};
     uint64_t digest_priv[NSIMD_SHA][2] = {0};
-    uint64_t lookup_keys[NSIMD_SHA] = {0}; // NOT THE BEST OPTION
+    uint64_t lookup_keys_priv[NSIMD_SHA] = {0};// = {0}; // @red_flag no alignmnet when it gets passed to
+    // printf("lookup_keys_priv has address %p\n", lookup_keys_priv);
+    // dict_get_values_simd(dict *d, uint64_t *keys, uint64_t *found_keys)
     uint32_t state_priv[NSIMD_SHA][8] = {0};
     size_t found_keys_priv[NSIMD_SHA] = {0};
     size_t ctr_priv = 0;
@@ -283,9 +285,9 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 	memcpy(state_priv[i], state_init_priv, sizeof(state_init_priv));
 	sha256_process_x86_single(state_priv[i], random_message_priv[i]);	
 	truncate_state32bit_get_digest(digest_priv[i], state_priv[i], n_of_bits);
-	lookup_keys[i] = digest_priv[i][0];
+	lookup_keys_priv[i] = digest_priv[i][0];
       }
-      dict_get_values_simd(d, lookup_keys, found_keys_priv);
+      dict_get_values_simd(d, lookup_keys_priv, found_keys_priv);
 
 
       // test if a collision is found? false positives are acceptable

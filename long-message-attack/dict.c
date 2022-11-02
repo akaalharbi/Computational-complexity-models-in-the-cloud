@@ -151,33 +151,26 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     
   // -------------------- VARIBLES SETUP ------------------------ //
   //+ set component i: 64 bit to be the key passed from input
-  __m256i lookup_keys_simd = _mm256_setr_epi64x(keys[0],
-						keys[1],
-						keys[2],
-						keys[3]);
+  /* __m256i lookup_keys_simd = _mm256_setr_epi64x(keys[0], */
+  /* 						keys[1], */
+  /* 						keys[2], */
+  /* 						keys[3]); */
+  __m256i lookup_keys_simd = _mm256_loadu_si256((__m256i*) keys);
+
   //+ indices to load from the memory:
   uint64_t indices[4] __attribute__((aligned(32))) = {
       keys[0] % d->nslots,
       keys[1] % d->nslots,
       keys[2] % d->nslots,
       keys[3] % d->nslots
-    } ;
+    };
+  __m256i indices_simd = _mm256_load_si256((__m256i*) indices);
 
-
-  __m256i indices_simd;// = _mm256_load_si256((__m256i*) indices);
-  //print_m25i(indices_simd, "indices at init");
-  //puts("indices before update");
-  //for (int i=0; i<4; i++) 
-  //  printf("idx%d=%ld\n", i, indices[i]);
 
   // Load keys from dictionary according to indices: (is gather better?)
   // they will be compared against lookup_keys_simd
   // todo: use load instead of set!
-  __m256i dict_keys_simd; /* = _mm256_set_epi64x(d->keys[indices[0]], */
-			  /* 		     d->keys[indices[1]], */
-			  /* 		     d->keys[indices[2]], */
-			  /* 		     d->keys[indices[3]]); */
-
+  __m256i dict_keys_simd;
   __m256i zero_vect = _mm256_setzero_si256();
   __m256i ones = _mm256_set1_epi64x(1); /* (1, 1, 1, 1) */
   __m256i nslots_simd = _mm256_set1_epi64x(d->nslots); /* (1, 1, 1, 1) */
@@ -189,7 +182,7 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
   // empty were encountered, 0 otherwise.
   __m256i comp_keys_simd;   /* = _mm256_cmpeq_epi64(lookup_keys_simd, dict_keys_simd); */
   __m256i comp_empty_simd;  /* = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect); */
-
+  __m256i comp_less_nslots;
   // Currently: 0 if no key were found nor an empty hole,
   // i.e. probe the next element. The 0 will become 1, just be patient
   __m256i steps;  /* = _mm256_or_si256(comp_keys_simd, comp_empty_simd); */
@@ -202,22 +195,13 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
   //+ rewirte the codition to suit the vectorized version
   // @TODO start from here
 
-  indices_simd = _mm256_load_si256((__m256i*) indices);
+  
   while (!should_stop){// occupied slo,tmul
     // linear probing
     // get new fresh keys
     //+ change load to be consistent with idx vector
     // Load fresh new keys // use load instead
-    #ifdef VERBOSE_LEVEL
-     #if VERBOSE_LEVEL == 2
-      puts("================================");
-      printf("nslots=%lu\n",  d->nslots);
-      for (int i=0; i<4; i++) 
-	printf("idx%d=%ld\n", i, indices[i]);
-      puts("-----------------------------");
-    #endif
-    #endif
-    
+
     /* dict_keys_simd = _mm256_set_epi64x(d->keys[indices[3]], */
     /* 				       d->keys[indices[2]], */
     /* 				       d->keys[indices[1]], */
@@ -240,26 +224,25 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     indices_simd = _mm256_add_epi64(indices_simd, steps);
 
 
-    indices_simd = _mm256_and_si256(indices_simd,
-				    _mm256_cmpgt_epi64(nslots_simd, indices_simd));
+    comp_less_nslots = _mm256_cmpgt_epi64(nslots_simd, indices_simd);
+    indices_simd = _mm256_and_si256(indices_simd, comp_less_nslots);
+				    
 
-    _mm256_store_si256((__m256i*) indices, indices_simd);
-    should_stop =  _mm256_testz_si256(steps, steps);
+    /* _mm256_store_si256((__m256i*) indices, indices_simd); */
+    should_stop  =  _mm256_testz_si256(steps, steps) || _mm256_movemask_epi8(comp_keys_simd);
+
 
     #ifdef VERBOSE_LEVEL
      #if VERBOSE_LEVEL == 2
      printf("nslots=%lu\n",  d->nslots);
      print_m25i(lookup_keys_simd, "lookup_key_simd");
+     print_m25i(comp_less_nslots, "comp_less_nslots"); 
      print_m25i(comp_keys_simd, "comp_keys_simd");
      print_m25i(dict_keys_simd, "dict_keys_simd");
      print_m25i(comp_empty_simd, "comp_empty_simd");
      print_m25i(steps, "steps");
-     print_m25i(indices_simd, "indices_simd");
+     print_m25i(indices_simd, "indices_simd(hex)");
      printf("should stop=%d\n", should_stop);
-     print_m25i(indices_simd, "indices_simd");
-     puts("new indices");
-     for (int i=0; i<4; i++) 
-       printf("idx%d=%ld\n", i, indices[i]);
      puts("==========================");
      #endif
    #endif
