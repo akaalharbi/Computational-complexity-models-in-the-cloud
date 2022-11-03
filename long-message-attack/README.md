@@ -28,24 +28,29 @@ In these measurements, we used a predictable prng in order to test the same numb
 
 
 ## n=52, l=25
-- 03 nov 2022:  5,1244 +- 0,0461 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
+- 03 nov 2022: 3,9475 +- 0,0131 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
+- 02 nov 2022:  5,1244 +- 0,0461 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
 - 13 oct 2022(updated):  6,2746 +- 0,0566 sec (ɑ=0.90, sha256-x86, simd(single element search), openmp, 64bit key store)
 - (not-accurate) 27 sep 2022: 976.07 sec (ɑ=0.50, sha256, openmp)
 
 ## n=51, l=25
-- 03 nov 2022:  5,0265 +- 0,0145 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
+- 03 nov 2022: 3,9668 +- 0,0143 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
+- 02 nov 2022:  5,0265 +- 0,0145 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
 - 13 oct 2022(updated):  5,611 +- 0,0292 sec  (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
 - 27 sep 2022(not-accurate): 322.98 sec (ɑ=0.50, sha256, openmp)
 
 ## n=50, l=25
 (c rand_r, seed is the thread number)
-- 03 nov 2022: 4,0711 +- 0,0105 secc (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
+- 03 nov 2022: 3,95056 +- 0,00790 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
+- 02 nov 2022: 4,0711 +- 0,0105 secc (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
 - 13 oct 2022:   5,6730 +- 0,0871 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
 (random numbers)
 - 27 sep 2022(not-accurate): 51.15 sec (ɑ=0.50, sha256, openmp)
 
 
-
+## n=44, l=18
+(todo restore old data)
+- 03 nov 2022: 0,01836 +- 0,00231 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
 
 # Summary:
 This folder has three main executables `long_message_attack`, `verify_hash', `bench_mark` which generate two colliding messages, verifies the results, and benchmark the dictionary and sha256 respectively. 

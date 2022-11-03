@@ -1,2 +1,2 @@
 n l estimated_time estimated_memory time_phase_i real_memory_usage virt_memory_usage time_all_attack trials idx_message
-50, 25, NAN, 2982713.00kb, 3.916608sec, RES=293652kb, VmSize=295284kb, 3.925180sec, 48, 392640946999495
+55, 25, NAN, 2982713.00kb, 3.957937sec, RES=293732kb, VmSize=295284kb, 3.968269sec, 44, 31624016241306938

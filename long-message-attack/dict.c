@@ -49,11 +49,12 @@ dict* dict_new(size_t nelements){
 
   //nslots = nslots + padding_alignment;
   d->nslots = nslots;
-  printf("nslots=%lu, padding=%d, alignmen/sizeof(uint64)=%lu\n",
-	 d->nslots, padding_alignment, (ALIGNMENT/sizeof(uint64_t)));
+  /* printf("nslots=%lu, padding=%d, alignmen/sizeof(uint64)=%lu\n", */
+  /* 	 d->nslots, padding_alignment, (ALIGNMENT/sizeof(uint64_t))); */
 
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
+  d->nelments_succ_lookup = 0;
   d->keys = (uint64_t*) aligned_alloc(ALIGNMENT,
 		         (padding_alignment + nslots)*(sizeof(uint64_t)));
   // (uint64_t*) malloc(d->nslots*(sizeof(uint64_t)));
@@ -206,7 +207,7 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     /* 				       d->keys[indices[2]], */
     /* 				       d->keys[indices[1]], */
     /* 				       d->keys[indices[0]]); */
-    dict_keys_simd = _mm256_i64gather_epi64(d->keys, indices_simd, 8);
+    dict_keys_simd = _mm256_i64gather_epi64((const long long int*)d->keys, indices_simd, 8);
     // indices_simd = _mm256_load_si256((__m256i*) indices);
     /* test1: compare found key from dict with input key */
     comp_keys_simd = _mm256_cmpeq_epi64(lookup_keys_simd, dict_keys_simd);
@@ -229,8 +230,12 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
 				    
 
     /* _mm256_store_si256((__m256i*) indices, indices_simd); */
-    should_stop  =  _mm256_testz_si256(steps, steps) || _mm256_movemask_epi8(comp_keys_simd);
-
+    // this always guarantees the worst run time among the 4 elements
+    // should_stop  =  _mm256_testz_si256(steps, steps) || _mm256_movemask_epi8(comp_keys_simd);
+                   /* one chunk is 64bit, movemaks checks every 8bit, we test if at least three elements seen an empty slot   */
+    should_stop =  __builtin_popcount( _mm256_movemask_epi8 (comp_empty_simd) )  >= 8*3;
+    printf("should_stop=%d, popcount=%d\n", should_stop, __builtin_popcount( _mm256_movemask_epi8 (comp_empty_simd) ));
+    should_stop = should_stop || _mm256_movemask_epi8(comp_empty_simd);
 
     #ifdef VERBOSE_LEVEL
      #if VERBOSE_LEVEL == 2
@@ -249,7 +254,8 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     
     
     #ifdef NPROBES_COUNT
-    ++(d->nprobes_lookup);
+     d->nprobes_lookup += 4; // @todo NSIMD_SHA
+     d->nelments_succ_lookup += __builtin_popcount( _mm256_movemask_epi8 (comp_empty_simd) )>>3;
     #endif
   }
   _mm256_storeu_si256((__m256i*) found_keys, dict_keys_simd);

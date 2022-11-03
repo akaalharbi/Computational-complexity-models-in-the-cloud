@@ -38,6 +38,7 @@ typedef struct  __attribute__((aligned(32))) {
   size_t nslots; // number of elements  in the dictionary
   size_t nprobes_insert;
   size_t nprobes_lookup;
+  size_t nelments_succ_lookup;
   //  size_t memory_estimates;
 } dict;
 

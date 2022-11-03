@@ -150,7 +150,7 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
     truncate_state32bit_get_digest(digest, state, 128);
 
     gettimeofday(&begin, 0);
-    dict_add_element_to(d, digest, i);
+    dict_add_element_to(d, digest);
     gettimeofday(&end, 0);    
     seconds = end.tv_sec - begin.tv_sec;
     microseconds = end.tv_usec - begin.tv_usec;
@@ -173,17 +173,35 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
 
 
   /// LOOKUP TIMING FINE TUNED
-  size_t values = 0; 
+  // size_t values = 0; 
+  #define NSIMD_SHA 4
+  // use simd to create 8 hashes simultanously
+  uint32_t state_init_priv[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+ 
+  BYTE random_message_priv[NSIMD_SHA][64] = {0};
+  uint64_t digest_priv[NSIMD_SHA][2] = {0};
+  uint64_t lookup_keys_priv[NSIMD_SHA] = {0};
+  uint32_t state_priv[NSIMD_SHA][8] = {0};
+  size_t found_keys_priv[NSIMD_SHA] = {0};
 
-  for (size_t i=0; i<N; ++i){
+  
+  for (size_t i=0; i<(N/NSIMD_SHA); ++i){
     // random numbers
-    sha256_process_x86_single(state, M);
-
-    truncate_state32bit_get_digest(digest, state, 128);
-
+    for (int i=0; i<NSIMD_SHA; ++i) {
+      fill_radom_byte_array_get_random(random_message_priv[i], 64);
+      // clean previously used values
+      memcpy(state_priv[i], state_init_priv, sizeof(state_init_priv));
+      sha256_process_x86_single(state_priv[i], random_message_priv[i]);	
+      truncate_state32bit_get_digest(digest_priv[i], state_priv[i], 128);
+      lookup_keys_priv[i] = digest_priv[i][0];
+    }
     gettimeofday(&begin, 0);
-    values += dict_get_value(d, digest);
+    dict_get_values_simd(d, lookup_keys_priv, found_keys_priv);
     gettimeofday(&end, 0);
+
     seconds = end.tv_sec - begin.tv_sec;
     microseconds = end.tv_usec - begin.tv_usec;
     elapsed = seconds + microseconds*1e-6;
@@ -195,6 +213,7 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
   elapsed_total = 0;
 
   printf("dictionary lookup %lu elements took %fsec \n", N,  elapsed);
+  printf("dictionary successful lookups %lu \n", d->nelments_succ_lookup);
   // fill base_lookup_rate only in the first call
   if (base_lookup_rate==0)
     base_lookup_rate = ((float) N) / elapsed;
@@ -222,19 +241,20 @@ int main(int argc, char* argv[]){
   // benchmark parallel sha256
   benchmark_sha256_x86_parallel();
 
-  
-  /* // benchmark filling rate */
-  /* size_t nelements = 1<<25; */
-  /* FILE* fp = fopen("log/benchmark_dict", "w"); */
-  /* fprintf(fp, "alpha, insert, nprobes_insert,  lookup, nprobes_lookup, total_gain\n" */
-  /* 	  "N=%lu\n", nelements); */
-  /* fclose(fp); */
-  
-  /* for (float i=0.5; i<0.99; i += 0.01){ */
-  /*   FILE* fp = fopen("log/benchmark_dict", "a"); */
-  /*   filling_rate_time(nelements, i, fp); */
-  /*   fclose(fp); */
-  /* } */
+
+  // benchmark filling rate
+  size_t nelements = 1<<25;
+
+  FILE* fp = fopen("log/benchmark_dict", "w");
+  fprintf(fp, "alpha, insert, nprobes_insert,  lookup, nprobes_lookup, total_gain\n"
+	  "N=%lu\n", nelements);
+  fclose(fp);
+  //filling_rate_time(nelements, 0.9, fp);  
+  for (float i=0.5; i<0.99; i += 0.01){
+    FILE* fp = fopen("log/benchmark_dict", "a");
+    filling_rate_time(nelements, i, fp);
+    fclose(fp);
+  }
 }
 
 
