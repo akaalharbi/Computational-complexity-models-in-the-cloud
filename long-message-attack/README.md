@@ -4,7 +4,11 @@
 - Phase III: Filter all false positives, record messages the produces collisions.
 
 # Known Bugs:
-- Phase II: doesn't work
+- Phase II: 
+  - stops when finding only one potential collision. It should stops after a sufficient number of collisions
+  - Store potential collisions in a file 
+
+- Phase III: 
 
 ## todo (Techincally not bugs):
 - Rewrite the format of the files
@@ -19,24 +23,28 @@
 - `messages/` there should be a distinction between potential messages and messages the leads to collisions
 
 # Performance Evolution
-In these measurements, we used a predictable prng in order to test the same numbers on all variants. Also, all parameters below have no cycle in Phase I. We believe this is realistic model.
+In these measurements, we used a predictable prng in order to test the same numbers on all variants. Also, all parameters below have no cycle in Phase I. We believe this is realistic model. These tests have been conducted on the same machine with the same OS.
+
+
 
 ## n=52, l=25
-- 13 oct 2022:  13.16 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
-- 27 sep 2022: 976.07 sec (ɑ=0.50, sha256, openmp)
+- 03 nov 2022:  5,1244 +- 0,0461 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
+- 13 oct 2022(updated):  6,2746 +- 0,0566 sec (ɑ=0.90, sha256-x86, simd(single element search), openmp, 64bit key store)
+- (not-accurate) 27 sep 2022: 976.07 sec (ɑ=0.50, sha256, openmp)
 
 ## n=51, l=25
-- 13 oct 2022:   7.41 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
-- 27 sep 2022: 322.98 sec (ɑ=0.50, sha256, openmp)
+- 03 nov 2022:  5,0265 +- 0,0145 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
+- 13 oct 2022(updated):  5,611 +- 0,0292 sec  (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
+- 27 sep 2022(not-accurate): 322.98 sec (ɑ=0.50, sha256, openmp)
 
 ## n=50, l=25
-- 13 oct 2022:  4.22 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
-- 27 sep 2022: 51.15 sec (ɑ=0.50, sha256, openmp)
+(c rand_r, seed is the thread number)
+- 03 nov 2022: 4,0711 +- 0,0105 secc (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
+- 13 oct 2022:   5,6730 +- 0,0871 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
+(random numbers)
+- 27 sep 2022(not-accurate): 51.15 sec (ɑ=0.50, sha256, openmp)
 
 
-## n=44, l=18
-- 13 oct 2022:   3.20 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
-- 27 sep 2022: 103.01 sec (ɑ=0.50, sha256, openmp)
 
 
 # Summary:

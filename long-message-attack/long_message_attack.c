@@ -258,7 +258,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
       0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
     };
-    #define NSIMD_SHA 8
+    #define NSIMD_SHA 4
     // use simd to create 8 hashes simultanously
     BYTE random_message_priv[NSIMD_SHA][64] = {0};
     uint64_t digest_priv[NSIMD_SHA][2] = {0};
@@ -270,6 +270,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     size_t ctr_priv = 0;
     size_t j = 0;
     int maybe_collision = 0;
+    unsigned int seed = omp_get_thread_num();
     /* BYTE* random_message_priv = (BYTE*) malloc(sizeof(BYTE)*64); */
     /* uint64_t* digest_priv = (uint64_t*) malloc((sizeof(uint64_t)*2)); */
     /* uint32_t* state_priv = (uint32_t*) malloc(sizeof(uint32_t)*8); */
@@ -280,7 +281,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       // create a random message of 64 bytes
       #pragma omp simd
       for (int i=0; i<NSIMD_SHA; ++i) {
-	fill_radom_byte_array(random_message_priv[i], 64);
+	fill_radom_byte_array(random_message_priv[i], 64, &seed);
 	// clean previously used values
 	memcpy(state_priv[i], state_init_priv, sizeof(state_init_priv));
 	sha256_process_x86_single(state_priv[i], random_message_priv[i]);	

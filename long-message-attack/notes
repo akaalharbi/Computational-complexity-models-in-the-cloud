@@ -1,4 +1,9 @@
 
+Wednesday 3 nov 2022
+- convert lookup_keys and found keys to __m256i
+- lay down the first steps of simd sha256
+
+____________________
 Thursday 27 oct 2022:
 - create dict_get_value_simd 
 - 

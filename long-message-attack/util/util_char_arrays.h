@@ -10,7 +10,7 @@ int cmp_arrays(char* array1, char* array2, size_t len);
 void print_char(char *l, size_t len);
 unsigned char *long_message_zeros(size_t n_of_bits);
 unsigned char *create_radom_byte_array(int n_of_bytes);
-void fill_radom_byte_array(unsigned char* A, int n_of_bytes);
+void fill_radom_byte_array(unsigned char* A, int n_of_bytes, unsigned int *seed);
 void truncate_array(unsigned char* A, size_t size_A, size_t total_out_bits);
 void truncate_state32bit_get_digest(uint64_t* dst, uint32_t state[8], int n_of_bits);
 #endif
