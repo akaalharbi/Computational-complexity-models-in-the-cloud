@@ -233,9 +233,28 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
     // this always guarantees the worst run time among the 4 elements
     // should_stop  =  _mm256_testz_si256(steps, steps) || _mm256_movemask_epi8(comp_keys_simd);
                    /* one chunk is 64bit, movemaks checks every 8bit, we test if at least three elements seen an empty slot   */
+
+    /// n=52, l=25
+    /// 4/4 votes: 5,0589 +- 0,0210 seconds time elapsed  ( +-  0,42% )
+    /// 3/4 votes: 4,74582 +- 0,00778 seconds time elapsed  ( +-  0,16% ) 
+    /// 2/4 votes: 4,61415 +- 0,00838 seconds time elapsed  ( +-  0,18% )
+    /// 1/4 votes: 4,6051 +- 0,0494 seconds time elapsed  ( +-  1,07% )
+    /// simd linear probing  5,9917 +- 0,0192 seconds time elapsed  ( +-  0,32% )
+
+    #ifdef NPROBES_COUNT
+     d->nprobes_lookup += 4; // @todo NSIMD_SHA
+     d->nelments_succ_lookup += __builtin_popcount( _mm256_movemask_epi8 (comp_empty_simd) )>>3;
+    #endif
+
+    
     should_stop =  __builtin_popcount( _mm256_movemask_epi8 (comp_empty_simd) )  >= 8*3;
-    printf("should_stop=%d, popcount=%d\n", should_stop, __builtin_popcount( _mm256_movemask_epi8 (comp_empty_simd) ));
-    should_stop = should_stop || _mm256_movemask_epi8(comp_empty_simd);
+    if (should_stop){
+      /// Note that found_keys are not all empty, we need to return 0
+      _mm256_storeu_si256((__m256i*) found_keys, zero_vect);
+      return;
+    }
+      
+    should_stop = _mm256_movemask_epi8(comp_keys_simd);
 
     #ifdef VERBOSE_LEVEL
      #if VERBOSE_LEVEL == 2
@@ -248,15 +267,13 @@ void dict_get_values_simd(dict* d, uint64_t keys[4], uint64_t found_keys[4]){
      print_m25i(steps, "steps");
      print_m25i(indices_simd, "indices_simd(hex)");
      printf("should stop=%d\n", should_stop);
+     printf("move_mask_empty=0x%02x\n", _mm256_movemask_epi8 (comp_empty_simd));
+     printf("move_mask_comp_keys=0x%02x\n", _mm256_movemask_epi8 (comp_keys_simd));
+
      puts("==========================");
      #endif
    #endif
     
-    
-    #ifdef NPROBES_COUNT
-     d->nprobes_lookup += 4; // @todo NSIMD_SHA
-     d->nelments_succ_lookup += __builtin_popcount( _mm256_movemask_epi8 (comp_empty_simd) )>>3;
-    #endif
   }
   _mm256_storeu_si256((__m256i*) found_keys, dict_keys_simd);
 }

@@ -247,9 +247,9 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
   #endif // _OPENMP
 
-  #ifdef VERBOSE_LEVEL
-  omp_set_num_threads(1); // for debugging only 1 thread 
-  #endif
+  /* #ifdef VERBOSE_LEVEL */
+  /* omp_set_num_threads(1); // for debugging only 1 thread  */
+  /* #endif */
   #pragma omp parallel shared(collision_found)
   {
     // each variable inside is private to each thread
@@ -292,15 +292,25 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
 
       // test if a collision is found? false positives are acceptable
-      
+      // @todo this is incorrect with multiple dict probing
       for (int i=0; i<NSIMD_SHA; ++i){
 	if (found_keys_priv[i]){
 	  //j = found_keys_priv[i];
 	  #pragma omp critical
 	  {
+
 	    collision_found = 1;
 	    idx = found_keys_priv[i];
 	    memcpy(random_message, random_message_priv[j], 64);
+
+   	    #ifdef VERBOSE_LEVEL
+	    printf("thread%d\n", omp_get_thread_num());
+	    printf("found_keys\n");
+	    for (int k=0; k<NSIMD_SHA; ++k)
+	      printf("0x%016lx, ", found_keys_priv[k]);
+	    puts("");
+	    #endif
+
 	  }
 	}
       }

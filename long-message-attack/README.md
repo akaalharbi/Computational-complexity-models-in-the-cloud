@@ -25,26 +25,44 @@
 # Performance Evolution
 In these measurements, we used a predictable prng in order to test the same numbers on all variants. Also, all parameters below have no cycle in Phase I. We believe this is realistic model. These tests have been conducted on the same machine with the same OS.
 
+## to gather or not to gather:
+Benchmarking dictionary lookup where 4-elements simultaneously using gather instruction, the look up are slower than linear lookup of a single element. On the other hand, when benchmarking `long\_message\_attack 52 25` the gather version seems to be 20% faster. 
+
+These conflicting measures can be resolved by observing the two facts:
+1. The old code has a dictionary size almost 2x larger than dictionary used in gather version. This is because, we decided to remove values array. 
+2. Counting the number of trials, due to to the prng, gather version was lucky when it found the collision after ~30M trials. The linear version had to go through ~70M trials and was around ~20% slower!
+
+## Verdict:
+Gather instruction is not worth using in our case. 
+
+### Addendum:
+
+I found claims that:
+	- Gather is 8x faster on new amd threadripper (see https://twitter.com/ChrisGr93091552/status/1562583460992397317 )
+	- Gather can be as fast as linear scan (see to use or not to use the simd gather https://dl.acm.org/doi/abs/10.1145/3533737.3535089 )
+
 
 
 ## n=52, l=25
-- 03 nov 2022: 3,9475 +- 0,0131 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
-- 02 nov 2022:  5,1244 +- 0,0461 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
-- 13 oct 2022(updated):  6,2746 +- 0,0566 sec (ɑ=0.90, sha256-x86, simd(single element search), openmp, 64bit key store)
+- 13 oct 2022(updated):  5,9917 +- 0,0192 seconds time elapsed  ( +-  0,32%) (ɑ=0.90, sha256-x86, simd(single element search), openmp, 64bit key store)
 - (not-accurate) 27 sep 2022: 976.07 sec (ɑ=0.50, sha256, openmp)
+- (Warning: This result is faster due to incorrect behavior! when 3/4 decides to end the probe, ) 03 nov 2022: 3,9475 +- 0,0131 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
+
+
+
 
 ## n=51, l=25
-- 03 nov 2022: 3,9668 +- 0,0143 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
+
 - 02 nov 2022:  5,0265 +- 0,0145 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
 - 13 oct 2022(updated):  5,611 +- 0,0292 sec  (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
 - 27 sep 2022(not-accurate): 322.98 sec (ɑ=0.50, sha256, openmp)
-
+- (Warning: This result is faster due to incorrect behavior!) 03 nov 2022: 3,9668 +- 0,0143 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
 ## n=50, l=25
 (c rand_r, seed is the thread number)
-- 03 nov 2022: 3,95056 +- 0,00790 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
 - 02 nov 2022: 4,0711 +- 0,0105 secc (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
 - 13 oct 2022:   5,6730 +- 0,0871 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
 (random numbers)
+- (Warning: This result is faster due to incorrect behavior!) 03 nov 2022: 3,95056 +- 0,00790 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
 - 27 sep 2022(not-accurate): 51.15 sec (ɑ=0.50, sha256, openmp)
 
 

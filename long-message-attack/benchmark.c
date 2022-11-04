@@ -125,8 +125,8 @@ void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
   dict* d = dict_new(n_of_blocks);
 
   size_t N = (size_t) (n_of_blocks<<1) * alpha;
-  /* printf("N=%lu=2^%f\n", N, log2(N)); */
-  /* printf("dict has %lu slots = 2^%f slots", d->nslots, log2(d->nslots)); */
+  printf("N=%lu=2^%f\n", N, log2(N));
+  printf("dict has %lu slots = 2^%f slots", d->nslots, log2(d->nslots));
   fprintf(fp, "%.2f, ", alpha);
   struct timeval begin, end;
   long seconds = 0;
