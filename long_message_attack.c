@@ -9,8 +9,9 @@
 // 3- check the code is sound
 
 
+// define which sha256 to use 
+#include "sha256/sha256-x86.h"
 
-#include "sha256-x86.h"
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
 #include <endian.h>

@@ -91,15 +91,15 @@ float benchmark_sha256_x86_parallel(){
 
   #pragma omp parallel
   {
-  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
+  BYTE M[64]  __attribute__ ((aligned (32)))  = {0}; // long_message_zeros(n_of_blocks*512);
   // store the hash value in this variable
   // uint64_t digest[2] = {0, 0};
   // INIT SHA256 
   
-  uint32_t state[8] = {
+  uint32_t state[8] __attribute__ ((aligned (32))) = {
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-  };
+  } ;
 
 
 
@@ -183,12 +183,12 @@ float benchmark_sha256_x86_modified_parallel(){
 
   #pragma omp parallel
   {
-  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
+  BYTE M[64] __attribute__ ((aligned (32)))  = {0}; // long_message_zeros(n_of_blocks*512);
   // store the hash value in this variable
   // uint64_t digest[2] = {0, 0};
   // INIT SHA256 
   
-  uint32_t state[8] = {
+  uint32_t state[8]  __attribute__ ((aligned (32)))   = {
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
   };
@@ -517,8 +517,8 @@ int main(int argc, char* argv[]){
   // benchmark parallel sha256
   benchmark_sha256_x86_parallel();
 
-  // benchmark_sha256_x86_modified();
-  // benchmark_sha256_x86_modified_parallel();
+  benchmark_sha256_x86_modified();
+  benchmark_sha256_x86_modified_parallel();
   benchmark_vsha256();
   benchmark_vsha256_parallel();
 
