@@ -25,6 +25,13 @@
 # Performance Evolution
 In these measurements, we used a predictable prng in order to test the same numbers on all variants. Also, all parameters below have no cycle in Phase I. We believe this is realistic model. These tests have been conducted on the same machine with the same OS.
 
+## sha256 performance:
+- sha256-x86 elapsed=1.046995sec, 32048322.000000 hash/sec≈2^24.933745 
+- parallel sha256-x86 elapsed=1.737093sec, 386328576.000000 hash/sec≈2^28.525253 
+- vsha256 elapsed=1.057237sec, 31737852.000000 hash/sec≈2^24.919701 
+- vsha256 parallel eapsed=3.001098sec, 223614368.000000 hash/sec≈2^27.736438 
+
+
 ## to gather or not to gather:
 Benchmarking dictionary lookup where 4-elements simultaneously using gather instruction, the look up are slower than linear lookup of a single element. On the other hand, when benchmarking `long\_message\_attack 52 25` the gather version seems to be 20% faster. 
 
