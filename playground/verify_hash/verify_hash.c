@@ -8,9 +8,9 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "sha256-x86.h"
+#include "sha256.h"
 #include "shared.h"
-#include "util/util_char_arrays.h"
+#include "util_char_arrays.h"
 int is_there_duplicate = 0;
 
 size_t where_collides(const unsigned char rM[64], int output_size_bits){

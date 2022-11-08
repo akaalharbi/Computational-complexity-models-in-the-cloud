@@ -12,7 +12,7 @@
 #include <string.h> // memcpy
 #include <stdio.h>  // printf
 #include "types.h" // dict_key union type 
-#include "util/util_char_arrays.h" // cmp_arrays
+#include "util_char_arrays.h" // cmp_arrays
 #include "shared.h"
 ///-----------------------------------------------------///
 ///                  data structure                     ///

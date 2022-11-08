@@ -1,7 +1,7 @@
 /// fast sha256 implementation on intel processeors
 /// 
 /// source: https://github.com/noloader/SHA-Intrinsics/blob/master/sha256-x86.c
-#include "sha256-x86.h"
+#include "sha256.h"
 #include <emmintrin.h>
 
 /* Process multiple blocks. The caller is responsible for setting the initial */

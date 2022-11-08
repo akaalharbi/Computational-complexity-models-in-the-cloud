@@ -10,7 +10,7 @@
 
 
 // define which sha256 to use 
-#include "sha256/sha256-x86.h"
+#include "sha256.h"
 
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
@@ -23,9 +23,9 @@
 #include <string.h>
 #include <memory.h>
 #include "types.h"
-#include "util/util_char_arrays.h"
+#include "util_char_arrays.h"
 #include "shared.h" // shared variables for duplicate 
-#include "util/memory.h"
+#include "memory.h"
 #include <sys/time.h>
 #include <omp.h>
 

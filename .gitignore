@@ -11,6 +11,7 @@ feedback
 *.ko
 *.obj
 *.elf
+obj/*
 
 # Linker output
 *.ilk
@@ -56,5 +57,4 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-benchmark
-verify_hash
+long_message_attac
