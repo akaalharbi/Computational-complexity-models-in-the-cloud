@@ -1,1 +1,0 @@
-{"[\"/usr/bin/clang\", \"c\", []]": {"compiler_includes": ["/usr/lib/llvm-14/lib/clang/14.0.0/include", "/usr/local/include", "/usr/include/x86_64-linux-gnu", "/usr/include"], "compiler_standard": "-std=gnu17", "target": "x86_64-pc-linux-gnu"}}

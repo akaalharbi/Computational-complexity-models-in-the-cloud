@@ -1,16 +1,17 @@
-CC=clang
+#CC=clang
+CC=gcc
 LDLIBS  = -lm
 LDFLAGS = -fopenmp
 INCLUDE = include
 INC = -I$(INCLUDE)
 
 ifeq ($(CC), clang)
-	CFLAGS = -g -O3 -fopenmp -Wall -march=native -msha -Rpass-analysis=loop-vectorize -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Xanalyzer -analyzer-constraints=z3
+	CFLAGS = -g -O3 -fopenmp -Wall -march=native -msha  #-Rpass-analysis=loop-vectorize -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Xanalyzer -analyzer-constraints=z3
 else
 	CFLAGS  = -g -O3 -fopenmp -Wall -march=native -msha -std=c11 -fanalyzer -fopt-info-vec -fopt-info-omp-vec-optimized-missed #-DVERBOSE_LEVEL=2 
 endif
 
-CFLAGS += -DVERBOSE_LEVEL=2 
+#CFLAGS += -DVERBOSE_LEVEL=2 
 
 
 #-DVERBOSE_LEVEL=2 
