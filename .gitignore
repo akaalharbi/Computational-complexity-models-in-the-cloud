@@ -12,6 +12,9 @@ feedback
 *.obj
 *.elf
 obj/*
+.ccls-cache
+.ccls-cache/*
+
 
 # Linker output
 *.ilk
