@@ -270,7 +270,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     size_t found_keys_priv[NSIMD_SHA] = {0};
     size_t ctr_priv = 0;
     size_t j = 0;
-    int maybe_collision = 0;
+    // int maybe_collision = 0;
     unsigned int seed = omp_get_thread_num();
     /* BYTE* random_message_priv = (BYTE*) malloc(sizeof(BYTE)*64); */
     /* uint64_t* digest_priv = (uint64_t*) malloc((sizeof(uint64_t)*2)); */
@@ -394,11 +394,9 @@ int main(int argc, char* argv []){
 
   char first_line[] =   "n l estimated_time estimated_memory time_phase_i real_memory_usage virt_memory_usage time_all_attack trials idx_message\n";
 
-  #ifdef _OPENMP
-  char directory_name[] = "statistics_parallel/";
-  #else
-  char directory_name[] = "statistics/";
-  #endif
+  char directory_name[] = "data/stats/";
+
+
 
 
   /// How to handle the arguments given by the command line:
@@ -409,46 +407,46 @@ int main(int argc, char* argv []){
   /// case 5: nmax nmin lmax lmin are given
 
 
-  if (argc == 1) {
-    /// special case for cluster.lip6.fr 
-    // supply n_max n_min l_max l_min
-    int n_max = 100;
-    int n_min = 71;
-    float l = 33.5;
-    // l = atof(argv[2]);
+  /* if (argc == 1) { */
+  /*   /// special case for cluster.lip6.fr  */
+  /*   // supply n_max n_min l_max l_min */
+  /*   int n_max = 100; */
+  /*   int n_min = 71; */
+  /*   float l = 33.5; */
+  /*   // l = atof(argv[2]); */
 
-    printf("n_max=%d,  n_min=%d, l_max=%f, l_min=%f\n",
- 	   n_max, n_min, l, l);
-    // variable file name
+  /*   printf("n_max=%d,  n_min=%d, l_max=%f, l_min=%f\n", */
+  /* 	   n_max, n_min, l, l); */
+  /*   // variable file name */
 
-    char file_name[43];
-    snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_one_l_stats.txt",
-	     n_max, n_min);
-    FILE* fp = fopen(file_name, "w");
-    fprintf(fp, "%s", first_line);    fclose(fp);
+  /*   char file_name[43]; */
+  /*   snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_one_l_stats.txt", */
+  /* 	     n_max, n_min); */
+  /*   FILE* fp = fopen(file_name, "w"); */
+  /*   fprintf(fp, "%s", first_line);    fclose(fp); */
     
-    /// loop over n_min <= n <= n_max, l_min <= l <= l_max
-    // opening file multiple time to results as soon we as we have it
+  /*   /// loop over n_min <= n <= n_max, l_min <= l <= l_max */
+  /*   // opening file multiple time to results as soon we as we have it */
    
-    for (int n1=n_min; n1<=n_max; ++n1){
-      FILE* fp = fopen(file_name, "a");
-      long_message_attack(n1, l, fp);
-      fclose(fp);      
-    }
+  /*   for (int n1=n_min; n1<=n_max; ++n1){ */
+  /*     FILE* fp = fopen(file_name, "a"); */
+  /*     long_message_attack(n1, l, fp); */
+  /*     fclose(fp);       */
+  /*   } */
 
 
-	// puts("");
-  }
+  /* 	// puts(""); */
+  /* } */
     
 
   
-  else if (argc == 3){ // ./long_message_attack n l
+  if (argc == 3){ // ./long_message_attack n l
   // get the input from the user
   n = atoi(argv[1]);
   l = atof(argv[2]);
 
   // variable file name
-  char file_name[36];
+  char file_name[40];
   snprintf(file_name, sizeof(file_name), "%s%d_%d_stats.txt", directory_name, (int) n, (int) l);
   printf("filename=%s\n", file_name);
 
@@ -465,69 +463,69 @@ int main(int argc, char* argv []){
   return 0;
     }
 
-  else if (argc == 2){ // ./long_message_attack n
-    // we test all n1 <= n and i <l<= n/2
-    // i is determined by the programmer 
-    n = atoi(argv[1]);
+  /* else if (argc == 2){ // ./long_message_attack n */
+  /*   // we test all n1 <= n and i <l<= n/2 */
+  /*   // i is determined by the programmer  */
+  /*   n = atoi(argv[1]); */
 
-    // variable file name
-    char file_name[36];
-    snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_stats.txt", (int) n);
+  /*   // variable file name */
+  /*   char file_name[36]; */
+  /*   snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_stats.txt", (int) n); */
 
 
     
     
-    FILE* fp = fopen(file_name, "w");
-    fprintf(fp, "%s", first_line);
-    fclose(fp);
+  /*   FILE* fp = fopen(file_name, "w"); */
+  /*   fprintf(fp, "%s", first_line); */
+  /*   fclose(fp); */
 
-    int l_max = 26; // after this the program consumes more than the available ram
-    for (int n1 = 2; n1 < n; ++n1){
-      // when l > n/2 then the we expect to be a cylce in phase I
-      for (int l=1; (l<=l_max && l<= (n1>>1) ); ++l){
-	// printf("n=%d, l=%d\n", n1, l );
-	// opening file multiple time to results as soon we as we have it
-	FILE* fp = fopen(file_name, "a");
-	long_message_attack(n1, l, fp);
-	fclose(fp);
-	// puts("");
-      }
-    }
+  /*   int l_max = 26; // after this the program consumes more than the available ram */
+  /*   for (int n1 = 2; n1 < n; ++n1){ */
+  /*     // when l > n/2 then the we expect to be a cylce in phase I */
+  /*     for (int l=1; (l<=l_max && l<= (n1>>1) ); ++l){ */
+  /* 	// printf("n=%d, l=%d\n", n1, l ); */
+  /* 	// opening file multiple time to results as soon we as we have it */
+  /* 	FILE* fp = fopen(file_name, "a"); */
+  /* 	long_message_attack(n1, l, fp); */
+  /* 	fclose(fp); */
+  /* 	// puts(""); */
+  /*     } */
+  /*   } */
     
     
-  } else if (argc == 5) { // ./long_message_attack nmax nmin lmax lmin
+  /* } else if (argc == 5) { // ./long_message_attack nmax nmin lmax lmin */
 
-    // supply n_max n_min l_max l_min
-    int n_max = atoi(argv[1]);
-    int n_min = atoi(argv[2]);
-    int l_max = atoi(argv[3]);
-    int l_min = atoi(argv[4]);
-    // l = atof(argv[2]);
+  /*   // supply n_max n_min l_max l_min */
+  /*   int n_max = atoi(argv[1]); */
+  /*   int n_min = atoi(argv[2]); */
+  /*   int l_max = atoi(argv[3]); */
+  /*   int l_min = atoi(argv[4]); */
+  /*   // l = atof(argv[2]); */
 
-    printf("n_max=%d,  n_min=%d, l_max=%d, l_min=%d\n",
- 	   n_max, n_min, l_max, l_min);
-    // variable file name
+  /*   printf("n_max=%d,  n_min=%d, l_max=%d, l_min=%d\n", */
+  /* 	   n_max, n_min, l_max, l_min); */
+  /*   // variable file name */
 
-    char file_name[43];
-    snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_%d_%d_stats.txt",
-	     n_max, n_min, l_max, l_min);
-    FILE* fp = fopen(file_name, "w");
-    fprintf(fp, "%s", first_line);    fclose(fp);
+  /*   char file_name[43]; */
+  /*   snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_%d_%d_stats.txt", */
+  /* 	     n_max, n_min, l_max, l_min); */
+  /*   FILE* fp = fopen(file_name, "w"); */
+  /*   fprintf(fp, "%s", first_line);    fclose(fp); */
     
-    /// loop over n_min <= n <= n_max, l_min <= l <= l_max
-    for (int n1=n_min; n1 <= n_max; ++n1){
-      // when l > n/2 then the we expect to be a cylce in phase I
-      for (int l=l_min; (l<=l_max && l<= (n1>>1) ); ++l){
-	// opening file multiple time to results as soon we as we have it
-	FILE* fp = fopen(file_name, "a");
-	long_message_attack(n1, l, fp);
-	fclose(fp);
-	// puts("");
-      }
-    }
+  /*   /// loop over n_min <= n <= n_max, l_min <= l <= l_max */
+  /*   for (int n1=n_min; n1 <= n_max; ++n1){ */
+  /*     // when l > n/2 then the we expect to be a cylce in phase I */
+  /*     for (int l=l_min; (l<=l_max && l<= (n1>>1) ); ++l){ */
+  /* 	// opening file multiple time to results as soon we as we have it */
+  /* 	FILE* fp = fopen(file_name, "a"); */
+  /* 	long_message_attack(n1, l, fp); */
+  /* 	fclose(fp); */
+  /* 	// puts(""); */
+  /*     } */
+  /*   } */
 
 
-  }
+  /* } */
   
   else {
     

@@ -1,0 +1,20 @@
+---
+MainSourceFile:  '/home/ifrit/phd_shared/src/sha256.c'
+Diagnostics:
+  - DiagnosticName:  clang-diagnostic-unused-variable
+    DiagnosticMessage:
+      Message:         'unused variable ''state0'''
+      FilePath:        '/home/ifrit/phd_shared/src/sha256.c'
+      FileOffset:      27554
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/home/ifrit/phd_shared'
+  - DiagnosticName:  clang-diagnostic-unused-variable
+    DiagnosticMessage:
+      Message:         'unused variable ''state1'''
+      FilePath:        '/home/ifrit/phd_shared/src/sha256.c'
+      FileOffset:      27562
+      Replacements:    []
+    Level:           Warning
+    BuildDirectory:  '/home/ifrit/phd_shared'
+...

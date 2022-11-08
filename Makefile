@@ -1,9 +1,19 @@
-#CC=g++
+CC=clang
 LDLIBS  = -lm
-CFLAGS  = -g -O3 -fopenmp -Wall -march=native -msse4 -msha -std=c11 -fanalyzer -fopt-info-vec -fopt-info-omp-vec-optimized-missed #-DVERBOSE_LEVEL=2 
 LDFLAGS = -fopenmp
 INCLUDE = include
 INC = -I$(INCLUDE)
+
+ifeq ($(CC), clang)
+	CFLAGS = -g -O3 -fopenmp -Wall -march=native -msha -Rpass-analysis=loop-vectorize -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Xanalyzer -analyzer-constraints=z3
+else
+	CFLAGS  = -g -O3 -fopenmp -Wall -march=native -msha -std=c11 -fanalyzer -fopt-info-vec -fopt-info-omp-vec-optimized-missed #-DVERBOSE_LEVEL=2 
+endif
+
+CFLAGS += -DVERBOSE_LEVEL=2 
+
+
+#-DVERBOSE_LEVEL=2 
 
 # store *.o files in obj/
 OBJDIR = obj
@@ -25,14 +35,14 @@ OBJECTS := $(FILENAMES:$(SRC)/%.c=$(OBJDIR)/%.o)
 #OBJECTS := $(addprefix $(OBJDIR)/, $(OBJECTS))
 # $(info FILENAMES = $(FILENAMES))
 # $(info OBJECTS = $(OBJECTS))
-
+$(info CC=$(CC))
 # # list of all *.o
 
 
 # BUILD OBJECT FILES IN OBJECTDIR directory
 $(OBJDIR)/%.o: $(SRC)/%.c
 	mkdir -p '$(@D)'
-	$(CC) -c $(INC) $(CFLAGS) $< -o $@
+	$(CC) -c $< $(INC) $(CFLAGS)  -o $@
 
 
 

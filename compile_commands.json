@@ -1,0 +1,140 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-Rpass-analysis=loop-vectorize",
+      "-Rpass=loop-vectorize",
+      "-Rpass-missed=loop-vectorize",
+      "-DVERBOSE_LEVEL=2",
+      "-o",
+      "obj/long_message_attack.o",
+      "src/long_message_attack.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/long_message_attack.c",
+    "output": "/home/ifrit/phd_shared/obj/long_message_attack.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-Rpass-analysis=loop-vectorize",
+      "-Rpass=loop-vectorize",
+      "-Rpass-missed=loop-vectorize",
+      "-DVERBOSE_LEVEL=2",
+      "-o",
+      "obj/dict.o",
+      "src/dict.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/dict.c",
+    "output": "/home/ifrit/phd_shared/obj/dict.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-Rpass-analysis=loop-vectorize",
+      "-Rpass=loop-vectorize",
+      "-Rpass-missed=loop-vectorize",
+      "-DVERBOSE_LEVEL=2",
+      "-o",
+      "obj/sha256.o",
+      "src/sha256.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/sha256.c",
+    "output": "/home/ifrit/phd_shared/obj/sha256.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-Rpass-analysis=loop-vectorize",
+      "-Rpass=loop-vectorize",
+      "-Rpass-missed=loop-vectorize",
+      "-DVERBOSE_LEVEL=2",
+      "-o",
+      "obj/util/memory.o",
+      "src/util/memory.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/util/memory.c",
+    "output": "/home/ifrit/phd_shared/obj/util/memory.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-Rpass-analysis=loop-vectorize",
+      "-Rpass=loop-vectorize",
+      "-Rpass-missed=loop-vectorize",
+      "-DVERBOSE_LEVEL=2",
+      "-o",
+      "obj/util/pretty_print.o",
+      "src/util/pretty_print.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/util/pretty_print.c",
+    "output": "/home/ifrit/phd_shared/obj/util/pretty_print.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-Iinclude",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-Rpass-analysis=loop-vectorize",
+      "-Rpass=loop-vectorize",
+      "-Rpass-missed=loop-vectorize",
+      "-DVERBOSE_LEVEL=2",
+      "-o",
+      "obj/util/util_char_arrays.o",
+      "src/util/util_char_arrays.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/util/util_char_arrays.c",
+    "output": "/home/ifrit/phd_shared/obj/util/util_char_arrays.o"
+  }
+]

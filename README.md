@@ -23,24 +23,13 @@ We are in ** step 3.**
 
 # Usage
 
-1- enalbe sha256 intrinsics and openmp parallism (default)
 
 `make clean && make`
 
 Then run it
-`./long\_message_\attack n l` where $n$ and $l$ are the attack parameters.
+`./long_message_attack n l` where $n$ and $l$ are the attack parameters.
 
 
-2- debug mode: single thread with detailed printing
-	
-	
-3- benchmark
-`make clean && make benchmark`
-
-then run it 
-`./benchmark`
-
-See the results in `log/timestamp_benchmark`
 
 # Work to be done:
 
