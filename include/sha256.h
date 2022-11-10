@@ -24,6 +24,6 @@ typedef UINT32 uint32_t;
 typedef UINT8 uint8_t;
 #endif
 
-void sha256_process_x86_single(uint32_t state[8], const uint8_t data[]);
+void sha256_single(uint32_t state[8], const uint8_t data[]);
 
 #endif

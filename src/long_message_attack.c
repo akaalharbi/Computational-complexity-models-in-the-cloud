@@ -13,7 +13,7 @@
 
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
-#include <endian.h>
+// #include <endian.h> // @todo do we need it?
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -21,12 +21,16 @@
 #include <stdlib.h>
 #include <string.h>
 #include <memory.h>
+#include <sys/time.h>
+#include <omp.h>
+
+#include "config.h"
 #include "types.h"
 #include "util_char_arrays.h"
 #include "shared.h" // shared variables for duplicate 
 #include "memory.h"
-#include <sys/time.h>
-#include <omp.h>
+
+
 
 // mask for distinguished point
 #define DIST_MASK 0x7 // test if the last three bits are zeros
@@ -41,11 +45,124 @@ int idx_cycle = -1;
 
 
 
-void long_message_attack(size_t n_of_bits, double l, FILE* fp){
+void phase_i_store(const size_t n,
+		   size_t server_capacity[],
+		   size_t server_difficulty[],
+		   size_t nservers){
+
+  // ==================================================================================+
+  // Hash a long message of zeros. Store the digest in a file k where 0<= k < nservers |
+  // To decide where to store the digest h, compute k := h mod  nservers               |
+  // We allow each server to adjust its own difficulty level (not sure we need that )  |
+  // or its distinguished point format.                                                |
+  // Compute h -> decides which server k -> check server difficulty -> decide to store |
+  // h or discard it.                                                                  |
+  // ----------------------------------------------------------------------------------|
+  // INPUTS:                                                                           |
+  // `n`: hash digest length, our goal is 96-bit                                       |
+  // `server_capacity[]` : array of size nservers,  entry i contains how many blocks   |
+  //                       server i will store in its dictionary                       |
+  // `server_difficulty[]` : entry i contains d s.t. server i only accepts digests h   |
+  //                         h <= d                                                    |
+  // `nservers` : how many servers we should prepare for                               |
+  // ==================================================================================+
+  
+
+
+
+
+  /// ----------------------- INIT ---------------------------///
+  // INIT server files that will be send later
+  size_t ncores = 14; // @tidy @todo get the value directly from config.h
+  size_t k =  0; // server index
+  size_t ctr = 0; // number of hashes stored
+  int should_NOT_stop = 1;
+  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
+  // store the hash value in this variable
+  uint64_t digest[2] = {0, 0};
+  // INIT SHA256 
+
+  uint32_t state[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+
+  // TOUCH FILES ON THE DISK
+  char file_name[35]; // more than enough to store file name
+  FILE* data_to_servers[nservers];
+  for (size_t i=0; i<nservers; ++i) {
+    //edit file name according to server i
+    snprintf(file_name, sizeof(file_name), "data/servers/%lu", i);
+    printf("file_name=%s\n", file_name);
+
+    data_to_servers[i] = fopen(file_name, "w");
+  }
+
+
+  /// timing
+  struct timeval begin, end;
+  long seconds = 0;
+  long microseconds = 0;
+  double elapsed = 0;
+  gettimeofday(&begin, 0);
+
+
+  /// ----------------- PHASE I: Part 1/2   ------------------------  ///
+  // First phase hash an extremely long message
+  // M0 M1 ... M_{2^l}, Mi entry will evaluated on the fly
+  // Store the hashes in file correspond to some server k
+
+  while (should_NOT_stop) {
+    // hash and extract n bits of the digest
+    sha256_single(state, M);
+    truncate_state32bit_get_digest(digest, state, n);
+
+    // Decide which server is responsible for storing this digest
+    k = digest[0] % nservers;
+    if (digest[1] <= server_difficulty[k]){
+      // This is a distinguished 
+      fwrite(state, sizeof(uint32_t), 8, data_to_servers[k]);
+      server_capacity[k] -= 1; // We need to store less blocks now
+    }
+    
+
+    // decide should_stop or not?
+    for (size_t i=0; i<nservers; ++i) {
+      if (server_capacity[i] > 0)
+	should_NOT_stop = 1;
+    }
+    // @todo start from here
+    // + save states after required amount of intervals
+    
+    
+  }
+
+
+
+
+
+
+
+
+  /// TIMING record PHASE I time elapsed ///
+  gettimeofday(&end, 0);
+  seconds = end.tv_sec - begin.tv_sec;
+  microseconds = end.tv_usec - begin.tv_usec;
+  elapsed = seconds + microseconds*1e-6;
+  ///
+  /// write it in a file  ///
+  printf("done in %fsec, ", elapsed);
+  /// -------------------///
+
+}
+
+
+
+void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
 //(size_t n_of_bits, size_t n_of_blocks){    
   /*  Mount long message attack on truncated sha256 */
   /// INPUT:
-  ///  - n: compression functions output size in bits
+  ///  - n_of_bits: compression functions output size in bits
   ///  - l: 2^l = how many message blocks we need to store their intermediate values
   ///  -fp: a pointer to file where we will store the benchmark information (time,)
   ///      it will write in the first line it encounters then 
@@ -54,7 +171,9 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   /// PROCESS THE PRARAMETERS
   is_there_duplicate = 0; // global variable to detect cycles
   size_t n_of_blocks = (size_t) ceil(pow(2.0, l));
-
+  // We will use this to reconstruct the long message again
+  size_t ncores = 14; // @tidy @todo get the value directly from config.h 
+  
   
   // each thread will create number of registers @todo adapte the formula below
   double memory_estimate = (64  + 32)*omp_get_max_threads() + dict_memory(n_of_blocks); // edit me
@@ -83,13 +202,15 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
   double elapsed = 0;
   gettimeofday(&begin, 0);
 
+  
   // store values in a dictionary
   // dict_new(#elemnets will be stored, element's size)
   // assuming all element have the same size
   dict* d = dict_new(n_of_blocks); 
-  
-  
 
+  // store the states of the long message after some defined interval
+  FILE* fstate = fopen("data/states", "wb");
+  fclose(fstate); // for now we only need to clean the file 
   /// -------------- PHASE I ------------------------  ///
   /// First phase hash an extremely long message
   // M0 M1 ... M_{2^l}
@@ -108,11 +229,14 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 
 
   // hash a long message (for now it's a series of zeros)
-  size_t nmsg_rec = 0; // number of messages recorded
-
+  // number of messages recorded 
+  size_t nmsg_rec = 0; // e.g. how many distinguished points we have seen so far 
+  // when nmsg_rec mod interval == 0; record the state in a file
+  size_t interval = n_of_blocks / ncores;
+  
   while (nmsg_rec < n_of_blocks){
     // number of (distinguished messages == n_of_blocks)
-    sha256_process_x86_single(state, M);
+    sha256_single(state, M);
 
     // get the digest from the state
     truncate_state32bit_get_digest(digest, state, n_of_bits);
@@ -127,6 +251,17 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       continue; // skip this element
     #endif
 
+    if (nmsg_rec % interval == 0){
+      //+ @todo
+      //+ record (state) at somefile
+      // should we close and open the file each time the if condition
+      // becomes true? I think yes, we get the panelty on a local laptop 14 times only.
+      FILE* fstate = fopen("data/states", "a");
+      fwrite(state, sizeof(uint32_t), 8, fstate);
+      fclose(fstate);
+    }
+      
+    // @todo do we need to record the value in a dictionary? Or should we do it later?
     dict_add_element_to(d, digest);
     nmsg_rec++;
 
@@ -139,8 +274,8 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
     puts("\n");
     #endif // VERBOSE_LEVEL
     /// --------------- END IF VERBOSE ENABLED ---------------- ///
-  }
-  ///             DONE WITH HASHING THE LONG MESSAG            ///
+  } ///             DONE WITH HASHING THE LONG MESSAG            ///
+
   /// ----------------- IF VERBOSE ENABLED ------------------ ///
 
   #ifdef VERBOSE_LEVEL
@@ -199,6 +334,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
 	 omp_get_max_threads(), n_of_bits, (int) l);
   // printf("Max nthreads=%d\n", omp_get_max_threads());
 
+  
   #endif // _OPENMP
 
   /// ---------  PARELLLEL SEARCH ----------- ///
@@ -234,7 +370,7 @@ void long_message_attack(size_t n_of_bits, double l, FILE* fp){
       memcpy(state_priv, state_init_priv, sizeof(state_init_priv));
 
       // hash
-      sha256_process_x86_single(state_priv, random_message_priv);
+      sha256_single(state_priv, random_message_priv);
 
       // extract the results
       truncate_state32bit_get_digest(digest_priv, state_priv, n_of_bits);
@@ -333,37 +469,6 @@ int main(int argc, char* argv []){
   /// case 5: nmax nmin lmax lmin are given
 
 
-  /* if (argc == 1) { */
-  /*   /// special case for cluster.lip6.fr  */
-  /*   // supply n_max n_min l_max l_min */
-  /*   int n_max = 100; */
-  /*   int n_min = 71; */
-  /*   float l = 33.5; */
-  /*   // l = atof(argv[2]); */
-
-  /*   printf("n_max=%d,  n_min=%d, l_max=%f, l_min=%f\n", */
-  /* 	   n_max, n_min, l, l); */
-  /*   // variable file name */
-
-  /*   char file_name[43]; */
-  /*   snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_%d_one_l_stats.txt", */
-  /* 	     n_max, n_min); */
-  /*   FILE* fp = fopen(file_name, "w"); */
-  /*   fprintf(fp, "%s", first_line);    fclose(fp); */
-    
-  /*   /// loop over n_min <= n <= n_max, l_min <= l <= l_max */
-  /*   // opening file multiple time to results as soon we as we have it */
-   
-  /*   for (int n1=n_min; n1<=n_max; ++n1){ */
-  /*     FILE* fp = fopen(file_name, "a"); */
-  /*     long_message_attack(n1, l, fp); */
-  /*     fclose(fp);       */
-  /*   } */
-
-
-  /* 	// puts(""); */
-  /* } */
-    
 
   
   if (argc == 3){ // ./long_message_attack n l
@@ -449,37 +554,6 @@ int main(int argc, char* argv []){
   }
 
 
-  /* else if (argc == 2){ // ./long_message_attack n */
-  /*   // we test all n1 <= n and i <l<= n/2 */
-  /*   // i is determined by the programmer  */
-  /*   n = atoi(argv[1]); */
-
-  /*   // variable file name */
-  /*   char file_name[36]; */
-  /*   snprintf(file_name, sizeof(file_name), "statistics_parallel/%d_stats.txt", (int) n); */
-
-
-    
-    
-  /*   FILE* fp = fopen(file_name, "w"); */
-  /*   fprintf(fp, "%s", first_line); */
-  /*   fclose(fp); */
-
-  /*   int l_max = 26; // after this the program consumes more than the available ram */
-  /*   for (int n1 = 2; n1 < n; ++n1){ */
-  /*     // when l > n/2 then the we expect to be a cylce in phase I */
-  /*     for (int l=1; (l<=l_max && l<= (n1>>1) ); ++l){ */
-  /* 	// printf("n=%d, l=%d\n", n1, l ); */
-  /* 	// opening file multiple time to results as soon we as we have it */
-  /* 	FILE* fp = fopen(file_name, "a"); */
-  /* 	long_message_attack(n1, l, fp); */
-  /* 	fclose(fp); */
-  /* 	// puts(""); */
-  /*     } */
-  /*   } */
-    
-    
-  
   
   return 0;
 }

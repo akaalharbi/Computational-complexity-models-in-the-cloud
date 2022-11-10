@@ -80,15 +80,15 @@ inline void dict_free(dict* d){
 
 size_t dict_memory(size_t nelements){
   /// return memory estimation of the dictionary size
-  int estimate = (size_t)  ceil((1/FILLING_RATE)*nelements);
-  int padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - nelements%( (ALIGNMENT/sizeof(uint64_t)) );
+  size_t estimate = (size_t)  ceil((1/FILLING_RATE)*nelements);
+  size_t padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - nelements%( (ALIGNMENT/sizeof(uint64_t)) );
   // how many slots in the dictionary
   estimate = estimate + padding_alignment;
 
   estimate = estimate*(sizeof(uint64_t)) /* keys */
            + sizeof(dict);
 
-  return estimate/100.0;
+  return estimate/1000.0;
 }
 
 

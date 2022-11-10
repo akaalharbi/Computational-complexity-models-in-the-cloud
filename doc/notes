@@ -1,4 +1,7 @@
+Thursday 10 nov 2022
+- when storing the long message in the disk 
 
+____________________
 Wednesday 3 nov 2022
 - convert lookup_keys and found keys to __m256i
 - lay down the first steps of simd sha256
