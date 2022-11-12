@@ -56,6 +56,13 @@ TARGETS = long_message_attack verify_hash
 
 
 all: long_message_attack
+	mkdir -p data
+	mkdir -p data/upload
+	mkdir -p data/messages
+	mkdir -p data/stats
+	mkdir -p data/received
+
+
 
 # remove all $(TARGETS) members from dependencies
 # and add long_message_attack.o as a dependency

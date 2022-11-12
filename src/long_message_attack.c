@@ -61,7 +61,7 @@ void phase_i_store(const size_t n,
   // INPUTS:                                                                           |
   // `n`: hash digest length, our goal is 96-bit                                       |
   // `server_capacity[]` : array of size nservers,  entry i contains how many blocks   |
-  //                       server i will store in its dictionary                       |
+  //                      n server i will store in its dictionary                       |
   // `server_difficulty[]` : entry i contains d s.t. server i only accepts digests h   |
   //                         h <= d                                                    |
   // `nservers` : how many servers we should prepare for                               |
@@ -72,46 +72,69 @@ void phase_i_store(const size_t n,
 
 
   /// ----------------------- INIT ---------------------------///
-  // INIT server files that will be send later
+  /// 1- INIT numerical and bytes variables:
   size_t ncores = 14; // @tidy @todo get the value directly from config.h
   size_t k =  0; // server index
-  size_t ctr = 0; // number of hashes stored
   int should_NOT_stop = 1;
-  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
-  // store the hash value in this variable
-  uint64_t digest[2] = {0, 0};
-  // INIT SHA256 
-
-  uint32_t state[8] = {
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-  };
-
-  // TOUCH FILES ON THE DISK
-  char file_name[35]; // more than enough to store file name
-  FILE* data_to_servers[nservers];
-  for (size_t i=0; i<nservers; ++i) {
-    //edit file name according to server i
-    snprintf(file_name, sizeof(file_name), "data/servers/%lu", i);
-    printf("file_name=%s\n", file_name);
-
-    data_to_servers[i] = fopen(file_name, "w");
-  }
+  size_t nhashes_stored = 0; // 
+  size_t interval = 1;
 
 
-  /// timing
+  /// timing variables
   struct timeval begin, end;
   long seconds = 0;
   long microseconds = 0;
   double elapsed = 0;
+
+  // INIT SHA256 
+  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
+
+  // store the hash value in this variable
+  uint64_t digest[2] = {0, 0};
+  uint32_t state[8] = {
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
+  };
+  /// INIT FILES: server files that will be send later and state
+  char file_name[40]; // more than enough to store file name
+  char states_file_name[40];
+  
+  FILE* data_to_servers[nservers];
+  FILE* states_file;
+ 
+  // TOUCH FILES ON THE DISK
+ 
+  fopen("data/states", "w");
   gettimeofday(&begin, 0);
+  snprintf(states_file_name, sizeof(states_file_name), "data/%lu_state", begin.tv_sec);
+  states_file = fopen(states_file_name, "w");
+  fclose(states_file); // we will open this file again in few occasions
+  
+  for (size_t i=0; i<nservers; ++i) {
+    //edit file name according to server i
+    snprintf(file_name, sizeof(file_name), "data/upload/%lu", i);
+    printf("file_name=%s\n", file_name);
+
+    data_to_servers[i] = fopen(file_name, "w");
+    nhashes_stored += server_capacity[i];
+  }
+
+  // Init coutners before the beginning of the attack
+  interval = nhashes_stored / ncores;
+  printf("interval=%ld, nhashes_stores=%ld, ncores=%ld\n",
+	 interval, nhashes_stored, ncores);
+  nhashes_stored = 0; // we have not recorded any hash yet
+
+
+
 
 
   /// ----------------- PHASE I: Part 1/2   ------------------------  ///
   // First phase hash an extremely long message
   // M0 M1 ... M_{2^l}, Mi entry will evaluated on the fly
   // Store the hashes in file correspond to some server k
-
+  gettimeofday(&begin, 0);
+  
   while (should_NOT_stop) {
     // hash and extract n bits of the digest
     sha256_single(state, M);
@@ -119,30 +142,36 @@ void phase_i_store(const size_t n,
 
     // Decide which server is responsible for storing this digest
     k = digest[0] % nservers;
-    if (digest[1] <= server_difficulty[k]){
-      // This is a distinguished 
-      fwrite(state, sizeof(uint32_t), 8, data_to_servers[k]);
+    if (digest[1] >= server_difficulty[k]){
+      /* if (k==0) { */
+      /* 	printf("k=%ld, digest1,0=%016lx%016lx\n", k,digest[1], digest[0]); */
+      /* } */
+
+      // This is a distinguished point, we store maximally 128bits
+      // in the distant future we may regret this decision.
+      fwrite(digest, sizeof(uint64_t), 2, data_to_servers[k]);
       server_capacity[k] -= 1; // We need to store less blocks now
+      ++nhashes_stored;
     }
     
 
     // decide should_stop or not?
     for (size_t i=0; i<nservers; ++i) {
-      if (server_capacity[i] > 0)
+      if (server_capacity[i] > 0){
 	should_NOT_stop = 1;
+	break; // from the inner loop
+      }
     }
     // @todo start from here
     // + save states after required amount of intervals
-    
+    if (nhashes_stored % interval == 0) {
+      FILE* states_file = fopen(states_file_name, "a");
+      fwrite(state, sizeof(uint32_t), 8, states_file);
+      // We would like to flush the data disk as soon we have them
+      fclose(states_file);
+    }
     
   }
-
-
-
-
-
-
-
 
   /// TIMING record PHASE I time elapsed ///
   gettimeofday(&end, 0);
@@ -159,7 +188,11 @@ void phase_i_store(const size_t n,
 
 
 void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
-//(size_t n_of_bits, size_t n_of_blocks){    
+
+
+  
+
+  
   /*  Mount long message attack on truncated sha256 */
   /// INPUT:
   ///  - n_of_bits: compression functions output size in bits
@@ -450,6 +483,19 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
 
 int main(int argc, char* argv []){
   // attack(size_t n_of_blocks, size_t n_of_bits)
+
+  puts("starting with storing message");
+  #define nservers 16
+  size_t servers_capacity[nservers];
+  size_t server_difficulty[nservers];
+  for (int i=0; i<nservers; ++i) {
+    servers_capacity[i] = 1LL<<25;
+    server_difficulty[i] = 0;
+  }
+  phase_i_store(96, servers_capacity, servers_capacity, nservers);
+  puts("done with registering the message");
+
+  
   
   int n = 0;
   float l = 0;
@@ -478,7 +524,8 @@ int main(int argc, char* argv []){
 
   // variable file name
   char file_name[40];
-  snprintf(file_name, sizeof(file_name), "%s%d_%d_stats.txt", directory_name, (int) n, (int) l);
+  snprintf(file_name, sizeof(file_name), "%s%d_%d_stats.txt",
+	   directory_name, (int) n, (int) l);
   printf("filename=%s\n", file_name);
 
   /// todo write the value of n and l explicitly in the file 
