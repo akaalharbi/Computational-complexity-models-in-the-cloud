@@ -25,6 +25,7 @@
 #include <omp.h>
 
 #include "config.h"
+#include "timing.h"
 #include "types.h"
 #include "util_char_arrays.h"
 #include "shared.h" // shared variables for duplicate 
@@ -39,15 +40,15 @@
 ///                  UTILITY FUNCTIONS                   ///
 
 
-// was there a cycle in PHASE I
-int is_there_duplicate = 0;
-int idx_cycle = -1;
+
+
+
 
 
 
 void phase_i_store(const size_t n,
 		   size_t server_capacity[],
-		   size_t server_difficulty[],
+		   size_t global_difficulty,
 		   size_t nservers){
 
   // ==================================================================================+
@@ -61,9 +62,9 @@ void phase_i_store(const size_t n,
   // INPUTS:                                                                           |
   // `n`: hash digest length, our goal is 96-bit                                       |
   // `server_capacity[]` : array of size nservers,  entry i contains how many blocks   |
-  //                      n server i will store in its dictionary                       |
-  // `server_difficulty[]` : entry i contains d s.t. server i only accepts digests h   |
-  //                         h <= d                                                    |
+  //                      n server i will store in its dictionary                      |
+  // `global_difficulty` : We assume all servers have the same difficulty level. It's  |
+  //                       to th server to decide to increase the level  locally       |
   // `nservers` : how many servers we should prepare for                               |
   // ==================================================================================+
   
@@ -81,9 +82,7 @@ void phase_i_store(const size_t n,
 
 
   /// timing variables
-  struct timeval begin, end;
-  long seconds = 0;
-  long microseconds = 0;
+  double start = 0;
   double elapsed = 0;
 
   // INIT SHA256 
@@ -105,8 +104,7 @@ void phase_i_store(const size_t n,
   // TOUCH FILES ON THE DISK
  
   fopen("data/states", "w");
-  gettimeofday(&begin, 0);
-  snprintf(states_file_name, sizeof(states_file_name), "data/%lu_state", begin.tv_sec);
+  snprintf(states_file_name, sizeof(states_file_name), "data/%lu_state", (size_t) wtime());
   states_file = fopen(states_file_name, "w");
   fclose(states_file); // we will open this file again in few occasions
   
@@ -133,7 +131,9 @@ void phase_i_store(const size_t n,
   // First phase hash an extremely long message
   // M0 M1 ... M_{2^l}, Mi entry will evaluated on the fly
   // Store the hashes in file correspond to some server k
-  gettimeofday(&begin, 0);
+  start = wtime();
+
+
   
   while (should_NOT_stop) {
     // hash and extract n bits of the digest
@@ -142,7 +142,7 @@ void phase_i_store(const size_t n,
 
     // Decide which server is responsible for storing this digest
     k = digest[0] % nservers;
-    if (digest[1] >= server_difficulty[k]){
+    if (digest[1] >= global_difficulty){
       /* if (k==0) { */
       /* 	printf("k=%ld, digest1,0=%016lx%016lx\n", k,digest[1], digest[0]); */
       /* } */
@@ -155,14 +155,20 @@ void phase_i_store(const size_t n,
     }
     
 
-    // decide should_stop or not?
+    // decide should not stop or should stop?
     for (size_t i=0; i<nservers; ++i) {
+      /*-----------------------------------------------------------------------*/
+      /* Since we reduce the server capacity by one each time we add it to its */
+      /* files. If any server has capacity larger than zero then it means that */
+      /* we should. continue hashing till all servers capacities are met.      */
+      /*-----------------------------------------------------------------------*/  
       if (server_capacity[i] > 0){
 	should_NOT_stop = 1;
 	break; // from the inner loop
       }
     }
-    // @todo start from here
+    
+
     // + save states after required amount of intervals
     if (nhashes_stored % interval == 0) {
       FILE* states_file = fopen(states_file_name, "a");
@@ -174,10 +180,7 @@ void phase_i_store(const size_t n,
   }
 
   /// TIMING record PHASE I time elapsed ///
-  gettimeofday(&end, 0);
-  seconds = end.tv_sec - begin.tv_sec;
-  microseconds = end.tv_usec - begin.tv_usec;
-  elapsed = seconds + microseconds*1e-6;
+  elapsed = wtime() - start;
   ///
   /// write it in a file  ///
   printf("done in %fsec, ", elapsed);
@@ -243,7 +246,7 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
 
   // store the states of the long message after some defined interval
   FILE* fstate = fopen("data/states", "wb");
-  fclose(fstate); // for now we only need to clean the file 
+
   /// -------------- PHASE I ------------------------  ///
   /// First phase hash an extremely long message
   // M0 M1 ... M_{2^l}
@@ -289,9 +292,8 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
       //+ record (state) at somefile
       // should we close and open the file each time the if condition
       // becomes true? I think yes, we get the panelty on a local laptop 14 times only.
-      FILE* fstate = fopen("data/states", "a");
       fwrite(state, sizeof(uint32_t), 8, fstate);
-      fclose(fstate);
+      fflush(fstate); // ensure that the contents are physically on harddrive
     }
       
     // @todo do we need to record the value in a dictionary? Or should we do it later?
@@ -346,16 +348,6 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
   size_t idx = 0; // the index of the message to be removed
   BYTE random_message[64] = {0};
 
-  /// The code now never checks for duplicates :(
-  /* if (is_there_duplicate){ */
-  /*   // this corresponds to having cycles while hashing the long message */
-  /*   // i.e. h(mi  ... mj) = h(mi ... mk) where k>i */
-  /*   fprintf(fp, "%f, 0, %d cycle\n", elapsed, idx_cycle); */
-  /*   collision_found = 1; */
-  /*   dict_free(d); */
-  /*   free(d); */
-  /*   return; */
-  /* } */
   
 
   /// ------------------- ///
@@ -384,8 +376,8 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
     BYTE random_message_priv[64] = {0};
     uint64_t *random_message_priv64 = (uint64_t*) random_message_priv;
     random_message_priv64[0] = omp_get_thread_num()*( (1LL<<63)/((uint64_t)omp_get_max_threads()) );
-    /* printf("the interval will b divided as %d intervals, each interval os size %llu\n", omp_get_max_threads(),  (1LL<<63)/(omp_get_max_threads()) ); */
-    /* printf("thread %02d with offset %lu, as normal arith=%llu\n", omp_get_thread_num(), random_message_priv64[0], omp_get_thread_num()*( (1LL<<63)/(omp_get_max_threads()) )); */
+
+
     
     uint64_t digest_priv[2] = {0};
     uint32_t state_priv[8] = {0};
@@ -421,7 +413,7 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
       // test for collision and print the results if successful.
       // idx_priv := 0 if digest_priv doesn't exist in the dictionary
       idx_priv = dict_get_value(d, digest_priv);
-      //if (dict_has_key(d, digest_priv) ){ // maybe extra condition && !collision_found is needed
+
       if (idx_priv ){ //
 
 	int does_it_collide = 1; //collides_at(random_message_priv, n_of_bits, idx_priv);
@@ -447,6 +439,8 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
     }
 
     // record the number of trials
+    // #pragma omp atomic update  the compiler complains about this
+    // it require operations of the form ++x, x++, x--, etc
     #pragma omp critical
     {
       ctr += ctr_priv;
@@ -482,17 +476,21 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
 
 
 int main(int argc, char* argv []){
+
+  /* Main currently doesn't correspond to a fully working attack */
+
+  
   // attack(size_t n_of_blocks, size_t n_of_bits)
 
   puts("starting with storing message");
   #define nservers 16
   size_t servers_capacity[nservers];
-  size_t server_difficulty[nservers];
+  size_t global_difficulty = 0;
   for (int i=0; i<nservers; ++i) {
     servers_capacity[i] = 1LL<<25;
-    server_difficulty[i] = 0;
+
   }
-  phase_i_store(96, servers_capacity, servers_capacity, nservers);
+  phase_i_store(96, servers_capacity, global_difficulty, nservers);
   puts("done with registering the message");
 
   

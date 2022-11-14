@@ -9,14 +9,14 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "dict.h"
+//#include "dict.h"
 #include <stdlib.h>
 #include <sys/time.h>
 #include "shared.h"
 #include <math.h>
 #include <omp.h>
 #include "vsha256.h"
-
+#define BYTE unsigned char
 
 // was there a cycle in PHASE I
 int is_there_duplicate = 0;
@@ -395,116 +395,116 @@ float benchmark_vsha256_parallel(){
 
 
 
-void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){
-  // size_t n_of_blocks = 1<<25;
-  // the dictionary has size 2^26
-  dict* d = dict_new(n_of_blocks);
+/* void filling_rate_time(size_t n_of_blocks, float alpha, FILE* fp){ */
+/*   // size_t n_of_blocks = 1<<25; */
+/*   // the dictionary has size 2^26 */
+/*   dict* d = dict_new(n_of_blocks); */
 
-  size_t N = (size_t) (n_of_blocks<<1) * alpha;
-  printf("N=%lu=2^%f\n", N, log2(N));
-  printf("dict has %lu slots = 2^%f slots", d->nslots, log2(d->nslots));
-  fprintf(fp, "%.2f, ", alpha);
-  struct timeval begin, end;
-  long seconds = 0;
-  long microseconds = 0;
-  double elapsed = 0;
-  double elapsed_total=0;
-  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
-  // store the hash value in this variable
-  uint64_t digest[2] = {0, 0};
-  // INIT SHA256
-  uint32_t state[8] = {
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-  };
+/*   size_t N = (size_t) (n_of_blocks<<1) * alpha; */
+/*   printf("N=%lu=2^%f\n", N, log2(N)); */
+/*   printf("dict has %lu slots = 2^%f slots", d->nslots, log2(d->nslots)); */
+/*   fprintf(fp, "%.2f, ", alpha); */
+/*   struct timeval begin, end; */
+/*   long seconds = 0; */
+/*   long microseconds = 0; */
+/*   double elapsed = 0; */
+/*   double elapsed_total=0; */
+/*   BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512); */
+/*   // store the hash value in this variable */
+/*   uint64_t digest[2] = {0, 0}; */
+/*   // INIT SHA256 */
+/*   uint32_t state[8] = { */
+/*     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, */
+/*     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 */
+/*   }; */
 
 
-  // --------------------------------------///
-  //// INSERTION TIMING FINE TUNED
-  for (size_t i=0; i<N; ++i){
-    sha256_process_x86_single(state, M);
-    truncate_state32bit_get_digest(digest, state, 128);
+/*   // --------------------------------------/// */
+/*   //// INSERTION TIMING FINE TUNED */
+/*   for (size_t i=0; i<N; ++i){ */
+/*     sha256_process_x86_single(state, M); */
+/*     truncate_state32bit_get_digest(digest, state, 128); */
 
-    gettimeofday(&begin, 0);
-    dict_add_element_to(d, digest);
-    gettimeofday(&end, 0);    
-    seconds = end.tv_sec - begin.tv_sec;
-    microseconds = end.tv_usec - begin.tv_usec;
-    elapsed = seconds + microseconds*1e-6;
-    elapsed_total += elapsed;
+/*     gettimeofday(&begin, 0); */
+/*     dict_add_element_to(d, digest); */
+/*     gettimeofday(&end, 0);     */
+/*     seconds = end.tv_sec - begin.tv_sec; */
+/*     microseconds = end.tv_usec - begin.tv_usec; */
+/*     elapsed = seconds + microseconds*1e-6; */
+/*     elapsed_total += elapsed; */
 
-  }
+/*   } */
 
-  // how wasteful !
-  elapsed = elapsed_total;
-  elapsed_total = 0;
+/*   // how wasteful ! */
+/*   elapsed = elapsed_total; */
+/*   elapsed_total = 0; */
   
-  printf("dictionary filling %lu elements took %fsec \n", N,  elapsed);
-  printf("i.e. %f elm/sec≈2^%felm/sec\n", (float) N / elapsed, log2((float) N / elapsed));
-  fprintf(fp, "%felm/sec, %fprobes/elm, ", (float) N / elapsed, ((float)d->nprobes_insert)/N);
-  // edit base_alpha only in the first call of the function
-  if (base_alpha == 0)
-    base_alpha = alpha;
+/*   printf("dictionary filling %lu elements took %fsec \n", N,  elapsed); */
+/*   printf("i.e. %f elm/sec≈2^%felm/sec\n", (float) N / elapsed, log2((float) N / elapsed)); */
+/*   fprintf(fp, "%felm/sec, %fprobes/elm, ", (float) N / elapsed, ((float)d->nprobes_insert)/N); */
+/*   // edit base_alpha only in the first call of the function */
+/*   if (base_alpha == 0) */
+/*     base_alpha = alpha; */
  
 
 
-  /// LOOKUP TIMING FINE TUNED
-  // size_t values = 0; 
-  #define NSIMD_SHA 4
-  // use simd to create 8 hashes simultanously
-  uint32_t state_init_priv[8] = {
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-  };
+/*   /// LOOKUP TIMING FINE TUNED */
+/*   // size_t values = 0;  */
+/*   #define NSIMD_SHA 4 */
+/*   // use simd to create 8 hashes simultanously */
+/*   uint32_t state_init_priv[8] = { */
+/*     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, */
+/*     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 */
+/*   }; */
  
-  BYTE random_message_priv[NSIMD_SHA][64] = {0};
-  uint64_t digest_priv[NSIMD_SHA][2] = {0};
-  uint64_t lookup_keys_priv[NSIMD_SHA] = {0};
-  uint32_t state_priv[NSIMD_SHA][8] = {0};
-  size_t found_keys_priv[NSIMD_SHA] = {0};
+/*   BYTE random_message_priv[NSIMD_SHA][64] = {0}; */
+/*   uint64_t digest_priv[NSIMD_SHA][2] = {0}; */
+/*   uint64_t lookup_keys_priv[NSIMD_SHA] = {0}; */
+/*   uint32_t state_priv[NSIMD_SHA][8] = {0}; */
+/*   size_t found_keys_priv[NSIMD_SHA] = {0}; */
 
   
-  for (size_t i=0; i<(N/NSIMD_SHA); ++i){
-    // random numbers
-    for (int i=0; i<NSIMD_SHA; ++i) {
-      fill_radom_byte_array_get_random(random_message_priv[i], 64);
-      // clean previously used values
-      memcpy(state_priv[i], state_init_priv, sizeof(state_init_priv));
-      sha256_process_x86_single(state_priv[i], random_message_priv[i]);	
-      truncate_state32bit_get_digest(digest_priv[i], state_priv[i], 128);
-      lookup_keys_priv[i] = digest_priv[i][0];
-    }
-    gettimeofday(&begin, 0);
-    dict_get_values_simd(d, lookup_keys_priv, found_keys_priv);
-    gettimeofday(&end, 0);
+/*   for (size_t i=0; i<(N/NSIMD_SHA); ++i){ */
+/*     // random numbers */
+/*     for (int i=0; i<NSIMD_SHA; ++i) { */
+/*       fill_radom_byte_array_get_random(random_message_priv[i], 64); */
+/*       // clean previously used values */
+/*       memcpy(state_priv[i], state_init_priv, sizeof(state_init_priv)); */
+/*       sha256_process_x86_single(state_priv[i], random_message_priv[i]);	 */
+/*       truncate_state32bit_get_digest(digest_priv[i], state_priv[i], 128); */
+/*       lookup_keys_priv[i] = digest_priv[i][0]; */
+/*     } */
+/*     gettimeofday(&begin, 0); */
+/*     dict_get_values_simd(d, lookup_keys_priv, found_keys_priv); */
+/*     gettimeofday(&end, 0); */
 
-    seconds = end.tv_sec - begin.tv_sec;
-    microseconds = end.tv_usec - begin.tv_usec;
-    elapsed = seconds + microseconds*1e-6;
-    elapsed_total += elapsed;
-  }
+/*     seconds = end.tv_sec - begin.tv_sec; */
+/*     microseconds = end.tv_usec - begin.tv_usec; */
+/*     elapsed = seconds + microseconds*1e-6; */
+/*     elapsed_total += elapsed; */
+/*   } */
 
-  // how wasteful !
-  elapsed = elapsed_total;
-  elapsed_total = 0;
+/*   // how wasteful ! */
+/*   elapsed = elapsed_total; */
+/*   elapsed_total = 0; */
 
-  printf("dictionary lookup %lu elements took %fsec \n", N,  elapsed);
-  printf("dictionary successful lookups %lu \n", d->nelments_succ_lookup);
-  // fill base_lookup_rate only in the first call
-  if (base_lookup_rate==0)
-    base_lookup_rate = ((float) N) / elapsed;
+/*   printf("dictionary lookup %lu elements took %fsec \n", N,  elapsed); */
+/*   printf("dictionary successful lookups %lu \n", d->nelments_succ_lookup); */
+/*   // fill base_lookup_rate only in the first call */
+/*   if (base_lookup_rate==0) */
+/*     base_lookup_rate = ((float) N) / elapsed; */
 
-  float new_lookup_rate = ((float) N) / elapsed;
-  // how many bits have we gain in memory
-  float gain = log2(alpha/base_alpha);
-  // how many bits have we lost in performance
-  float loss = log2(new_lookup_rate/base_lookup_rate);
-  printf("i.e. %f elm/sec≈2^%felm/sec\n", new_lookup_rate, log2((float) new_lookup_rate));
-  fprintf(fp, "%felm/sec, %fprobes/elm, %fbits\n", new_lookup_rate, ((float) d->nprobes_lookup)/N, gain+loss);
-  puts("--------end---------");
-  dict_free(d);
-  free(d);
-}
+/*   float new_lookup_rate = ((float) N) / elapsed; */
+/*   // how many bits have we gain in memory */
+/*   float gain = log2(alpha/base_alpha); */
+/*   // how many bits have we lost in performance */
+/*   float loss = log2(new_lookup_rate/base_lookup_rate); */
+/*   printf("i.e. %f elm/sec≈2^%felm/sec\n", new_lookup_rate, log2((float) new_lookup_rate)); */
+/*   fprintf(fp, "%felm/sec, %fprobes/elm, %fbits\n", new_lookup_rate, ((float) d->nprobes_lookup)/N, gain+loss); */
+/*   puts("--------end---------"); */
+/*   dict_free(d); */
+/*   free(d); */
+/* } */
 
  
 int main(int argc, char* argv[]){

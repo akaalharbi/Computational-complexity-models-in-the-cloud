@@ -5,6 +5,17 @@
 #include "sha256.h"
 #include <emmintrin.h>
 
+#define m256i_TO_2m128i(VEC, HI, LO) HI = _mm256_castsi256_si128(VEC);\
+  LO = _mm256_extracti128_si256(VEC, 1);\
+  
+
+
+#define two_m128i_to_m256(HI, LO, VEC) VEC = _mm256_castsi128_si256 (LO);	\
+  VEC = _mm256_insertf128_si256 (VEC, HI, 1);\
+  
+
+ 
+
 /* Process multiple blocks. The caller is responsible for setting the initial */
 /*  state, and the caller is responsible for padding the final block.        */
 
@@ -23,8 +34,18 @@ void sha256_2way(uint32_t state[16], const uint8_t data[128])
   // or its variant) will work without any modification for most of the |
   // instructions.                                                      |
   //////////////////////////////////////////////////////////////////////+
-  
-  
+
+
+  /* Casting _mm256i to 2 _mm128i
+    lo:  __m128i _mm256_castsi256_si128 (__m256i a)
+    hi:  __m128i _mm256_extracti128_si256(data, 1);
+
+     casting 2 __mm128i to__m256i
+     
+    lo: __m256i _mm256_castsi128_si256 (__m128i a)
+    hi: __m256i _mm256_insertf128_si256 (__m256i a, __m128i b, int imm8)
+
+   */
   __m256i STATE0, STATE1;
   __m256i MSG, TMP;
   __m256i MSG0, MSG1, MSG2, MSG3;
@@ -61,6 +82,7 @@ void sha256_2way(uint32_t state[16], const uint8_t data[128])
 			   _mm256_set_epi64x(0xE9B5DBA5B5C0FBCFULL, 0x71374491428A2F98ULL,
 					     0xE9B5DBA5B5C0FBCFULL, 0x71374491428A2F98ULL)
 			   );
+    
     STATE1 = _mm_sha256rnds2_epu32(STATE1, STATE0, MSG);
     MSG = _mm256_shuffle_epi32(MSG, 0x0E);
     STATE0 = _mm_sha256rnds2_epu32(STATE0, STATE1, MSG);

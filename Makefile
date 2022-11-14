@@ -1,5 +1,5 @@
-#CC=clang
-CC=gcc
+CC=clang
+#CC=gcc
 LDLIBS  = -lm
 LDFLAGS = -fopenmp
 INCLUDE = include
@@ -56,6 +56,7 @@ TARGETS = long_message_attack verify_hash
 
 
 all: long_message_attack
+	mkdir -p obj
 	mkdir -p data
 	mkdir -p data/upload
 	mkdir -p data/messages
