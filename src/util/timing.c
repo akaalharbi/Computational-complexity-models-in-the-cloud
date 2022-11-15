@@ -1,9 +1,4 @@
-#ifndef TIMING_FUNCTION
-#define TIMING_FUNCTION
-
-#include <sys/time.h>
-#include <bits/types/struct_timeval.h>
-
+#include "timing.h"
 
 
 double wtime()
@@ -13,4 +8,4 @@ double wtime()
         return (double) ts.tv_sec + ts.tv_usec / 1e6;
 }
 
-#endif
+

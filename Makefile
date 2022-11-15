@@ -1,5 +1,5 @@
-CC=clang
-#CC=gcc
+#CC=clang
+CC=gcc
 LDLIBS  = -lm
 LDFLAGS = -fopenmp
 INCLUDE = include

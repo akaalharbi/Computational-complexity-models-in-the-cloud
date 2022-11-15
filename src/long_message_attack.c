@@ -189,6 +189,20 @@ void phase_i_store(const size_t n,
 }
 
 
+void phase_i_load(dict* d, FILE* fp, size_t nelements, ){
+  /// Load file of hashes to dictionary d
+  /// this is local function, it doesn't know which server it's
+  //+ check available memory
+  //+ available memeory >= nelements
+  //++ add all elemnets of file to d
+  //+ available memeory < nelements
+  //++ Fix some distinguish points or store first elemnets till
+  //   memeory is full
+}
+
+
+
+
 
 void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
 
@@ -205,7 +219,7 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
   /// todo nblocks instead of n_of_blocks!
 
   /// PROCESS THE PRARAMETERS
-  is_there_duplicate = 0; // global variable to detect cycles
+
   size_t n_of_blocks = (size_t) ceil(pow(2.0, l));
   // We will use this to reconstruct the long message again
   size_t ncores = 14; // @tidy @todo get the value directly from config.h 
@@ -463,7 +477,7 @@ void long_message_attack(const size_t n_of_bits, const double l, FILE* fp){
   snprintf(file_name, sizeof(file_name), "data/messages/%lu_%d",  n_of_bits,  (int) l);
   FILE* fm = fopen(file_name, "w");
   fwrite(random_message, 1, 64, fm);
-  fclose(fm);
+  fclose(fm); 
 
   // Free memeory
   dict_free(d);
@@ -482,16 +496,16 @@ int main(int argc, char* argv []){
   
   // attack(size_t n_of_blocks, size_t n_of_bits)
 
-  puts("starting with storing message");
-  #define nservers 16
-  size_t servers_capacity[nservers];
-  size_t global_difficulty = 0;
-  for (int i=0; i<nservers; ++i) {
-    servers_capacity[i] = 1LL<<25;
+  /* puts("starting with storing message"); */
+  /* #define nservers 16 */
+  /* size_t servers_capacity[nservers]; */
+  /* size_t global_difficulty = 0; */
+  /* for (int i=0; i<nservers; ++i) { */
+  /*   servers_capacity[i] = 1LL<<25; */
 
-  }
-  phase_i_store(96, servers_capacity, global_difficulty, nservers);
-  puts("done with registering the message");
+  /* } */
+  /* phase_i_store(96, servers_capacity, global_difficulty, nservers); */
+  /* puts("done with registering the message"); */
 
   
   
