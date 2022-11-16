@@ -17,6 +17,30 @@ int cmp_arrays(char* array1, char* array2, size_t len){
 }
 
 
+void human_format(char * target, uint64_t n) {
+        if (n < 1000) {
+                sprintf(target, "%lu" , n);
+                return;
+        }
+        if (n < 1000000) {
+                sprintf(target, "%.1fK", n / 1e3);
+                return;
+        }
+        if (n < 1000000000) {
+                sprintf(target, "%.1fM", n / 1e6);
+                return;
+        }
+        if (n < 1000000000000ll) {
+                sprintf(target, "%.1fG", n / 1e9);
+                return;
+        }
+        if (n < 1000000000000000ll) {
+                sprintf(target, "%.1fT", n / 1e12);
+                return;
+        }
+}
+
+
 void print_char(char* l, size_t len){
   printf("0x");
   for (size_t i = 0; i<len; ++i)
@@ -62,20 +86,20 @@ unsigned char* create_radom_byte_array(int n_of_bytes){
 
 
 
-void fill_radom_byte_array(unsigned char* A, int n_of_bytes, unsigned int *seed){
+inline void fill_radom_byte_array(unsigned char* A, int n_of_bytes, unsigned int *seed){
   /* Create seemingly a random byte array with total_n_of_bits */
   /// INPUT: how many bytes
   /// OUTPUT: array with ceil(total_n_of_bytes) entries
   ///         the last entry doesn't necessarily use all the 8 bits
   
 
-  int d = 0;
-  for (size_t i=0; i<n_of_bytes; ++i){
-    d = 0 + rand_r(seed) / (RAND_MAX / (255 - 0 + 1) + 1);
-    A[i] = (unsigned char) d;
-  }
-  //int returned_bytes = getrandom(A, n_of_bytes, 1);
-  //++returned_bytes; // dummy operation to avoid not used warning
+  /* int d = 0; */
+  /* for (size_t i=0; i<n_of_bytes; ++i){ */
+  /*   d = 0 + rand_r(seed) / (RAND_MAX / (255 - 0 + 1) + 1); */
+  /*   A[i] = (unsigned char) d; */
+  /* } */
+  int returned_bytes = getrandom(A, n_of_bytes, 1);
+  ++returned_bytes; // dummy operation to avoid not used warning
 
 }
 

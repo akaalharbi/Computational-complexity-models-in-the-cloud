@@ -2,7 +2,7 @@
 This repository is still a work in progress that should implement long message attack on parallel using multiple computers. The goal is to attack 96-bits (or higher!) of `sha-256` output. 
 
 ## Attack Overview
-For a better description see (find somone explains lma)[]. The attack can be parametrized by $n, l$ where denote $n=#bits$ to be attacked and $2^l$ is the number of elements stored in `Phase I` (number of blocks in the long message)
+For a better description see (find somone explains lma)[]. The attack can be parametrized by $n, l$ where denote $n=nbits$ to be attacked and $2^l$ is the number of elements stored in `Phase I` (number of blocks in the long message)
 
 
 - Phase I  : Constructs a long message

@@ -14,8 +14,10 @@
 #include <string.h>
 #include <math.h>
 #include "shared.h"
-#define ALIGNMENT 32
+
 #include <immintrin.h>
+
+
 
 
 /* //-----------------------------------------------------// */
@@ -26,9 +28,11 @@
 //-----------------------------------------------------//
 //                       methods                       //
 //-----------------------------------------------------//
-
+/* represent n in <= 6 char  */
 
 dict* dict_new(size_t nelements){
+  /// dict v4: we take part of the value as in index and store the rest
+  ///          as a value. The value is maximally 32 bits 
   /// dict v3: we don't store values, we only store 64bit of the key
   ///         in d->keys[k]. When d->keys[k]=0, it means that we have
   ///         we have an empty slot
@@ -36,40 +40,34 @@ dict* dict_new(size_t nelements){
 
   dict* d = (dict *) aligned_alloc(ALIGNMENT, (sizeof(dict)));
 
-  
-  // Use a defined filling rate type.h, empiricall data shows 0.77
-  // is the best
+  // on my laptop 8 elements per bucket
+  int nslots_per_bucket = AVX_SIZE / 32; // since we store 32 bits value
+  size_t scale = (int) log2(nslots_per_bucket);
+  // we will add few slots to enusre 
   size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
   
-  // the number of slots is multiple of alignment
-  // this is for SIMD. Don't confuse it with sha256 padding
-  // multiple of ALIGNMENT BYTES. @update: not sure if this is required!
-  int padding_alignment =   nslots %  (ALIGNMENT/sizeof(uint64_t)) ;
-  padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - padding_alignment ;
 
-  //nslots = nslots + padding_alignment;
+  // nsolts = nbuckets * nslots_per_bucket; nbuckets divides nslots
+  nslots = nslots + (-nslots % nslots_per_bucket);
+  //+ todo does negative gives the correct result here?
+
+  /// Save configured variables as dictionary entries 
   d->nslots = nslots;
-  /* printf("nslots=%lu, padding=%d, alignmen/sizeof(uint64)=%lu\n", */
-  /* 	 d->nslots, padding_alignment, (ALIGNMENT/sizeof(uint64_t))); */
-
+  d->nbuckets = nslots/nslots_per_bucket;
+  d->scale = scale;
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
   d->nelments_succ_lookup = 0;
   d->keys = (uint64_t*) aligned_alloc(ALIGNMENT,
-		         (padding_alignment + nslots)*(sizeof(uint64_t)));
-  // (uint64_t*) malloc(d->nslots*(sizeof(uint64_t)));
-				
-  /* d->memory_estimates = (padding_alignment + nslots)*(sizeof(uint64_t)) // keys */
-  /*                     + sizeof(size_t)*2 */
-  /*                     + sizeof(dict); */
-  
+				      (nslots)*(sizeof(uint64_t)));
 
-  // Ensure the keys are next to each other
+
+
+  // Ensure keys are zeroed
   #pragma omp simd
-  for (size_t i = 0; i < nslots; ++i) {
+  for (size_t i = 0; i < nslots; ++i) 
      d->keys[i] = 0; // 0 if it is not occupied
-  }  
-   // printf("- Dictionary of size 0x%lx\n has been initialized\n", nslots);
+
   return d;
 }
 
@@ -80,38 +78,38 @@ inline void dict_free(dict* d){
 
 size_t dict_memory(size_t nelements){
   /// return memory estimation of the dictionary size
-  size_t estimate = (size_t)  ceil((1/FILLING_RATE)*nelements);
-  size_t padding_alignment = (ALIGNMENT/sizeof(uint64_t)) - nelements%( (ALIGNMENT/sizeof(uint64_t)) );
-  // how many slots in the dictionary
-  estimate = estimate + padding_alignment;
-
-  estimate = estimate*(sizeof(uint64_t)) /* keys */
-           + sizeof(dict);
-
+  int nslots_per_bucket = AVX_SIZE / 32; // since we store 32 bits value
+  size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
+  nslots = nslots + (-nslots % nslots_per_bucket);
+  size_t estimate = nslots*(sizeof(uint32_t)) + sizeof(dict);
+  
   return estimate/1000.0;
 }
 
 
-void dict_add_element_to(dict* d, uint64_t key[2]){
+void dict_add_element_to(dict* d, uint64_t store_as_idx, uint32_t val){
   /// Use linear probing to add element to the array d->keys
-  uint64_t h = key[0]; // for now we assume indices don't need more than 64 bits 
-  h = h % d->nslots; // assumption nslots = 2^m; 
+  uint64_t h = store_as_idx; // for now we assume indices don't need more than 64 bits 
+  h = h % d->nbuckets; // get the bucket number
+  size_t idx = h << (d->scale) ; // get the index of bucket in keys array
 
+  // linear probing 
   // locate where to place (key, value)
-  while (d->keys[h]){ /* ==0; means empty slot */
-    // linear probing
-    
-    ++h;
-    if (h >= d->nslots)
-      h = 0; //h - d->nslots;
-    
-    #ifdef NPROBES_COUNT
-    ++(d->nprobes_insert);
-    #endif
-  }
+  // in insertion we are not going to use buckets explicitly
+  for (int i=0; i<MAX_NPROBES; ++i) {
+    // found an empty slot inside a bucket
+    if (d->keys[idx] == 0) { // found an empty slot
+      d->keys[idx] = val;
+      return;
+    }
 
-  /// Found an empty slot, update its 
-  d->keys[h] = key[0];
+
+    ++idx;
+    // reduce mod n->slots
+    if (idx>d->nslots)
+      idx = 0;
+  }
+  // done
 }
 
 
@@ -128,22 +126,21 @@ void print_m25i(__m256i a, char* text){
 
 
 
+size_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
 
-size_t dict_get_value(dict* d, uint64_t key[2]){
 
-  int step = ALIGNMENT/sizeof(uint64_t); // for the while loop
-  size_t h =  key[0];
-  h = h % d->nslots;
+  uint64_t h = store_as_idx; // for now we assume indices don't need more than 64 bits 
+  h = h % d->nbuckets; 
+  size_t idx = h << (d->scale) ; // get the index of bucket in keys array
   
-  // Gymnastics for the alignment
-  h = h - (h&(step-1)); // since step = 2^r for some r 
 
 
   int is_key_found = 0;
   int has_empty_slot = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
   
   __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
-  __m256i lookup_key_simd = _mm256_setr_epi64x(key[0], key[0], key[0], key[0]);
+  __m256i lookup_key_simd = _mm256_setr_epi32(val, val, val, val, val, val, val, val);
+  //+todo start from here
   __m256i zero_vect = _mm256_setzero_si256();
   __m256i comp_vect_simd;
 
