@@ -21,6 +21,34 @@ For a better description see (find somone explains lma)[]. The attack can be par
 We are in ** step 3.**
 
 
+## Message structure
+sha256 has a 
+uint32_t state[8] =  {A, B, C, D, E, F, G, H};
+
+
+Casting state to uint64_t:
+
+(uint64_t*) state; //= { (B<<32|A), (D<<32|C), (F<<32|E), (H<<32)|G } 
+
+
+uint32_t digest[3] = {A, B, C}; // 96 bits
+
+### Distinguished point and server number
+A = rest||server_number||bits for distinguished point
+
+### What to store in the dictionary
+
+the index is 
+Let m:= nbits dedicated for distinguished points + nbits dedicated for server_number
+
+idx= (B<<32|A) >> m // remove truncate distinguished points and server number
+idx = idx mod (nbuckets)
+Store whole word C (or state[2]) as a value in the dictionary 
+
+
+
+
+
 # Usage
 
 
@@ -42,21 +70,12 @@ Then run it
 
 ## todo (Techincally not bugs):
 
-- unified interface for sha256 regardless of implementation i.e.:
-  - `sha256\_transform(u32 state[8], u32 msg[16])` // both arguments are aligned to 32bytes
-  - `sha256_2way_transform(u32 state[2][8], u32 msg[2][16])` // again all arguments are aligned
 
-- automatically find the best distinguishability level (e.g. how many zeros should be in the hash before appending it to the dictionary)
-- put statistics and messages inside the folder `log/`
-- add time stamp for log files
-- compute how many potentiall collisions should be computed in phase ii
 - write phase iii
-- when writing the long message, we might record several internal states of it wiht index in a file. This allows parallel execution in phase iii
-- python verify hash shoudl ignore time stamps and should work wiht input from the terminal not hardcoded
-- create a single makefile with that can generates long\_message\_attack with different options: 1- no intrinsics, 2- debug mode, 3- use another sha256 implementation
 
-- `log/` folder is for statistics and testing output
-- `messages/` there should be a distinction between potential messages and messages the leads to collisions
+
+
+
 
 # Performance Evolution
 In these measurements, we used a predictable prng in order to test the same numbers on all variants. Also, all parameters below have no cycle in Phase I. We believe this is realistic model. These tests have been conducted on the same machine with the same OS.
@@ -115,104 +134,3 @@ I found claims that:
 
 
 
-Anything below this line are legacy notes, probably are not accurate
-_______________
-# Summary:
-This folder has three main executables `long_message_attack`, `verify_hash', `bench_mark` which generate two colliding messages, verifies the results, and benchmark the dictionary and sha256 respectively. 
-
-# definitions
-long message: a large message of zeros.
-
-## Usage:
-Basic usage:
-make clean && make
-
-./long_message_attack n l
-
-This will mount an attack of truncated sha256 to n-bits using a long message of length 2^l. The random message that collides with the long message can be found in `messages/n_l` in binary format (read it as unsigned char[64]). Also, you can find benchmark and the index where the collision occurs at `statistics_parallel/n_l.txt`.  Substitute n and l, if l>= n/2 then there is a high chance of having a cycle. In this case, you can only find a file in `statistics_parallel/n_l.txt`
-
-
-### Verifies the results
-./verify_hash "messages/n_l" n
-This will read the file n_l, truncate the output to n bits, and search for an index where the message found in `messages/n_l` collides with the long message. If the index mentioned in "messages/n_l" doesn't produce a collision it will indicate that they are not colliding.
-
-
-
-
-# compile:
-run `make` and the executable `long_message_attack` is the a parallel version of the attack, apologies for the confusion with what written below.
-
-## Flags
-`-fopenmp` for parallel executable (only Phase II can be parallel)
-`-DVERBOSE_LEVEL` print intermediate information (it will flood the program use with care)
-
-
-- parallel
-gcc -fopenmp -O3 long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack_parallel
-
-// DEBUG
-gcc -DVERBOSE_LEVEL -fopenmp -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack_parallel
-
-
-
-
-- serial
-gcc -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack
-
-// with debug using
-gcc -DVERBOSE_LEVEL -O3  -g long_message_attack.c sha256.c dict.c util/util_char_arrays.c util/memory.c -lm -o long_message_attack
-
-
-
-- verify hash
-gcc -g verify_hash.c sha256.c -lm -o verify_hash
-
-cost statistics:
-sudo perf stat -a  -e power/energy-pkg/ ./long_message_attack_parallel 63 29
-
-sudo perf stat -o stats.txt -a -r 2 -e power/energy-pkg/ ./long_message_attack 30 15
-
-
-sudo perf stat -a -r 2 -e power/energy-pkg/ ./long_message_attack 30 15
-
-usage:
-./longa_message_attack n l
-n: 0<n<257 which is the number of bits in the output of the compression function
-l:float 2^l is the number of blocks
-
-- the two messages, that collide, will be saved in the files `message1` `message2`
-
-
-files:
-- 
-- statistics*/n_l_bits.txt files contain the system power usage while the program was running.
-- long_message_attack.c: main file that implements the attack
-- verify_hash.c: reads 64 bytes from a binary file then it hashes a long message till a collision is found.
-                 returns the index idx where the collision occurs.
-- dict.*: chained dictionary implementation using linked list
-- util_char_arrays.* : some useful functionalities
-- ignore the tmp file
-
-
-
-taken from the internet: 
-- sha256.* (modified)
-- crypto-algorithms-master.zip
-- memory.c
-
-questions:
-
-
-issues:
-
-
-future improvements:
-
-
-possible optimizations:
-- profile the code
-
-
-Benchmarks:
-- Number of sha256 transforms ~2^21 calls / sec
-- Memory writes ~100MB/sec
