@@ -21,8 +21,7 @@
 ///-----------------------------------------------------///
 
 // based on our experiments this will inlude > 95% of elements 
-#define MAX_NPROBES 24 
-
+#define NPROBES_MAX 24
 #ifndef FILLING_RATE
 #define FILLING_RATE 0.9
 #endif
@@ -36,7 +35,8 @@ typedef struct  __attribute__((aligned(32))) {
   uint64_t* keys   __attribute__((aligned(32)));
   size_t nslots; // number of elements  in the dictionary
   size_t nbuckets; // a bucket contains x0 slots depending avx register length
-  size_t scale; // log2(nslots_per_bucket)
+  size_t nslots_per_bucket; // = nslots / nbuckets
+  //size_t scale; // = log2(nslots_per_bucket)
   size_t nprobes_insert;
   size_t nprobes_lookup;
   size_t nelments_succ_lookup;
@@ -55,7 +55,7 @@ void dict_free(dict* d);
 size_t  dict_memory(size_t nelements);
 
 void dict_add_element_to(dict* d, uint64_t idx, uint32_t val);
-size_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val);
+uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val);
 void dict_print(dict *d);
 
 
