@@ -17,6 +17,8 @@
 // ---------------------- |
 #define AVX_SIZE  256 //  |
 #define ALIGNMENT 32  //  |
+// Number of elements per simd register
+#define SIMD_LEN  8   //  |
 // ---------------------- |
 
 #endif

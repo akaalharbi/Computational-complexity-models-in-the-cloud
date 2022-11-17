@@ -90,8 +90,9 @@ size_t dict_memory(size_t nelements){
 }
 
 
-void dict_add_element_to(dict* d, uint64_t store_as_idx, uint32_t val){
+int dict_add_element_to(dict* d, uint64_t store_as_idx, uint32_t val){
   // =========================================================================+
+  // returns 1 if an element has been added, 0 otherwise                      |
   // This dictionary is unusual:                                              |
   // User have Value = (64bit) || (32bit), the user choses to split as they   |
   // wish. The reason, we don't do split by ourselves is that we might have   |
@@ -116,7 +117,7 @@ void dict_add_element_to(dict* d, uint64_t store_as_idx, uint32_t val){
     // found an empty slot inside a bucket
     if (d->keys[idx] == 0) { // found an empty slot
       d->keys[idx] = val;
-      return;
+      return 1;
     }
 
 
@@ -125,7 +126,7 @@ void dict_add_element_to(dict* d, uint64_t store_as_idx, uint32_t val){
     if (idx>d->nslots)
       idx = 0;
   }
-  // done
+  return 0; // element has been added
 }
 
 
@@ -162,15 +163,19 @@ uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
   int is_key_found = 0;
   // it's enough to check if the first element is empty
   int empty_bucket = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
+  // we can remove one of the above variables 
+  
   __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
   __m256i lookup_key_simd = _mm256_set1_epi32(val); // (val, val, ..., val) 8times
-  __m256i zero_vect = _mm256_setzero_si256();
+  //__m256i zero_vect = _mm256_setzero_si256(); // no need for this with buckets
   __m256i comp_vect_simd;
 
   
   
-  // while (!empty_bucket){// has occupied slot,
-  for (size_t i=0; i<NPROBES_MAX; ++i) {
+  
+  // loop at most NPROBES_MAX/SIMD_LEN since we load SIMD_LEN
+  // elements from dictionary each loop.
+  for (size_t i=0; i< (int) (NPROBES_MAX/SIMD_LEN); ++i) {
         
     // we are relying that the val != 0, Pr(val !=0 ) = 1/(2^32)
     // linear probing
@@ -181,7 +186,7 @@ uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
     //                   TEST 1                       //
     /*  Does key equal one of the slots?              */
     //------------------------------------------------//
-    comp_vect_simd = _mm256_cmpeq_epi64(lookup_key_simd, dict_keys_simd);
+    comp_vect_simd = _mm256_cmpeq_epi32(lookup_key_simd, dict_keys_simd);
     is_key_found = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
 
     #ifdef VERBOSE_LEVEL
@@ -192,31 +197,40 @@ uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
     printf("is_key_found? %d\n", is_key_found);
     #endif
     
-    //+ todo: correct this area                                  
+
     if (is_key_found) { // @todo explains theese magical lines!
       // movemask_ps(a) will return 4 bytes m, where m[i] := some mask with ith 64 bit entry
-      int loc = _mm256_movemask_epi8(comp_vect_simd);
-      // some magical formula, too tired to explain it's 00:12am
-      size_t idx_val = (__builtin_ctz(loc)>>3) + h;
-      // since we deal with values of size 64 will be repeated twice
-      return d->keys[idx_val];// - 1; // let caller deal with correcting the offset
+
+      // wi:32-bit,  w8 w7 w6 w5 w4 w3 w2 w1 - move mask ->
+      // (hw8||hw7) || (hw6||hw5) || (hw4||hw3) || (hw2||hw1) 
+      // hwi: 4-bits extracted as MSB of each consecutive 8bits in wi
+      uint32_t loc = _mm256_movemask_epi8(comp_vect_simd);
+
+      // We wish to find the wi that is not 0.
+      // each wi on the right that equals zero, will add 4 zeros
+      // (since movemask gets 4 bits from each 32-bit word)
+      // __builtin_ctz(x): Returns the number of trailing 0-bits in x, starting
+      // at the least significant bit position. undefined if x==0.
+      size_t idx_val = (__builtin_ctz(loc)>>2) + idx;
+      // note in our case loc != 0 since a key was found.
+      return d->keys[idx_val];
     }
 
     // -------------------------------------------------//
     //                   TEST 2                         //
     /* is one the slots empty? then no point of probing */
     //- ------------------------------------------------//
-    
-    comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
-    empty_bucket = _mm256_movemask_epi8(comp_vect_simd);
+    // no need for the commented instruction since we only check the first value
+    // comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
+    // copy the value of the first slot of the bucket, check is it 0?
+    empty_bucket = ( _mm256_cvtsi256_si32(comp_vect_simd) == 0 );
 
     if (empty_bucket)
       return 0;
 
 
-
+    // Linear probing
     // update the index for keys load
-    //!
     idx += d->nslots_per_bucket; // move to the next bucket
     if (idx >= d->nslots)
       idx = 0;
@@ -240,8 +254,7 @@ uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
     //printf("inside next: step=%d, h=%lu, nslots=%lu\n", step, h, d->nslots);
   }
 
-  // update current->key = key 
-  // memcpy(current->key, key->bytes, key_size);
+
   return 0; // no element is found
   
 }

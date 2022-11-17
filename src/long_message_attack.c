@@ -61,7 +61,7 @@ void phase_i_store(const size_t n,
   // or its distinguished point format.                                                |
   // Compute h -> decides which server k -> check server difficulty -> decide to store |
   // h or discard it.                                                                  |
-  // ----------------------------------------------------------------------------------|
+  // ----------------------------------------------------------------------------------+
   // INPUTS:                                                                           |
   // `n`: hash digest length, our goal is 96-bit                                       |
   // `server_capacity[]` : array of size nservers,  entry i contains how many blocks   |
@@ -70,6 +70,9 @@ void phase_i_store(const size_t n,
   //                       i.e. is state[0]&(2**global_difficulty - 1) == 0 or not?    |
   // `nservers` : how many servers we should prepare for                               |
   // NOTE: endinaness: u32 A[2] = {x, y} then (uint64*) A = { (x<<32) | y) }           |
+  // ----------------------------------------------------------------------------------+
+  // TODO:                                                                             |
+  // - Load server capacities from a file.                                             |
   // ==================================================================================+
   
 
@@ -196,7 +199,25 @@ void phase_i_store(const size_t n,
 }
 
 
-void phase_i_load(dict* d, FILE* fp, size_t nelements){
+void phase_i_load(dict *d,
+		  FILE *fp,
+		  size_t fp_nhashes,
+		  size_t mem_nhashes,
+                  size_t difficulty) {
+
+  // ===========================================================================+
+  // Summary: Load hashes from the file *fp, and store the in dict *d           |
+  // ---------------------------------------------------------------------------+
+  // INPUTS:                                                                    |
+  // `*d`: Dictionary that will keep elements from *fp.                         |
+  // `*fp` : File contain number of hashes larger than nelements                |
+  // `fp_nhashes`  : The nhashes available in the file.                         |
+  // `mem_nhashes` : The max number of hashes we are allowed to store in this   |
+  //                   machine. The dictionary *d may not accepts all elements. |
+  // ---------------------------------------------------------------------------+
+  // TODO:                                                                      |
+  // ===========================================================================+
+
   /// Load file of hashes to dictionary d
   /// this is local function, it doesn't know which server it's
   //+ check available memory
@@ -205,431 +226,107 @@ void phase_i_load(dict* d, FILE* fp, size_t nelements){
   //+ available memeory < nelements
   //++ Fix some distinguish points or store first elemnets till
   //   memeory is full
+
+  // Check that file exists
+  if (!fp){
+    puts("Am I joke to you? I have been given a file that lives in nowhere");
+    return; // raise an error instead
+  }
+
+
+  uint32_t digest[3] = {0};
+  // Read the first two elements as one 64bit unsigned int 
+  uint64_t store_as_idx;
+  
+  // Exit as soon we have exausted the file or the memory
+  for (; (mem_nhashes > 0) && (fp_nhashes > 0); fp_nhashes--){
+    // size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
+    fread(digest, sizeof(uint32_t), 3, fp);
+    // Read the first two elements as one 64bit unsigned int 
+    store_as_idx = ((uint64_t*) digest) [0] ;
+    // remove the distinguished points. They are shared between all 
+    store_as_idx = store_as_idx >> difficulty;
+    //+ should I also remove the server number?
+    //+ I think this will help with clustering
+
+    // Add element to the dictionary. If it is successful,
+    // reduce mem_nhashes by one.
+    mem_nhashes -= dict_add_element_to(d, store_as_idx, digest[2]);
+    
+  }
+  fclose(fp); // close the file
 }
 
 
 
 
 
-void long_message_attack(const size_t n_of_bits,
-			 const double l,
-			 dict* d,
-			 FILE* fp){
 
 
+void phase_ii(dict* d,
+	      FILE* fp_possible_collisions,
+	      size_t needed_collisions)
+{ 
+  // some extra arguments to communicate with other
   
-
-  
-  /*  Mount long message attack on truncated sha256 */
-  /// INPUT:
-  ///  - n_of_bits: compression functions output size in bits
-  ///  - l: 2^l = how many message blocks we need to store their intermediate values
-  ///  -fp: a pointer to file where we will store the benchmark information (time,)
-  ///      it will write in the first line it encounters then 
-  /// todo nblocks instead of n_of_blocks!
-
-  /// PROCESS THE PRARAMETERS
-
-  /* size_t n_of_blocks = (size_t) ceil(pow(2.0, l)); */
-  /* // We will use this to reconstruct the long message again */
-  /* size_t ncores = 14; // @tidy @todo get the value directly from config.h  */
-  
-  
-  /* // each thread will create number of registers @todo adapte the formula below */
-  /* double memory_estimate = (64  + 32)*omp_get_max_threads() + dict_memory(n_of_blocks); // edit me */
+  // ===========================================================================+
+  // Summary: Hash many different messages till we found enough collisions      |
+  // ---------------------------------------------------------------------------+
+  // INPUTS:                                                                    |
+  // `*d` : dictionary that has hashes from phase i                             |
+  // `*fp_possible_collisions`: store all heashes h that dictionary tells they  |
+  //                            might exists. Also, store the corresponding     |
+  //                            message.                                        |
+  // NOTE: (64bytes message || 32bytes hash) (64bytes message || 32bytes hash)  |
+  // `needed_collisions` : How many messages we need that return positive hits  |
+  //                       when probe the dictionary.                           |
+  //----------------------------------------------------------------------------+
+  // TODO:                                                                      |
+  // - extra arguments to deal with other servers                               |
+  // ===========================================================================+
 
 
-  /* /// write it in a file fp */
-  /* fprintf(fp, "%lu, %d, NAN, %0.2fkb, ", */
-  /* 	  n_of_bits, (int) l, memory_estimate); */
+  // ---------------------- -PARALLEL SEARCH ---------------------------|
 
-
-  /* printf("Memory estimates %0.2fkb, \n", memory_estimate); */
-  /* /// ----------------- IF VERBOSE ENABLED ------------------ /// */
-  /* #ifdef VERBOSE_LEVEL */
-  /* printf("Memory estimates %0.2fkb, \n", memory_estimate); */
-  /* #endif // VERBOSE_LEVEL */
-  /* /// --------------- END IF VERBOSE ENABLED ---------------- /// */
-
-
-
-  
-  /* /// ----------------------- INIT ---------------------------/// */
-  /* /// timing */
-  /* struct timeval begin, end; */
-  /* long seconds = 0; */
-  /* long microseconds = 0; */
-  /* double elapsed = 0; */
-  /* gettimeofday(&begin, 0); */
-
-  
-  /* // store values in a dictionary */
-  /* // dict_new(#elemnets will be stored, element's size) */
-  /* // assuming all element have the same size */
-  /* dict* d = dict_new(n_of_blocks);  */
-
-  /* // store the states of the long message after some defined interval */
-  /* FILE* fstate = fopen("data/states", "wb"); */
-
-  /* /// -------------- PHASE I ------------------------  /// */
-  /* /// First phase hash an extremely long message */
-  /* // M0 M1 ... M_{2^l} */
-  /* // Mi entry will evaluated on the fly */
-
-
-  /* BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512); */
-  /* // store the hash value in this variable */
-  /* uint64_t digest[2] = {0, 0}; */
-  /* // INIT SHA256  */
-
-  /* uint32_t state[8] = { */
-  /*   0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, */
-  /*   0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19 */
-  /* }; */
-
-
-  /* // hash a long message (for now it's a series of zeros) */
-  /* // number of messages recorded  */
-  /* size_t nmsg_rec = 0; // e.g. how many distinguished points we have seen so far  */
-  /* // when nmsg_rec mod interval == 0; record the state in a file */
-  /* size_t interval = n_of_blocks / ncores; */
-  
-  /* while (nmsg_rec < n_of_blocks){ */
-  /*   // number of (distinguished messages == n_of_blocks) */
-  /*   sha256_single(state, M); */
-
-  /*   // get the digest from the state */
-  /*   truncate_state32bit_get_digest(digest, state, n_of_bits); */
-    
-    
-  /*   /// ------------ DISTINGUISHED POINTS ------------------------- /// */
-  /*   /// If distinguished points feature was enabled  during compile /// */
-
-  /*   #ifdef DISTINGUISHED_POINTS */
-  /*   // we skip hashes */
-  /*   if ( (digest[0]&DIST_MASK) != 0)  */
-  /*     continue; // skip this element */
-  /*   #endif */
-
-  /*   if (nmsg_rec % interval == 0){ */
-  /*     //+ @todo */
-  /*     //+ record (state) at somefile */
-  /*     // should we close and open the file each time the if condition */
-  /*     // becomes true? I think yes, we get the panelty on a local laptop 14 times only. */
-  /*     fwrite(state, sizeof(uint32_t), 8, fstate); */
-  /*     fflush(fstate); // ensure that the contents are physically on harddrive */
-  /*   } */
-      
-  /*   // @todo do we need to record the value in a dictionary? Or should we do it later? */
-  /*   dict_add_element_to(d, digest); */
-  /*   nmsg_rec++; */
-
-  /*   /// ----------------- IF VERBOSE ENABLED ------------------ /// */
-  /*   #ifdef VERBOSE_LEVEL */
-  /*   printf("value=%lu\n", nmsg_rec); */
-  /*   printf("digest=0x%016lx%016lx\n", digest[1], digest[0]); */
-  /*   puts("state="); */
-  /*   print_char((char*)state, 32); */
-  /*   puts("\n"); */
-  /*   #endif // VERBOSE_LEVEL */
-  /*   /// --------------- END IF VERBOSE ENABLED ---------------- /// */
-  /* } ///             DONE WITH HASHING THE LONG MESSAG            /// */
-
-  /* /// ----------------- IF VERBOSE ENABLED ------------------ /// */
-
-  /* #ifdef VERBOSE_LEVEL */
-  /* puts("dictionary after hash"); */
-  /* dict_print(d); */
-  /* puts("-----------------"); */
-  /* #endif // VERBOSE_LEVEL */
-  /* /// --------------- END IF VERBOSE ENABLED ---------------- /// */
-
-
-  /* /// TIMING record PHASE I time elapsed /// */
-  /* gettimeofday(&end, 0); */
-  /* seconds = end.tv_sec - begin.tv_sec; */
-  /* microseconds = end.tv_usec - begin.tv_usec; */
-  /* elapsed = seconds + microseconds*1e-6; */
-  /* /// */
-  /* /// write it in a file  /// */
-  /* fprintf(fp, "%fsec, ", elapsed); */
-  /* /// -------------------/// */
-
-  /* /// record memeory usage /// */
-  /* long res_mem  = 0; */
-  /* long virt_mem = 0; */
-  /* get_memory_usage_kb(&res_mem, &virt_mem); */
-  /* fprintf(fp, "RES=%lukb, VmSize=%lukb, ", res_mem, virt_mem); */
-  /* ///------------------------------------------------------/// */
-
-
-  /// ------------------ PHASE II -----------------------  ///
-  // Second phase: hash a random message till a collision is found
-  /// check if we have a duplicate first
-  
-  int collision_found = 0; // shared by all threads and dict.c file
-  size_t ctr = 0; // how many random messages we've tried
-  size_t idx = 0; // the index of the message to be removed
-  BYTE random_message[64] = {0};
-
-  
-
-  /// ------------------- ///
-
- 
-  // parallel search which are independent of each other
-  #ifdef _OPENMP
-  printf("Phase II: we will use %d threads, n=%lu, l=%d\n",
-	 omp_get_max_threads(), n_of_bits, (int) l);
-  // printf("Max nthreads=%d\n", omp_get_max_threads());
-
-  
-  #endif // _OPENMP
-
-  /// ---------  PARELLLEL SEARCH ----------- ///
-  #pragma omp parallel shared(collision_found)
+   #pragma omp parallel
   {
-    //printf("Thread %02d\n", omp_get_thread_num());
-
-
-    uint32_t state_init_priv[8] = {
+    //                     INIT PRIVATE VARAIABLES                     //
+    int in_dict_priv = 0;
+    //+ vsha_setup
+    uint32_t state_priv[8] =
+      {
       0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
       0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-    };
-    //+ todo add more structured search 
-    BYTE random_message_priv[64] = {0};
+      };
+
+    uint64_t store_as_idx_priv; // first two words of state_priv
+    
+    //+ Start with some ranomd message
+    BYTE random_message_priv[64];
+    getrandom(random_message_priv, 64, 1);
+
+    // Then increment the first 64bit each time
     uint64_t *random_message_priv64 = (uint64_t*) random_message_priv;
     random_message_priv64[0] = omp_get_thread_num()*( (1LL<<63)/((uint64_t)omp_get_max_threads()) );
 
 
-    
-    uint64_t digest_priv[2] = {0};
-    uint32_t state_priv[8] = {0};
-    size_t idx_priv = 0;
-    size_t ctr_priv = 0;
-
-
-
-    
-    while (!collision_found) {
-      // get a new different message
-      random_message_priv64[0] += 1ULL;
-
-      // clean previously used values
-      memcpy(state_priv, state_init_priv, sizeof(state_init_priv));
-
-      // hash
+    while (needed_collisions > 0) {
+      //+ todo hash multiple messages at once!
       sha256_single(state_priv, random_message_priv);
 
-      // extract the results
-      //+ todo remove truncate 
-      truncate_state32bit_get_digest(digest_priv, state_priv, n_of_bits);
+      store_as_idx_priv = ((uint64_t*) state_priv)[0];
 
-      /// ------------ DISTINGUISHED POINTS (if enabled) ------------- ///
-       /// If distinguished points feature was enabled  during compile ///
-      /// time. 
-      #ifdef DISTINGUISHED_POINTS
-      // we skip hashes
-      if ( (digest_priv[0]&DIST_MASK) != 0) 
-	continue; // skip this element
-      #endif
+      // Lines below should way to chose which server to forward to it
+      in_dict_priv = dict_get_value(d, store_as_idx_priv, state_priv[2]);
 
-
-      // test for collision and print the results if successful.
-      // idx_priv := 0 if digest_priv doesn't exist in the dictionary
-      //+ todo rechange dictionary signature to sth like 
-      // idx_priv = dict_get_value(d, uint64_t* idx, uint32_t value);
-      idx_priv = dict_get_value(d, digest_priv);
-
-      if (idx_priv ){ //
-
-	int does_it_collide = 1; //collides_at(random_message_priv, n_of_bits, idx_priv);
-	if (does_it_collide){
-          #pragma omp critical
-	  { // update a shared values
-	    collision_found = 1;
-	    idx = idx_priv; 
-	    memcpy(random_message, random_message_priv, 64);
-
-            #ifdef VERBOSE_LEVEL
-	    printf("digest_rand=0x%016lx%016lx\n", digest_priv[1], digest_priv[0]);
-	    printf("ctr_priv=%lu\n", ctr_priv);
-	    print_char((char*)random_message_priv, 64);
-	    puts("---end---\n\n");
-           #endif
-	  }
-	  // collision found
-	  break; // we don't care about the rest of the loop
-	}
-      }
-      ++ctr_priv;
-    }
-
-    // record the number of trials
-    // #pragma omp atomic update  the compiler complains about this
-    // it require operations of the form ++x, x++, x--, etc
-    #pragma omp critical
-    {
-      ctr += ctr_priv;
-    }
-  }
-
-
-  /* gettimeofday(&end, 0); */
-  /* seconds = end.tv_sec - begin.tv_sec; */
-  /* microseconds = end.tv_usec - begin.tv_usec; */
-  /* elapsed = seconds + microseconds*1e-6; */
-  /* /// record PHASE I time elapsed /// */
-  /* /// write it in a file  /// */
-  /* fprintf(fp, "%fsec, %lu, %lu\n", elapsed, ctr, idx); // last writing */
-
-  /// -------------------///
-
-  // record the message
-  char file_name[40];
-  snprintf(file_name, sizeof(file_name), "data/messages/%lu_%d",  n_of_bits,  (int) l);
-  FILE* fm = fopen(file_name, "w");
-  fwrite(random_message, 1, 64, fm);
-  fclose(fm); 
-
-  // Free memeory
-  dict_free(d);
-  //free(d);
-
-
-}
-
-
-
-
-int main(int argc, char* argv []){
-
-  /* Main currently doesn't correspond to a fully working attack */
-
-  
-  // attack(size_t n_of_blocks, size_t n_of_bits)
-
-  puts("starting with storing message");
-  #define nservers 16
-  size_t servers_capacity[nservers];
-  size_t global_difficulty = 4;
-  for (int i=0; i<nservers; ++i) {
-    servers_capacity[i] = 1LL<<20;
-
-  }
-  phase_i_store(96, servers_capacity, global_difficulty, nservers);
-  puts("done with registering the message");
-
-  
-  
-  /* int n = 0; */
-  /* float l = 0; */
-
-  /* char first_line[] =   "n l estimated_time estimated_memory time_phase_i real_memory_usage virt_memory_usage time_all_attack trials idx_message\n"; */
-
-  /* char directory_name[] = "data/stats/"; */
-
-
-
-  
-
-  /* /// How to handle the arguments given by the command line: */
-  /* /// case 1: no arguments, for oarsub we will assume now it will */
-  /* ///         be same as case 5 with nmax:=100, nmin:=71, lmin:=32, lmax:=32 */
-  /* /// case 2: n is given /// I think we should remove this case  */
-  /* /// case 3: n l are given */
-  /* /// case 5: nmax nmin lmax lmin are given */
-
-
-
-  
-  /* if (argc == 3){ // ./long_message_attack n l */
-  /* // get the input from the user */
-  /* n = atoi(argv[1]); */
-  /* l = atof(argv[2]); */
-
-  /* // variable file name */
-  /* char file_name[40]; */
-  /* snprintf(file_name, sizeof(file_name), "%s%d_%d_stats.txt", */
-  /* 	   directory_name, (int) n, (int) l); */
-  /* printf("filename=%s\n", file_name); */
-
-  /* /// todo write the value of n and l explicitly in the file  */
-  /* //  FILE* fp = fopen("statistics/n_l_stats.txt", "w"); */
-  /* FILE* fp = fopen(file_name, "w"); */
-  /* fprintf(fp, "%s", first_line); */
-	    
-
-  /* //long_message_attack(n, l, fp); */
-
-  /* fclose(fp); */
-
-  /* return 0; */
-
-  /* }  else if (argc == 5) { // ./long_message_attack nmax nmin lmax lmin */
-
-  /*   // supply n_max n_min l_max l_min */
-  /*   int n_max = atoi(argv[1]); */
-  /*   int n_min = atoi(argv[2]); */
-  /*   int l_max = atoi(argv[3]); */
-  /*   int l_min = atoi(argv[4]); */
-  /*   // l = atof(argv[2]); */
-
-  /*   printf("n_max=%d,  n_min=%d, l_max=%d, l_min=%d\n", */
-  /* 	   n_max, n_min, l_max, l_min); */
-  /*   // variable file name */
-  /*   char file_name[50]; */
-  /*   snprintf(file_name, sizeof(file_name), "%s%d_%d_%d_%d_stats.txt", directory_name, n_max, n_min, l_max, l_min); */
-  /*   printf("filename=%s\n", file_name); */
-
-
-
-	     
-  /*   FILE* fp = fopen(file_name, "w"); */
-  /*   fprintf(fp, "%s", first_line);    fclose(fp); */
-    
-  /*   /// loop over n_min <= n <= n_max, l_min <= l <= l_max */
-  /*   for (int n1=n_min; n1 <= n_max; ++n1){ */
-  /*     // when l > n/2 then the we expect to be a cylce in phase I */
-  /*     for (int l=l_min; (l<=l_max && l<= (n1>>1) ); ++l){ */
-  /* 	// opening file multiple time to results as soon we as we have it */
-  /* 	FILE* fp = fopen(file_name, "a"); */
-  /* 	long_message_attack(n1, l, fp); */
-  /* 	fclose(fp); */
-  /* 	// puts(""); */
-  /*     } */
-  /*   } */
-
-
-  /* } */
-  
-  /* else { */
-    
-    
-  /*   puts("=================================="); */
-  /*   puts("Welcome to the Long message attack"); */
-  /*   puts("USAGE: ./long_message_attack n_max n_min l_max l_min\n" */
-  /* 	 "This will test all paris (n, l) such that:\n" */
-  /* 	 "n_min<= n <= n_max, l_min <= l <= l_max\n" */
-  /* 	 "The results will be saved in the file:\n" */
-  /* 	 "nmax_nmin_lmax_lmin_stats.txt in the statistics folder."); */
-  /*   puts("USAGE: ./long_message_attack n l\n" */
-  /* 	 "This will only record the usage of n l." */
-  /* 	 "The corresponding satistics will be found in" */
-  /* 	 "n_l_stats.txt"); */
-    
-  /*   puts("USAGE: ./long_message_attack n\n" */
-  /* 	 "This will try 0<n and increase n by 1 each time." */
-  /* 	 "It will save the statistics in the file satistics/stats.txt"); */
-  /*   puts("n: 0<n<257, the number of bits in the output of the compression function\n" */
-  /* 	 "l:positive double, 2^l is the number of blocks"); */
-  /*   return 0; */
-  /* } */
-
-
-  
-  return 0;
-}
-
-
+      if (in_dict_priv) {
+       #pragma omp critical
+	{
+	needed_collisions--;
+	//+ write hash and message to file
+	// todo start from here
+      } // end if 
+    } // end while (needed_collisions > 0)
+  } // end parallel search
+}  // end function
 

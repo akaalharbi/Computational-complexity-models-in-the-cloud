@@ -54,7 +54,7 @@ void dict_init(dict* d);
 void dict_free(dict* d);
 size_t  dict_memory(size_t nelements);
 
-void dict_add_element_to(dict* d, uint64_t idx, uint32_t val);
+int dict_add_element_to(dict* d, uint64_t idx, uint32_t val);
 uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val);
 void dict_print(dict *d);
 

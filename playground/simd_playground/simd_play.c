@@ -13,12 +13,22 @@ void print_array(uint64_t* a, int nelements){
   puts("");
 }
 
+/* void print_m25i(__m256i a, char* text){ */
+/*   uint32_t A[8] = {0}; */
+/*   _mm256_storeu_si256((__m256i*)A, a); */
+/*   printf("%s = ", text); */
+/*   for (int i = 0; i<8; ++i) { */
+/*     printf("%02x, ", A[i]); */
+/*   } */
+/*   puts(""); */
+/* } */
+
 void print_m25i(__m256i a, char* text){
-  uint32_t A[8] = {0};
+  uint64_t A[4] = {0};
   _mm256_storeu_si256((__m256i*)A, a);
   printf("%s = ", text);
-  for (int i = 0; i<8; ++i) {
-    printf("%02x, ", A[i]);
+  for (int i = 0; i<4; ++i) {
+    printf("%016lx, ", A[i]);
   }
   puts("");
 }
@@ -83,39 +93,47 @@ int main(int argc, char* argv[]){
 
 
   
-  uint32_t A[16] __attribute__((aligned(32))) = {0x1a, 0xb, 0xc, 0xd,
-						 0xa, 0xb, 0xc, 0xd,
-						 0xe, 0xf, 0x10, 0x11,
-						 0xe, 0xf, 0x10, 0x11};
+  /* uint32_t A[16] __attribute__((aligned(32))) = {0x1a, 0xb, 0xc, 0xd, */
+  /* 						 0xa, 0xb, 0xc, 0xd, */
+  /* 						 0xe, 0xf, 0x10, 0x11, */
+  /* 						 0xe, 0xf, 0x10, 0x11}; */
 
 
-   __m256i STATE0, STATE1;
-  __m256i TMP = _mm256_load_si256( (__m256i*) &A[0]);
+  /*  __m256i STATE0, STATE1; */
+  /* __m256i TMP = _mm256_load_si256( (__m256i*) &A[0]); */
 
-  STATE1 = _mm256_load_si256( (__m256i*) &A[8]);
-  print_m25i(STATE1, "STATE1");  
-  print_m25i(TMP,    "TMP   ");
+  /* STATE1 = _mm256_load_si256( (__m256i*) &A[8]); */
+  /* print_m25i(STATE1, "STATE1");   */
+  /* print_m25i(TMP,    "TMP   "); */
   
-  TMP = _mm256_shuffle_epi32(TMP, 0xB1);          /* CDAB */  
-  STATE1 = _mm256_shuffle_epi32(STATE1, 0x1B);    /* EFGH */  
+  /* TMP = _mm256_shuffle_epi32(TMP, 0xB1);          /\* CDAB *\/   */
+  /* STATE1 = _mm256_shuffle_epi32(STATE1, 0x1B);    /\* EFGH *\/   */
 
-  print_m25i(TMP,    "shuffle TMP   ");
-  print_m25i(STATE1, "shuffle STATE1");
+  /* print_m25i(TMP,    "shuffle TMP   "); */
+  /* print_m25i(STATE1, "shuffle STATE1"); */
   
-  STATE0 = _mm256_alignr_epi8(TMP, STATE1, 8);    /* ABEF */
-  STATE1 = _mm256_blend_epi16(STATE1, TMP, 0xF0); /* CDGH */
+  /* STATE0 = _mm256_alignr_epi8(TMP, STATE1, 8);    /\* ABEF *\/ */
+  /* STATE1 = _mm256_blend_epi16(STATE1, TMP, 0xF0); /\* CDGH *\/ */
 
 
-  print_m25i(STATE0, "alignr STATE0");
-  print_m25i(STATE1, "blend  STATE1");
-  puts("G-> 10, H->11");
+  /* print_m25i(STATE0, "alignr STATE0"); */
+  /* print_m25i(STATE1, "blend  STATE1"); */
+  /* puts("G-> 10, H->11"); */
 
 
-  uint32_t B[8] __attribute__((aligned(32))) = {0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11};
-  __m128i tmp = _mm256_castsi256_si128( TMP); //_mm_load_si128( (__m128i*) &B[0]);
-  print_m128i(tmp,    "tmp");
-  tmp = _mm_shuffle_epi32(tmp, 0xB1);          /* CDAB */  
-  print_m128i(tmp,    "tmp after");
+  /* uint32_t B[8] __attribute__((aligned(32))) = {0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11}; */
+  /* __m128i tmp = _mm256_castsi256_si128( TMP); //_mm_load_si128( (__m128i*) &B[0]); */
+  /* print_m128i(tmp,    "tmp"); */
+  /* tmp = _mm_shuffle_epi32(tmp, 0xB1);          /\* CDAB *\/   */
+  /* print_m128i(tmp,    "tmp after"); */
+
+
+  
+  uint64_t AMIZERO[4] = {0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF};
+  __m256i amizero = _mm256_loadu_si256((__m256i*) AMIZERO);
+  print_m25i(amizero, "amizero begin");
+  int is_it = _mm256_testz_si256(amizero, amizero);
+  printf("is_it=%d\n", is_it);
   
 }
 
