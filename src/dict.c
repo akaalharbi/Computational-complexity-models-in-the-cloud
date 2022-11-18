@@ -46,8 +46,8 @@ dict* dict_new(size_t nelements){
   int nslots_per_bucket = AVX_SIZE / NBITS_VAL; // we store 32 bits per value
   //size_t scale = (int) log2(nslots_per_bucket);
   // we will add few slots to enusre 
-  size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
-  
+  // size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
+  size_t nslots = nelements;
 
   // nsolts = nbuckets * nslots_per_bucket; nbuckets divides nslots
   nslots = nslots + (-nslots % nslots_per_bucket);
@@ -82,7 +82,7 @@ inline void dict_free(dict* d){
 size_t dict_memory(size_t nelements){
   /// return memory estimation of the dictionary size
   int nslots_per_bucket = AVX_SIZE / NBITS_VAL; // we store 32 bits per value
-  size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
+  size_t nslots = nelements;
   nslots = nslots + (-nslots % nslots_per_bucket);
   size_t estimate = nslots*(sizeof(uint32_t)) + sizeof(dict);
   
@@ -162,7 +162,8 @@ uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
 
   int is_key_found = 0;
   // it's enough to check if the first element is empty
-  int empty_bucket = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
+  // in this version we don't need to check if we hit zero or not.
+  /* int empty_bucket = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd); */
   // we can remove one of the above variables 
   
   __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
@@ -223,10 +224,16 @@ uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
     // no need for the commented instruction since we only check the first value
     // comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
     // copy the value of the first slot of the bucket, check is it 0?
-    empty_bucket = ( _mm256_cvtsi256_si32(comp_vect_simd) == 0 );
 
-    if (empty_bucket)
-      return 0;
+    // with this new version we don't need to check if the first element is 0
+    // for two reasons: 1- The loop size is already defined.
+    // 2- if we hit zero but kept moving then worst case scenario we wil have a false positive
+    // we just need to increase the number of needed hits.
+    
+    /* empty_bucket = ( _mm256_cvtsi256_si32(comp_vect_simd) == 0 ); */
+
+    /* if (empty_bucket) */
+    /*   return 0; */
 
 
     // Linear probing

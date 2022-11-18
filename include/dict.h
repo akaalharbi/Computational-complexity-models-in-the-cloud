@@ -20,10 +20,15 @@
 ///                  config                             ///
 ///-----------------------------------------------------///
 
-// based on our experiments this will inlude > 95% of elements 
-#define NPROBES_MAX 24
+// based on our experiments this will inlude > 91% of elements
+// with filling rate 1. In conventional linear probing memory will
+// be (1/0.91) * nslot * sizeof(uint32) while in our case it's nslots * sizeof(uint32)
+#ifndef NPROBES_MAX
+#define NPROBES_MAX 32
+#endif
+
 #ifndef FILLING_RATE
-#define FILLING_RATE 0.9
+#define FILLING_RATE 1
 #endif
 
 
