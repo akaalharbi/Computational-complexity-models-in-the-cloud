@@ -258,14 +258,47 @@ void phase_i_load(dict *d,
 }
 
 
+void find_hash_distinguished(uint32_t M[16], uint32_t Mstate[8], const size_t dist_test){
+  /* Generates hashes till a distinguished point is found */
 
+  
+  // no need to construct init state with each call of the function
+  const static uint32_t init_state[8] = { 0x6a09e667, 0xbb67ae85,
+					  0x3c6ef372, 0xa54ff53a,
+					  0x510e527f, 0x9b05688c,
+					  0x1f83d9ab, 0x5be0cd19 };
+
+  
+  // linear version, othervesions need to modify the lines below
+  // until the end of the function.
+  static uint32_t state[8];
+  uint64_t ctr = 0;
+
+  // first two words of M are uses as counter
+  M[0] = (ctr & 0xFFFFFFFF);
+  M[1] = ctr>>32;
+
+  while (1) {
+    memcpy(state, init_state, 32);
+    sha256_single(state, (unsigned char*) M);
+    if (state[0] && dist_test == 0)
+      return;
+
+    // I dont' know if this work, I think I should use union
+    // we wish to increase the first 64-bit 
+    M[0] ^= (uint32_t) ctr; // truncte the MSB 32-bits
+    M[1] ^= (uint32_t) (ctr>>32); // get the first 32-bits
+    ++ctr;
+  }
+}
 
 
 
 
 void phase_ii(dict* d,
 	      FILE* fp_possible_collisions,
-	      size_t needed_collisions)
+	      size_t needed_collisions,
+	      size_t difficulty_level)
 { 
   // some extra arguments to communicate with other
   
@@ -292,33 +325,41 @@ void phase_ii(dict* d,
   {
     //                     INIT PRIVATE VARAIABLES                     //
     int in_dict_priv = 0;
-    //+ vsha_setup
-    uint32_t state_priv[8] =
-      {
-      0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-      0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-      };
+    //+ call
+    uint32_t state_priv[8] = { 0x6a09e667, 0xbb67ae85,
+			       0x3c6ef372, 0xa54ff53a,
+			       0x510e527f, 0x9b05688c,
+			       0x1f83d9ab, 0x5be0cd19 };
 
-    uint64_t store_as_idx_priv; // first two words of state_priv
     
-    //+ Start with some ranomd message
-    BYTE random_message_priv[64];
-    getrandom(random_message_priv, 64, 1);
+    // containers for hash and random message that have hash
+    // satisfies the difficulty level
+    uint32_t M_priv[16]; // 512-bits 
+    getrandom(M_priv, 64, 1);
+    // that have hash as
+    uint32_t M_state_priv[8];
+    uint64_t store_as_idx_priv; // first two words of M_state
 
-    // Then increment the first 64bit each time
-    uint64_t *random_message_priv64 = (uint64_t*) random_message_priv;
-    random_message_priv64[0] = omp_get_thread_num()*( (1LL<<63)/((uint64_t)omp_get_max_threads()) );
 
 
     while (needed_collisions > 0) {
-      //+ todo hash multiple messages at once!
-      sha256_single(state_priv, random_message_priv);
+      // Find message that produces distinguished point
+      find_hash_distinguished(M_priv, M_state_priv, difficulty_level);
 
-      store_as_idx_priv = ((uint64_t*) state_priv)[0];
+      //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
+      // DECIDES HOW TO DEAL WITH THE HASH:
+      // 1- ADD TO SERVER i BUFFER, i NEED TO BE COMPUTED
+      // 2- PROBE THE LOCAL DICTIONARY
+      // --------
+      // I am not sure, if probing and sending should be seperated from this
+      // function.
+      
 
-      // Lines below should way to chose which server to forward to it
+      // Imagine we will probe it locally:
+      store_as_idx_priv = ((uint64_t*) M_state_priv)[0];
+      
       in_dict_priv = dict_get_value(d, store_as_idx_priv, state_priv[2]);
-
+      
       if (in_dict_priv) {
        #pragma omp critical
 	{
@@ -328,5 +369,13 @@ void phase_ii(dict* d,
       } // end if 
     } // end while (needed_collisions > 0)
   } // end parallel search
+    //+ send the file to the master server
 }  // end function
+} // no idea where it belongs, but it silences flychek
 
+
+// phase iii
+//+ master server combines all files
+//+ master server sort the (hash, message) according to hash
+//+ master server look at the long messag file, and search for
+//+ hashes in the sorted list above
