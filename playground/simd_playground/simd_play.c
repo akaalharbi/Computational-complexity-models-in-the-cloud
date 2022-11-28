@@ -134,7 +134,9 @@ int main(int argc, char* argv[]){
   print_m25i(amizero, "amizero begin");
   int is_it = _mm256_testz_si256(amizero, amizero);
   printf("is_it=%d\n", is_it);
-  
+  #ifdef __SIZEOF_INT128__
+  puts("we have 128bit support");
+  #endif 
 }
 
 

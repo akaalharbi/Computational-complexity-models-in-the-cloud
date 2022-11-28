@@ -62,17 +62,16 @@ Then run it
 # Work to be done:
 
 ## bugs: 
-- Phase II: 
-  - stops when finding only one potential collision. It should stops after a sufficient number of collisions
-  - Store potential collisions in a file 
-
-
+- 
 
 ## todo (Techincally not bugs):
-
-
-- write phase iii
-
+- change the counter in `void find_hash_distinguished` to 128bits
+  i.e. In phase II, start with random message then increment 128 bit by one each time
+- move hard coded choices to config.h, e.g. nbits to be stored as an index
+- Due to optimizations introduced, the current code is not flexible with the choice of n!
+-- Restore the flexibility, so that we can test it on small n.
+- Stick to 80 characters per line. 
+- Draw communication model
 
 
 

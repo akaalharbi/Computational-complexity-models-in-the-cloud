@@ -36,6 +36,7 @@
 
 
 
+
 // mask for distinguished point
 #define DIST_MASK 0x7 // test if the last three bits are zeros
 
@@ -229,7 +230,7 @@ void phase_i_load(dict *d,
 
   // Check that file exists
   if (!fp){
-    puts("Am I joke to you? I have been given a file that lives in nowhere");
+    puts("I have been given a file that lives in nowhere");
     return; // raise an error instead
   }
 
@@ -258,37 +259,65 @@ void phase_i_load(dict *d,
 }
 
 
-void find_hash_distinguished(uint32_t M[16], uint32_t Mstate[8], const size_t dist_test){
-  /* Generates hashes till a distinguished point is found */
-
+static inline void increment_as_128(uint32_t ctr[4]){
+  // ===========================================================+
+  // Summary: Increment ctr by one  as if it is  128bit number  |
+  // -----------------------------------------------------------+
+  // Probably this is an over kill                              |
+  // -----------------------------------------------------------+
   
-  // no need to construct init state with each call of the function
+  unsigned __int128* ctr_128bit = (unsigned __int128*) ctr;
+  ctr_128bit[0] += 1;  
+}
+
+void find_hash_distinguished(uint32_t M[16],     /* in,out*/
+                             uint32_t Mstate[8], /* in,out*/
+                             const size_t dist_test /* in */)
+{
+  // ==========================================================================+
+  // Summary: Generates hashes till a distinguished point is found.            |
+  //          Mutate M and Mstate in the process                               |
+  // --------------------------------------------------------------------------+
+  // We start with message M, computed sha256(M) if it is not a distinguished  |
+  // point then we change M slightly. We keep a counter ctr, that gets         |
+  // increased by 1 with each tiral. Compute sha256(M xor ctr).                |
+  //                                                                           |
+  // INPUTS:                                                                   |
+  // - M[16] : initial value of the random message, we hash this in the first  |
+  //           in first trial, then change it to M xor ctr                     |
+  // - Mstate: This should be the initial state of sha256.                     |
+  // - dist_test: (2^nzeros - 1), e.g. a point is distinguished if it has 3    |
+  //              at the end, then the test is 2^3 - 1 = 7                     |
+  // --------------------------------------------------------------------------+
+  // WARNING: this function can't deal with more than 32zeros as dist_test     |
+  // WARNING: we are only working on the first word                            |
+  // --------------------------------------------------------------------------+
+
+  // no need to construct init state with each call of the 
   const static uint32_t init_state[8] = { 0x6a09e667, 0xbb67ae85,
 					  0x3c6ef372, 0xa54ff53a,
 					  0x510e527f, 0x9b05688c,
 					  0x1f83d9ab, 0x5be0cd19 };
-
   
-  // linear version, othervesions need to modify the lines below
-  // until the end of the function.
-  static uint32_t state[8];
-  uint64_t ctr = 0;
+  // uint64_t ctr = 0; // make this 128bits, maybe using c++
+  static uint32_t ctr[4] = {0};
+  
+  while (1) { // loop till a dist pt found
+    // hash message
+    memcpy(Mstate, init_state, 32);
+    sha256_single(Mstate, (unsigned char*) M);
 
-  // first two words of M are uses as counter
-  M[0] = (ctr & 0xFFFFFFFF);
-  M[1] = ctr>>32;
-
-  while (1) {
-    memcpy(state, init_state, 32);
-    sha256_single(state, (unsigned char*) M);
-    if (state[0] && dist_test == 0)
+    // is its digest is a distinguished pt?
+    if (Mstate[0] && dist_test == 0)
       return;
 
-    // I dont' know if this work, I think I should use union
-    // we wish to increase the first 64-bit 
-    M[0] ^= (uint32_t) ctr; // truncte the MSB 32-bits
-    M[1] ^= (uint32_t) (ctr>>32); // get the first 32-bits
-    ++ctr;
+    // we wish to increase the first 128-bit by 1
+    increment_as_128(ctr);
+    // Message xor ctr
+    M[0] ^= ctr[0];
+    M[1] ^= ctr[1];
+    M[2] ^= ctr[2];
+    M[3] ^= ctr[3];
   }
 }
 
@@ -302,21 +331,21 @@ void phase_ii(dict* d,
 { 
   // some extra arguments to communicate with other
   
-  // ===========================================================================+
-  // Summary: Hash many different messages till we found enough collisions      |
-  // ---------------------------------------------------------------------------+
-  // INPUTS:                                                                    |
-  // `*d` : dictionary that has hashes from phase i                             |
-  // `*fp_possible_collisions`: store all heashes h that dictionary tells they  |
-  //                            might exists. Also, store the corresponding     |
-  //                            message.                                        |
-  // NOTE: (64bytes message || 32bytes hash) (64bytes message || 32bytes hash)  |
-  // `needed_collisions` : How many messages we need that return positive hits  |
-  //                       when probe the dictionary.                           |
-  //----------------------------------------------------------------------------+
-  // TODO:                                                                      |
-  // - extra arguments to deal with other servers                               |
-  // ===========================================================================+
+  // ==========================================================================+
+  // Summary: Hash many different messages till we found enough collisions     |
+  // --------------------------------------------------------------------------+
+  // INPUTS:                                                                   |
+  // `*d` : dictionary that has hashes from phase i                            |
+  // `*fp_possible_collisions`: store all heashes h that dictionary tells they |
+  //                            might exists. Also, store the corresponding    |
+  //                            message.                                       |
+  // NOTE: (64bytes message || 32bytes hash) (64bytes message || 32bytes hash) |
+  // `needed_collisions` : How many messages we need that return positive hits |
+  //                       when probe the dictionary.                          |
+  //---------------------------------------------------------------------------+
+  // TODO:                                                                     |
+  // - extra arguments to deal with other servers                              |
+  // ==========================================================================+
 
 
   // ---------------------- -PARALLEL SEARCH ---------------------------|
@@ -326,6 +355,7 @@ void phase_ii(dict* d,
     //                     INIT PRIVATE VARAIABLES                     //
     int in_dict_priv = 0;
     //+ call
+    //- @todo do we need this? it is already on find_hash_distinguished
     uint32_t state_priv[8] = { 0x6a09e667, 0xbb67ae85,
 			       0x3c6ef372, 0xa54ff53a,
 			       0x510e527f, 0x9b05688c,
