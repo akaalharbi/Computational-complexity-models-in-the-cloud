@@ -65,6 +65,7 @@ Then run it
 - 
 
 ## todo (Techincally not bugs):
+- think about parallel insert in a list
 - change the counter in `void find_hash_distinguished` to 128bits
   i.e. In phase II, start with random message then increment 128 bit by one each time
 - move hard coded choices to config.h, e.g. nbits to be stored as an index

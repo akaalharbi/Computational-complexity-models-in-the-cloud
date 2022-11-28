@@ -270,7 +270,7 @@ static inline void increment_as_128(uint32_t ctr[4]){
   ctr_128bit[0] += 1;  
 }
 
-void find_hash_distinguished(uint32_t M[16],     /* in,out*/
+static void find_hash_distinguished(uint32_t M[16],     /* in,out*/
                              uint32_t Mstate[8], /* in,out*/
                              const size_t dist_test /* in */)
 {
@@ -349,30 +349,39 @@ void phase_ii(dict* d,
 
 
   // ---------------------- -PARALLEL SEARCH ---------------------------|
+    //+ create buffer to receive messags from others
+    //+ decide its size. 
+    //+ create buffer that holds message to be sent. This buffer is divided
+    //+ between servers. 
+    //+ for now only the master thread can communication with other servers
+    //+ think about how threads add to the send buffer.
 
-   #pragma omp parallel
+  // for simplicity, let's assume we only have one thread.
+  omp_set_num_threads(1); //- for now imagine it's a single core
+  #pragma omp parallel 
   {
     //                     INIT PRIVATE VARAIABLES                     //
     int in_dict_priv = 0;
-    //+ call
-    //- @todo do we need this? it is already on find_hash_distinguished
-    uint32_t state_priv[8] = { 0x6a09e667, 0xbb67ae85,
-			       0x3c6ef372, 0xa54ff53a,
-			       0x510e527f, 0x9b05688c,
-			       0x1f83d9ab, 0x5be0cd19 };
 
-    
     // containers for hash and random message that have hash
     // satisfies the difficulty level
     uint32_t M_priv[16]; // 512-bits 
-    getrandom(M_priv, 64, 1);
+    getrandom(M_priv, 64, 1); // this call only on the first time.
+    //+ @todo make this value the initial message for all threads,
+    //+ then divided 2^128/nthreads so each thread has a unique counter
+    // see increment_as_128(uint32_t *ctr)
+    
     // that have hash as
     uint32_t M_state_priv[8];
     uint64_t store_as_idx_priv; // first two words of M_state
 
 
+    
 
     while (needed_collisions > 0) {
+      //+ receive hashes and messages from other servers
+      
+      
       // Find message that produces distinguished point
       find_hash_distinguished(M_priv, M_state_priv, difficulty_level);
 
