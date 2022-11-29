@@ -270,6 +270,9 @@ static inline void increment_as_128(uint32_t ctr[4]){
   ctr_128bit[0] += 1;  
 }
 
+
+//+ todo pass offset as a pointer
+//+ todo use typedef unsigned __int128 u128
 static void find_hash_distinguished(uint32_t M[16],     /* in,out*/
                              uint32_t Mstate[8], /* in,out*/
                              const size_t dist_test /* in */)
@@ -350,26 +353,50 @@ void phase_ii(dict* d,
 
   // ------------------------- PARALLEL SEARCH --------------------------------|
 
-
+  //+ todo MPI INIT commands
   
   // create buffer to receive messags from others
-  
-  uint32_t rcv_buf[BUFF_SIZE*NWORDS_DIGEST]; // send digests, 1 digest = 256 bit
-  uint32_t snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST];
-  uint32_t snf_buf_ofst[NSERVERS][MY_QUOTA*NWORDS_OFFSET];
+  // see doc/communication_model.md for more details
+  // Only master thread is responsible for sending and receiving from other
+  // servers. 
 
-
+  /* send digests, 1 digest = 256 bit */
+  uint32_t* rcv_buf = (uint32_t*) malloc(sizeof(uint32_t)
+					 *BUFF_SIZE*NWORDS_DIGEST);
   
-  omp_set_num_threads(1); //- for now imagine it's a single core
+  // flatten uint32_t snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; 
+  uint32_t** snd_buf_dgst = (uint32_t**) malloc(sizeof(uint32_t*)
+						*NSERVERS
+						*MY_QUOTA 
+						*NWORDS_DIGEST);
+
+  // flatten uint32_t snf_buf_offst[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
+  uint32_t** snd_buf_offst = (uint32_t**) malloc(sizeof(uint32_t*)
+						*NSERVERS
+						*MY_QUOTA 
+			       /* different */	*NWORDS_OFFSET); 
+
+  int nthreads = omp_get_max_threads();
+
+  // Get a random message only once, that will be shared among all 
+  uint32_t M_st[NWORDS_INPUT]; // each thread will xor it with unique offset. 
+  getrandom(M_st, NWORDS_INPUT*WORD_SIZE, 1);
+  
+  
+  // omp_set_num_threads(1); //- for now imagine it's a single core
   #pragma omp parallel 
   {
+   
+    unsigned __int128 offset_priv = -1;
+    offset_priv = omp_get_thread_num()*(offset_priv / nthreads);
+    //+ @todo start here 
     //                     INIT PRIVATE VARAIABLES                     //
-    int in_dict_priv = 0;
+    int in_dict_priv = 0; //+ @todo what is the purpose of this variable?
+    
+    // containers for hash and random message that have hash satisfies the
+    // difficulty level.
+    uint32_t M_priv[NWORDS_INPUT]; // 512-bits 
 
-    // containers for hash and random message that have hash
-    // satisfies the difficulty level
-    uint32_t M_priv[16]; // 512-bits 
-    getrandom(M_priv, 64, 1); // this call only on the first time.
     //+ @todo make this value the initial message for all threads,
     //+ then divided 2^128/nthreads so each thread has a unique counter
     // see increment_as_128(uint32_t *ctr)

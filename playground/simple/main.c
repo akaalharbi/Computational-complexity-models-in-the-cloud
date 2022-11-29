@@ -28,5 +28,13 @@ int main(int argc, char* argv[]){
   uint32_t al = (uint32_t) a;
   uint32_t ah = (uint32_t) (a>>32);
   printf("a=%lx, ah=%x, al=%x\n", a, ah, al);
+
+  unsigned __int128 big = 1;
+  al = big;
+  ah = big >> 64;
+  printf(" ah=%x, al=%x\n", ah, al);
+  
+
+
   return 0;
 }
