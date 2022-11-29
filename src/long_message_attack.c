@@ -348,8 +348,12 @@ void phase_ii(dict* d,
   // ==========================================================================+
 
 
-  // ---------------------- -PARALLEL SEARCH ---------------------------|
-    //+ create buffer to receive messags from others
+  // ------------------------- PARALLEL SEARCH --------------------------------|
+
+
+  
+  // create buffer to receive messags from others
+  
     //+ decide its size. 
     //+ create buffer that holds message to be sent. This buffer is divided
     //+ between servers. 
@@ -357,6 +361,11 @@ void phase_ii(dict* d,
     //+ think about how threads add to the send buffer.
 
   // for simplicity, let's assume we only have one thread.
+  //+ for each server create snd_buf
+  //+ create one rcv_buf
+  
+
+  
   omp_set_num_threads(1); //- for now imagine it's a single core
   #pragma omp parallel 
   {
