@@ -354,16 +354,10 @@ void phase_ii(dict* d,
   
   // create buffer to receive messags from others
   
-    //+ decide its size. 
-    //+ create buffer that holds message to be sent. This buffer is divided
-    //+ between servers. 
-    //+ for now only the master thread can communication with other servers
-    //+ think about how threads add to the send buffer.
+  uint32_t rcv_buf[BUFF_SIZE*NWORDS_DIGEST]; // send digests, 1 digest = 256 bit
+  uint32_t snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST];
+  uint32_t snf_buf_ofst[NSERVERS][MY_QUOTA*NWORDS_OFFSET];
 
-  // for simplicity, let's assume we only have one thread.
-  //+ for each server create snd_buf
-  //+ create one rcv_buf
-  
 
   
   omp_set_num_threads(1); //- for now imagine it's a single core
@@ -406,7 +400,7 @@ void phase_ii(dict* d,
       // Imagine we will probe it locally:
       store_as_idx_priv = ((uint64_t*) M_state_priv)[0];
       
-      in_dict_priv = dict_get_value(d, store_as_idx_priv, state_priv[2]);
+      in_dict_priv = dict_get_value(d, store_as_idx_priv, M_state_priv[2]);
       
       if (in_dict_priv) {
        #pragma omp critical

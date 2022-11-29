@@ -11,12 +11,8 @@ receive without explicit synchronizations between servers.
 
 
 
-Goals:
 
-Speficications:
 
-General Model:
-- Use point to point communication, in advacne stages use one sided communication (group syncronisation)
 
 # High level model:
 
@@ -31,6 +27,7 @@ probes the local dictionary with received messages
 MPI_Wait() // for sending messages
 
 
+Also, use `MPI_All_reduce` to update number of founded potential collisions.
 
 
 # Messages Format

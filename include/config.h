@@ -10,6 +10,11 @@
 
 
 
+// hash function specific
+// since we use sha256
+#define WORD_SIZE 4 // bytes = 32 bit  
+#define NWORDS_DIGEST 8 // 8 words
+
 
 
 // depending on avx register length, on my laptop 256
@@ -20,6 +25,25 @@
 // Number of elements per simd register
 #define SIMD_LEN  8   //  |
 // ---------------------- |
+
+
+// Long message attack tuning:
+// Difficulty level
+#define DIFFICULTY 4 // bits are zero
+
+
+// MPI configurations
+#define NSERVERS 10 
+#define LG2_NSERVERS 4 // = ceil(log2(NSERVERS))
+#define BUFF_SIZE 100  // holds `BUFF_SIZE` elements.
+
+#define MY_QUOTA 10 // i.e. send 10 digests to each server
+
+#define NWORDS_OFFSET 4 // use 128 bits as offsets to find message 
+
+
+
+
 
 #endif
 
