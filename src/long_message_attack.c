@@ -32,7 +32,7 @@
 #include "shared.h" // shared variables for duplicate 
 #include "memory.h"
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
-
+#include <mpi.h>
 
 
 
@@ -337,29 +337,32 @@ void phase_ii(dict* d,
 
   //+ todo MPI INIT commands
   
-  // create buffer to receive messags from others
-  // see doc/communication_model.md for more details
-  // Only master thread is responsible for sending and receiving from other
-  // servers.
+ 
 
 
+  // --------------------- INIT MPI & Shared Variables ------------------------|
+  int nservers, rank;
+  MPI_Init(NULL, NULL);
   
-  // ----------------------- INIT Shared Variables -----------------------------|
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nservers);
+  //+ @todo start here complete the mpi routines
   /* send digests, 1 digest ≡ 256 bit */
   int nthreads = omp_get_max_threads();
+  
   u64 nfound_potential_collisions = 0; /* how many pot collisions been found yet */
   uint32_t* rcv_buf = (uint32_t*) malloc(sizeof(uint32_t)
 					 *BUFF_SIZE*NWORDS_DIGEST);
   
   /* flatten uint32_t snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; */
   uint32_t* snd_buf_dgst = (uint32_t*) malloc(sizeof(uint32_t*)
-					      *NSERVERS
+					      *nservers
 					      *SERVER_QUOTA
 					      *NWORDS_DIGEST);
 
   /* flatten uint32_t snf_buf_offst[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
   uint32_t* snd_buf_offst = (uint32_t*) malloc(sizeof(uint32_t*)
-					       *NSERVERS
+					       *nservers
 					       *SERVER_QUOTA
 					       *NWORDS_OFFSET); 
 
@@ -373,7 +376,7 @@ void phase_ii(dict* d,
   // ------------------------- PARALLEL SEARCH ---------------------------------|
   // omp_set_num_threads(1); //- for now imagine it's a single core
   #pragma omp parallel 
-  {
+  { /* how to do omp_master */
     //----------------------- INIT PRIVATE VARAIABLES ------------------------ //
     // all private varaibles to a thread have the suffix *_priv                //
     

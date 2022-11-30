@@ -35,7 +35,7 @@
 #ifndef LONG_MESSAGE_MPI_CONFIG
 #define LONG_MESSAGE_MPI_CONFIG
 // MPI configurations
-#define NSERVERS 10 
+// #define NSERVERS 10 we can get it from mpi_comm_size
 #define LOG2_NSERVERS 4 // = ceil(log2(NSERVERS))
 #define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements.
 
