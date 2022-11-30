@@ -341,8 +341,11 @@ void phase_ii(dict* d,
 
 
   // --------------------- INIT MPI & Shared Variables ------------------------|
-  int nservers, rank;
-  MPI_Init(NULL, NULL);
+  int nservers, rank, thread_level_provided;
+  
+  MPI_Init_thread(NULL, NULL,
+		  MPI_THREAD_FUNNELED,
+		  &thread_level_provided);
   
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &nservers);
