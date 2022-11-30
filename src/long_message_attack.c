@@ -9,11 +9,12 @@
 
 
 // define which sha256 to use 
+#include "numbers_shorthands.h"
 #include "sha256.h"
 
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
-// #include <endian.h> // @todo do we need it?
+
 #include <math.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -31,20 +32,6 @@
 #include "shared.h" // shared variables for duplicate 
 #include "memory.h"
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
-
-
-
-
-
-
-// mask for distinguished point
-#define DIST_MASK 0x7 // test if the last three bits are zeros
-
-/*---------------------------------------------------------*/
-///                  UTILITY FUNCTIONS                   ///
-
-
-
 
 
 
@@ -274,8 +261,10 @@ static inline void increment_as_128(uint32_t ctr[4]){
 //+ todo pass offset as a pointer
 //+ todo use typedef unsigned __int128 u128
 static void find_hash_distinguished(uint32_t M[16],     /* in,out*/
-                             uint32_t Mstate[8], /* in,out*/
-                             const size_t dist_test /* in */)
+				    uint32_t Mstate[8], /* in,out*/
+				    const size_t dist_test /* in */)
+
+
 {
   // ==========================================================================+
   // Summary: Generates hashes till a distinguished point is found.            |
@@ -302,25 +291,18 @@ static void find_hash_distinguished(uint32_t M[16],     /* in,out*/
 					  0x510e527f, 0x9b05688c,
 					  0x1f83d9ab, 0x5be0cd19 };
   
-  // uint64_t ctr = 0; // make this 128bits, maybe using c++
-  static uint32_t ctr[4] = {0};
+  /* placeholder to increment 128 bits by one */
+  u128* offset = (u128*) M;
+  
   
   while (1) { // loop till a dist pt found
-    // hash message
+    ++(offset[0]); /* increase the first 128bits by one */
     memcpy(Mstate, init_state, 32);
     sha256_single(Mstate, (unsigned char*) M);
 
-    // is its digest is a distinguished pt?
+    /* is its digest is a distinguished pt? */
     if (Mstate[0] && dist_test == 0)
       return;
-
-    // we wish to increase the first 128-bit by 1
-    increment_as_128(ctr);
-    // Message xor ctr
-    M[0] ^= ctr[0];
-    M[1] ^= ctr[1];
-    M[2] ^= ctr[2];
-    M[3] ^= ctr[3];
   }
 }
 
@@ -351,85 +333,111 @@ void phase_ii(dict* d,
   // ==========================================================================+
 
 
-  // ------------------------- PARALLEL SEARCH --------------------------------|
+
 
   //+ todo MPI INIT commands
   
   // create buffer to receive messags from others
   // see doc/communication_model.md for more details
   // Only master thread is responsible for sending and receiving from other
-  // servers. 
+  // servers.
 
-  /* send digests, 1 digest = 256 bit */
+
+  
+  // ----------------------- INIT Shared Variables -----------------------------|
+  /* send digests, 1 digest ≡ 256 bit */
+  int nthreads = omp_get_max_threads();
+  u64 nfound_potential_collisions = 0; /* how many pot collisions been found yet */
   uint32_t* rcv_buf = (uint32_t*) malloc(sizeof(uint32_t)
 					 *BUFF_SIZE*NWORDS_DIGEST);
   
-  // flatten uint32_t snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; 
-  uint32_t** snd_buf_dgst = (uint32_t**) malloc(sizeof(uint32_t*)
-						*NSERVERS
-						*MY_QUOTA 
-						*NWORDS_DIGEST);
+  /* flatten uint32_t snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; */
+  uint32_t* snd_buf_dgst = (uint32_t*) malloc(sizeof(uint32_t*)
+					      *NSERVERS
+					      *SERVER_QUOTA
+					      *NWORDS_DIGEST);
 
-  // flatten uint32_t snf_buf_offst[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
-  uint32_t** snd_buf_offst = (uint32_t**) malloc(sizeof(uint32_t*)
-						*NSERVERS
-						*MY_QUOTA 
-			       /* different */	*NWORDS_OFFSET); 
+  /* flatten uint32_t snf_buf_offst[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
+  uint32_t* snd_buf_offst = (uint32_t*) malloc(sizeof(uint32_t*)
+					       *NSERVERS
+					       *SERVER_QUOTA
+					       *NWORDS_OFFSET); 
 
-  int nthreads = omp_get_max_threads();
 
-  // Get a random message only once, that will be shared among all 
-  uint32_t M_st[NWORDS_INPUT]; // each thread will xor it with unique offset. 
-  getrandom(M_st, NWORDS_INPUT*WORD_SIZE, 1);
+  /* Each thread will xor this message with a unique offset. */
+  uint32_t M_start[NWORDS_INPUT];
+  /* Get a random message only once, that will be shared among all */
+  getrandom(M_start, NWORDS_INPUT*WORD_SIZE, 1);
+
   
-  
+  // ------------------------- PARALLEL SEARCH ---------------------------------|
   // omp_set_num_threads(1); //- for now imagine it's a single core
   #pragma omp parallel 
   {
-   
-    unsigned __int128 offset_priv = -1;
+    //----------------------- INIT PRIVATE VARAIABLES ------------------------ //
+    // all private varaibles to a thread have the suffix *_priv                //
+    
+    /* compute the offset for this thread to start with */
+    int thread_id = omp_get_thread_num();
+    u128 offset_priv = -1; // = 2^128 - 1 = ff...f 
     offset_priv = omp_get_thread_num()*(offset_priv / nthreads);
-    //+ @todo start here 
-    //                     INIT PRIVATE VARAIABLES                     //
-    int in_dict_priv = 0; //+ @todo what is the purpose of this variable?
+    
+    /* Divides the work between thread equally, except last thread */
+    size_t thread_quota = (thread_id < nthreads)
+                        ? SERVER_QUOTA/nthreads
+                        : SERVER_QUOTA/nthreads + SERVER_QUOTA % nthreads;
+
+    
+    /* 1 if the digest found in dict, 0 otherwise  */
+    int is_in_dict_priv = 0; 
     
     // containers for hash and random message that have hash satisfies the
     // difficulty level.
     uint32_t M_priv[NWORDS_INPUT]; // 512-bits 
+    memcpy(M_priv, M_start, sizeof(uint32_t)*NWORDS_INPUT);
 
-    //+ @todo make this value the initial message for all threads,
-    //+ then divided 2^128/nthreads so each thread has a unique counter
-    // see increment_as_128(uint32_t *ctr)
+    /* we are trying to make each thread works on a seperate interval */
+    M_priv[0] = offset_priv      ; 
+    M_priv[1] = offset_priv >> 32;
+    M_priv[2] = offset_priv >> 64;
+    M_priv[3] = offset_priv >> 96;
+    /* Two threads will intersect after at least 2^128 - 1 trials */
+
     
-    // that have hash as
-    uint32_t M_state_priv[8];
-    uint64_t store_as_idx_priv; // first two words of M_state
-
-
+    uint32_t Mstate_priv[8];
+    uint64_t store_as_idx_priv; /* first two words of M_state */
     
 
-    while (needed_collisions > 0) {
-      //+ receive hashes and messages from other servers
-      
-      
-      // Find message that produces distinguished point
-      find_hash_distinguished(M_priv, M_state_priv, difficulty_level);
+    while (needed_collisions > nfound_potential_collisions) {
+      // @todo 
+      //+ receive asynchronously hashes and messages from other servers
 
-      //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++|
-      // DECIDES HOW TO DEAL WITH THE HASH:
-      // 1- ADD TO SERVER i BUFFER, i NEED TO BE COMPUTED
-      // 2- PROBE THE LOCAL DICTIONARY
-      // --------
-      // I am not sure, if probing and sending should be seperated from this
-      // function.
+      for (size_t i=0; i<thread_quota; ++i){
+	/* Find a message that produces distinguished point */
+	find_hash_distinguished(M_priv, Mstate_priv, difficulty_level);
+	/* add it to snd_buf in location reserved for the thread  */
+	/* from 0 to  NWORDS_DIGEST - 1*/ /* this looks ugly! */
+	snd_buf_dgst[thread_id*thread_quota + i + 0] = Mstate_priv[0];
+	snd_buf_dgst[thread_id*thread_quota + i + 1] = Mstate_priv[1];
+	snd_buf_dgst[thread_id*thread_quota + i + 2] = Mstate_priv[2]; 
+
+	/* add it to snd_buf in location reserved for the thread  */
+	/* from 0 to  NWORDS_OFFSET - 1*/ /* this looks ugly! */
+	snd_buf_offst[thread_id*thread_quota + i + 0] = M_priv[0];
+	snd_buf_offst[thread_id*thread_quota + i + 1] = M_priv[1];
+      }
+      //+ send asynchronously
+      //+ wait for receive buffer to be filled
+      // every thing below is out of date
+      //+ todo specify what the master thread does
       
 
       // Imagine we will probe it locally:
-      store_as_idx_priv = ((uint64_t*) M_state_priv)[0];
+      store_as_idx_priv = ((uint64_t*) Mstate_priv)[0];
       
-      in_dict_priv = dict_get_value(d, store_as_idx_priv, M_state_priv[2]);
+      is_in_dict_priv = dict_get_value(d, store_as_idx_priv, Mstate_priv[2]);
       
-      if (in_dict_priv) {
+      if (is_in_dict_priv) {
        #pragma omp critical
 	{
 	needed_collisions--;

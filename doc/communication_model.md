@@ -48,16 +48,16 @@ server i will receive sth like:
   {offset_1, offset_2, ....,  offset_n}
 
 offset_i : 128bit
-Receiving server can construct message related to hashi by computing:
-mj xor offseti where mj is the initial random message of server j.
+Receiving server can construct message related to hashi by setting the last
+4 words of mj to offset where mj is the initial random message of server j.
 j depends on i.
 
 ### Determining j, or what server has generated the message:
 Say we are in server t, when it probes a hash_i and the dictionary tells this
 digest exists we wish to record the message the generated digest h.
 
-Recovering the message requires computing (offset_i xor mj) for unkown j yet. 
-Since each server writes on specified number of locations, 
+Recovering the message requires computing (set last 4 words of m\_j to offset\_j)
+for unkown j yet.  Since each server writes on specified number of locations, 
 
 
 e.g. if each server contributes equally we pick j s.t. i \in [j*n/m, (j+1)n/m )

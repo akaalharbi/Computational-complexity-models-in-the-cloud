@@ -3,6 +3,7 @@
 // the input values are not hashed since we assume that keys have been
 // already hashed (context: long message attack)
 
+#include "numbers_shorthands.h"
 #include "dict.h"
 #include "config.h"
 //#include "util_char_arrays.h"
@@ -84,13 +85,13 @@ size_t dict_memory(size_t nelements){
   int nslots_per_bucket = AVX_SIZE / NBITS_VAL; // we store 32 bits per value
   size_t nslots = nelements;
   nslots = nslots + (-nslots % nslots_per_bucket);
-  size_t estimate = nslots*(sizeof(uint32_t)) + sizeof(dict);
+  size_t estimate = nslots*(sizeof(u32)) + sizeof(dict);
   
   return estimate/1000.0;
 }
 
 
-int dict_add_element_to(dict* d, uint64_t store_as_idx, uint32_t val){
+int dict_add_element_to(dict* d, uint64_t store_as_idx, u32 val){
   // =========================================================================+
   // returns 1 if an element has been added, 0 otherwise                      |
   // This dictionary is unusual:                                              |
@@ -143,7 +144,7 @@ void print_m25i(__m256i a, char* text){
 
 
 
-uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
+u32 dict_get_value(dict *d, uint64_t store_as_idx, u32 val){
   // =========================================================================+
   // This dictionary is unusual:                                              |
   // User have Value = (64bit) || (32bit), the user choses to split as they   |
@@ -205,7 +206,7 @@ uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val){
       // wi:32-bit,  w8 w7 w6 w5 w4 w3 w2 w1 - move mask ->
       // (hw8||hw7) || (hw6||hw5) || (hw4||hw3) || (hw2||hw1) 
       // hwi: 4-bits extracted as MSB of each consecutive 8bits in wi
-      uint32_t loc = _mm256_movemask_epi8(comp_vect_simd);
+      u32 loc = _mm256_movemask_epi8(comp_vect_simd);
 
       // We wish to find the wi that is not 0.
       // each wi on the right that equals zero, will add 4 zeros

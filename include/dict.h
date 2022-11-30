@@ -14,7 +14,7 @@
 #include "types.h" // dict_key union type 
 #include "util_char_arrays.h" // cmp_arrays
 #include "shared.h"
-
+#include "numbers_shorthands.h"
 
 ///-----------------------------------------------------///
 ///                  config                             ///
@@ -59,8 +59,8 @@ void dict_init(dict* d);
 void dict_free(dict* d);
 size_t  dict_memory(size_t nelements);
 
-int dict_add_element_to(dict* d, uint64_t idx, uint32_t val);
-uint32_t dict_get_value(dict *d, uint64_t store_as_idx, uint32_t val);
+int dict_add_element_to(dict* d, uint64_t idx, u32 val);
+u32 dict_get_value(dict *d, uint64_t store_as_idx, u32 val);
 void dict_print(dict *d);
 
 
