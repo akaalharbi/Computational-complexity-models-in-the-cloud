@@ -4,6 +4,8 @@ we used m as the number of servers while in `README.md` m denoted sth else.
 Let's say we have m computers/servers that communicate with each other directly.
 1. Assumption: each thread within a server contributes equally to the generated hashes.
 2. Assumption: each server sends a fixed number of messages each time.
+3. Assumption (for now) each server have the same computing power.
+
 
 The first assumption enables each thread to insert elements in send buffer
 without using locks. The second assumption facilitates easier sectioning of
@@ -15,11 +17,32 @@ receive without explicit synchronizations between servers.
 
 
 # High level model:
+(new model )
+Seperate sending and receiving processors. Thus simplifiying the code.
+
+Say we have m servers, each server contains number of cores. MPI can map 
+each core to one processor. We force MPI to use the following numbering:
+
+e.g. four servers, each server has two cores
+
+S1    | S2   | S3   | S4
+0, 4  |1, 5  | 2, 6 | 3, 7 
+
+i.e. S1 will have the processors with ranks 0, and 4, and so on. 
+
+All processors with rank < nservers (in our example rank < 4) are receiveing
+processors. The others are sending processors, they are charged with generating
+hashes.
 
 
+
+
+
+(old model)
 MPI_Ireceive <--
 Generate enough messages
 MPI_Wait() // for receiving messages 
+// omp barrier
 
 
 MPI_Isend -->

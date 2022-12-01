@@ -74,7 +74,7 @@ void phase_i_store(const size_t n,
   int should_NOT_stop = 1;
   size_t nhashes_stored = 0; // 
   size_t interval = 1;
-  uint32_t ones = (1LL<<global_difficulty) - 1;
+  u32 ones = (1LL<<global_difficulty) - 1;
 
   /// timing variables
   double start = 0;
@@ -85,7 +85,7 @@ void phase_i_store(const size_t n,
 
   // store the hash value in this variable
   
-  uint32_t state[8] = {
+  u32 state[8] = {
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
   };
@@ -131,7 +131,7 @@ void phase_i_store(const size_t n,
   start = wtime();
 
 
-  
+  /* if one server gets filled, it will */
   while (should_NOT_stop) {
     // hash and extract n bits of the digest
     sha256_single(state, M);
@@ -147,30 +147,30 @@ void phase_i_store(const size_t n,
 
       // This is a distinguished point, we store maximally 128bits
       // in the distant future we may regret this decision.
-      fwrite(state, sizeof(uint32_t), 3, data_to_servers[k]);
+      fwrite(state, sizeof(u32), 3, data_to_servers[k]);
       server_capacity[k] -= 1; // We need to store less blocks now
       ++nhashes_stored;
     }
     
 
     // decide should not stop or should stop?
+    /* not the most optimal implementation */
+    should_NOT_stop = 0;
     for (size_t i=0; i<nservers; ++i) {
       /*-----------------------------------------------------------------------*/
-      /* Since we reduce the server capacity by one each time we add it to its */
-      /* files. If any server has capacity larger than zero then it means that */
-      /* we should. continue hashing till all servers capacities are met.      */
+      /* Since we reduce the server capacity by one each time when we add it to*/
+      /* its file. If any server has capacity larger than zero then it means   */
+      /* that we should. continue hashing till all servers capacities are met. */
       /*-----------------------------------------------------------------------*/  
-      if (server_capacity[i] > 0){
-	should_NOT_stop = 1;
-	break; // from the inner loop
-      }
+      /* should_NOT_stop == 0 iff all servers_capacities are 0; */
+      should_NOT_stop |= (server_capacity[i] > 0) ;
     }
     
 
     // + save states after required amount of intervals
     if (nhashes_stored % interval == 0) {
       FILE* states_file = fopen(states_file_name, "a");
-      fwrite(state, sizeof(uint32_t), 8, states_file);
+      fwrite(state, sizeof(u32), 8, states_file);
       // We would like to flush the data disk as soon we have them
       fclose(states_file);
     }
@@ -222,16 +222,16 @@ void phase_i_load(dict *d,
   }
 
 
-  uint32_t digest[3] = {0};
+  u32 digest[3] = {0};
   // Read the first two elements as one 64bit unsigned int 
-  uint64_t store_as_idx;
+  u64 store_as_idx;
   
   // Exit as soon we have exausted the file or the memory
   for (; (mem_nhashes > 0) && (fp_nhashes > 0); fp_nhashes--){
     // size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
-    fread(digest, sizeof(uint32_t), 3, fp);
+    fread(digest, sizeof(u32), 3, fp);
     // Read the first two elements as one 64bit unsigned int 
-    store_as_idx = ((uint64_t*) digest) [0] ;
+    store_as_idx = ((u64*) digest) [0] ;
     // remove the distinguished points. They are shared between all 
     store_as_idx = store_as_idx >> difficulty;
     //+ should I also remove the server number?
@@ -246,7 +246,7 @@ void phase_i_load(dict *d,
 }
 
 
-static inline void increment_as_128(uint32_t ctr[4]){
+static inline void increment_as_128(u32 ctr[4]){
   // ===========================================================+
   // Summary: Increment ctr by one  as if it is  128bit number  |
   // -----------------------------------------------------------+
@@ -260,8 +260,8 @@ static inline void increment_as_128(uint32_t ctr[4]){
 
 //+ todo pass offset as a pointer
 //+ todo use typedef unsigned __int128 u128
-static void find_hash_distinguished(uint32_t M[16],     /* in,out*/
-				    uint32_t Mstate[8], /* in,out*/
+static void find_hash_distinguished(u32 M[16],     /* in,out*/
+				    u32 Mstate[8], /* in,out*/
 				    const size_t dist_test /* in */)
 
 
@@ -286,7 +286,7 @@ static void find_hash_distinguished(uint32_t M[16],     /* in,out*/
   // --------------------------------------------------------------------------+
 
   // no need to construct init state with each call of the 
-  const static uint32_t init_state[8] = { 0x6a09e667, 0xbb67ae85,
+  const static u32 init_state[8] = { 0x6a09e667, 0xbb67ae85,
 					  0x3c6ef372, 0xa54ff53a,
 					  0x510e527f, 0x9b05688c,
 					  0x1f83d9ab, 0x5be0cd19 };
@@ -307,6 +307,37 @@ static void find_hash_distinguished(uint32_t M[16],     /* in,out*/
 }
 
 
+
+static inline u8 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE],
+		     u32 difficulty,
+		     u32 nservers)
+{
+  // ==========================================================================+
+  // Summary: Given a state. Decide to which server we send it to.             |   
+  // --------------------------------------------------------------------------+
+  // INPUTS:                                                                   |
+  // `Mstate` : Array of bytes of the digest.                                  |
+  // `difficulty`: Number of left/right most bits that has to be zero          |
+  // `nservers`: How many servers we have.                                     |
+  // --------------------------------------------------------------------------+
+
+
+  /* Given a state. Decide to which server we send to */
+  /* """ One potential idea is to do: */
+  /* server <-- h % nserver           */
+  /* h'     <-- h / nserver """       */
+  /* with the above suggestion it might be better to treat the digest as an */
+  /* array of bytes                                                         */
+
+  /* We assume that the difficulty is a multiple of 8. todo fix this */
+  u32 difficulty_in_bytes = difficulty/8;
+
+  /* this has to be changed is we wisht to change it to u16 */
+  u8 snd_to_server =  MState[difficulty_in_bytes]; /* max 255 servers */
+
+  return snd_to_server;
+  
+}
 
 
 void phase_ii(dict* d,
@@ -341,119 +372,93 @@ void phase_ii(dict* d,
 
 
   // --------------------- INIT MPI & Shared Variables ------------------------|
-  int nservers, rank, thread_level_provided;
+  int nservers, myrank, thread_level_provided;
   
-  MPI_Init_thread(NULL, NULL,
-		  MPI_THREAD_FUNNELED,
-		  &thread_level_provided);
+  MPI_Init(NULL, NULL);
+
+
   
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nservers);
-  //+ @todo start here complete the mpi routines
+
   /* send digests, 1 digest ≡ 256 bit */
-  int nthreads = omp_get_max_threads();
-  
-  u64 nfound_potential_collisions = 0; /* how many pot collisions been found yet */
-  uint32_t* rcv_buf = (uint32_t*) malloc(sizeof(uint32_t)
-					 *BUFF_SIZE*NWORDS_DIGEST);
-  
-  /* flatten uint32_t snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; */
-  uint32_t* snd_buf_dgst = (uint32_t*) malloc(sizeof(uint32_t*)
-					      *nservers
-					      *SERVER_QUOTA
-					      *NWORDS_DIGEST);
+  // int nthreads = omp_get_max_threads(); // no need for this?!
 
-  /* flatten uint32_t snf_buf_offst[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
-  uint32_t* snd_buf_offst = (uint32_t*) malloc(sizeof(uint32_t*)
-					       *nservers
-					       *SERVER_QUOTA
-					       *NWORDS_OFFSET); 
+  // 
 
-
-  /* Each thread will xor this message with a unique offset. */
-  uint32_t M_start[NWORDS_INPUT];
-  /* Get a random message only once, that will be shared among all */
-  getrandom(M_start, NWORDS_INPUT*WORD_SIZE, 1);
 
   
-  // ------------------------- PARALLEL SEARCH ---------------------------------|
-  // omp_set_num_threads(1); //- for now imagine it's a single core
-  #pragma omp parallel 
-  { /* how to do omp_master */
-    //----------------------- INIT PRIVATE VARAIABLES ------------------------ //
-    // all private varaibles to a thread have the suffix *_priv                //
+  if (myrank >= nservers){
+    /* I am a sending processor, I only generate hashes and send them */
+    /* flatten u32 snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; */
+    u32* snd_buf_dgst = (u32*) malloc(sizeof(u32*)
+						*nservers
+						*PROCESS_QUOTA
+						*NWORDS_DIGEST);
+
+    /* flatten u32 snf_buf_offst[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
+    u32* snd_buf_offst = (u32*) malloc(sizeof(u32*)
+						 *nservers
+						 *PROCESS_QUOTA
+						 *NWORDS_OFFSET);
+
+    u64 nfound_potential_collisions = 0; 
+    u32 M[NWORDS_INPUT]; /* random word */
+    u32 Mstate[8];
     
-    /* compute the offset for this thread to start with */
-    int thread_id = omp_get_thread_num();
-    u128 offset_priv = -1; // = 2^128 - 1 = ff...f 
-    offset_priv = omp_get_thread_num()*(offset_priv / nthreads);
-    
-    /* Divides the work between thread equally, except last thread */
-    size_t thread_quota = (thread_id < nthreads)
-                        ? SERVER_QUOTA/nthreads
-                        : SERVER_QUOTA/nthreads + SERVER_QUOTA % nthreads;
+    /* Get a random message only once */
+    getrandom(M, NWORDS_INPUT*WORD_SIZE, 1);
+
+    /* random message = random things || myrank || 64bit nonce || 64bit ctr */
+    u64 ctr = 0; // = 2^64 - 1 = ff...f 
+    u64 nonce;
+    int server_number;
+    getrandom(&nonce, sizeof(u64), 1);
+
+    M[0] = 0; /* ctr_l */ 
+    M[1] = 0;/*  ctr_h */
+
+    /* nonce */
+    M[2] = nonce;
+    M[3] = (nonce>>32);
 
     
-    /* 1 if the digest found in dict, 0 otherwise  */
-    int is_in_dict_priv = 0; 
-    
-    // containers for hash and random message that have hash satisfies the
-    // difficulty level.
-    uint32_t M_priv[NWORDS_INPUT]; // 512-bits 
-    memcpy(M_priv, M_start, sizeof(uint32_t)*NWORDS_INPUT);
-
-    /* we are trying to make each thread works on a seperate interval */
-    M_priv[0] = offset_priv      ; 
-    M_priv[1] = offset_priv >> 32;
-    M_priv[2] = offset_priv >> 64;
-    M_priv[3] = offset_priv >> 96;
-    /* Two threads will intersect after at least 2^128 - 1 trials */
 
     
-    uint32_t Mstate_priv[8];
-    uint64_t store_as_idx_priv; /* first two words of M_state */
-    
 
+
+
+    /* generate hashes */
     while (needed_collisions > nfound_potential_collisions) {
-      // @todo 
-      //+ receive asynchronously hashes and messages from other servers
-
-      for (size_t i=0; i<thread_quota; ++i){
+      /* now, we only send  */
+      for (size_t i=0; i<PROCESS_QUOTA; ++i){
+	
 	/* Find a message that produces distinguished point */
-	find_hash_distinguished(M_priv, Mstate_priv, difficulty_level);
-	/* add it to snd_buf in location reserved for the thread  */
-	/* from 0 to  NWORDS_DIGEST - 1*/ /* this looks ugly! */
-	snd_buf_dgst[thread_id*thread_quota + i + 0] = Mstate_priv[0];
-	snd_buf_dgst[thread_id*thread_quota + i + 1] = Mstate_priv[1];
-	snd_buf_dgst[thread_id*thread_quota + i + 2] = Mstate_priv[2]; 
+	find_hash_distinguished(M, Mstate, difficulty_level);
+	//+ decide to which server to add to? 
+	server_number = to_which_server((u8*) Mstate, difficulty_level, nservers);
 
-	/* add it to snd_buf in location reserved for the thread  */
-	/* from 0 to  NWORDS_OFFSET - 1*/ /* this looks ugly! */
-	snd_buf_offst[thread_id*thread_quota + i + 0] = M_priv[0];
-	snd_buf_offst[thread_id*thread_quota + i + 1] = M_priv[1];
+	//+ todo check if a server snd_buf has been filled
+	//+ if yes, send it immediately using buffered send 
+	
+	/* add it to snd_buf in location reserved for the receiver  */
+	
+
+
       }
-      //+ send asynchronously
-      //+ wait for receive buffer to be filled
-      // every thing below is out of date
-      //+ todo specify what the master thread does
-      
+  
+    }
+    
+    
+  } else {
+    /* I am a receiving processor, I only probe the dictionary */
+    u32* rcv_buf = (u32*) malloc(sizeof(u32)
+					   *BUFF_SIZE*NWORDS_DIGEST);
+    // todo fill this 
 
-      // Imagine we will probe it locally:
-      store_as_idx_priv = ((uint64_t*) Mstate_priv)[0];
-      
-      is_in_dict_priv = dict_get_value(d, store_as_idx_priv, Mstate_priv[2]);
-      
-      if (is_in_dict_priv) {
-       #pragma omp critical
-	{
-	needed_collisions--;
-	//+ write hash and message to file
-	// todo start from here
-      } // end if 
-    } // end while (needed_collisions > 0)
-  } // end parallel search
-    //+ send the file to the master server
-}  // end function
+  }
+  
+
 } // no idea where it belongs, but it silences flychek
 
 

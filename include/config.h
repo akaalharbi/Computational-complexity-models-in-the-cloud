@@ -39,7 +39,7 @@
 #define LOG2_NSERVERS 4 // = ceil(log2(NSERVERS))
 #define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements.
 
-#define SERVER_QUOTA 100 // i.e. send 10 digests to each server
+#define PROCESS_QUOTA 100 // i.e. send 10 digests to each server
 
 #define NWORDS_OFFSET 4 // use 128 bits as offsets to find message
 #endif // LONG_MESSAGE_MPI_CONFIG
