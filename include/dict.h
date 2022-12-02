@@ -36,8 +36,8 @@
 ///-----------------------------------------------------///
 ///                  data structure                     ///
 ///-----------------------------------------------------///
-typedef struct  __attribute__((aligned(32))) {
-  uint64_t* keys   __attribute__((aligned(32)));
+typedef struct  __attribute__((aligned(ALIGNMENT))) {
+  VAL_TYPE* values   __attribute__((aligned(ALIGNMENT)));
   size_t nslots; // number of elements  in the dictionary
   size_t nbuckets; // a bucket contains x0 slots depending avx register length
   size_t nslots_per_bucket; // = nslots / nbuckets
@@ -58,9 +58,8 @@ dict *dict_new(size_t nslots);
 void dict_init(dict* d);
 void dict_free(dict* d);
 size_t  dict_memory(size_t nelements);
-
-int dict_add_element_to(dict* d, uint64_t idx, u32 val);
-u32 dict_get_value(dict *d, uint64_t store_as_idx, u32 val);
+int dict_add_element_to(dict *d, u8 *state);
+int dict_has_elm(dict *d, u8* state);
 void dict_print(dict *d);
 
 

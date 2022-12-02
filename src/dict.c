@@ -19,7 +19,7 @@
 #include <immintrin.h>
 
 //  how many bits we store as a value in dictionary
-#define NBITS_VAL 32 // To avoid having magical numbers in the code
+
 
 
 
@@ -43,71 +43,81 @@ dict* dict_new(size_t nelements){
 
   dict* d = (dict *) aligned_alloc(ALIGNMENT, (sizeof(dict)));
 
-  // on my laptop 8 elements per bucket
-  int nslots_per_bucket = AVX_SIZE / NBITS_VAL; // we store 32 bits per value
-  //size_t scale = (int) log2(nslots_per_bucket);
-  // we will add few slots to enusre 
-  // size_t nslots = (size_t)  ceil((1/FILLING_RATE)*nelements);
+  int nslots_per_bucket = SIMD_LEN; /* See ../include/config.h */
   size_t nslots = nelements;
 
-  // nsolts = nbuckets * nslots_per_bucket; nbuckets divides nslots
-  nslots = nslots + (-nslots % nslots_per_bucket);
   //+ todo does negative gives the correct result here?
+   nslots = nslots + (-nslots % nslots_per_bucket);
+
 
   /// Save configured variables as dictionary entries 
   d->nslots = nslots;
   d->nbuckets = nslots/nslots_per_bucket;
   d->nslots_per_bucket = nslots_per_bucket;
-  //d->scale = scale;
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
   d->nelments_succ_lookup = 0;
-  d->keys = (uint64_t*) aligned_alloc(ALIGNMENT,
-				      (nslots)*(sizeof(uint64_t)));
+  d->values = (VAL_TYPE*) aligned_alloc(ALIGNMENT,
+				      (nslots)*(sizeof(VAL_TYPE)));
 
 
 
   // Ensure keys are zeroed
   #pragma omp simd
   for (size_t i = 0; i < nslots; ++i) 
-     d->keys[i] = 0; // 0 if it is not occupied
+     d->values[i] = 0; // 0 if it is not occupied
 
   return d;
 }
 
 inline void dict_free(dict* d){
-  free(d->keys);
+  free(d->values);
 }
 
 
 size_t dict_memory(size_t nelements){
   /// return memory estimation of the dictionary size
-  int nslots_per_bucket = AVX_SIZE / NBITS_VAL; // we store 32 bits per value
+  int nslots_per_bucket = SIMD_LEN; // we store 32 bits per value
   size_t nslots = nelements;
   nslots = nslots + (-nslots % nslots_per_bucket);
-  size_t estimate = nslots*(sizeof(u32)) + sizeof(dict);
+  size_t estimate = nslots*(sizeof(VAL_TYPE)) + sizeof(dict);
   
   return estimate/1000.0;
 }
 
 
-int dict_add_element_to(dict* d, uint64_t store_as_idx, u32 val){
+
+int dict_add_element_to(dict* d, u8* state){
   // =========================================================================+
   // returns 1 if an element has been added, 0 otherwise                      |
   // This dictionary is unusual:                                              |
-  // User have Value = (64bit) || (32bit), the user choses to split as they   |
-  // wish. The reason, we don't do split by ourselves is that we might have   |
-  // clustering if gcd(nbuckets, store_as_idx) > 1, this is likely to happen  |
-  // due to the fact that store_as_idx = 2^b * g.                             |
-  // In the future we might write a cleaner interface that only takes value   |
-  // and dict*                                                                |
+  // User have a value in the form:                                           |
+  // (dist pts, srvr no) || (L bits) || discard || (VAL_SIZE bits) || discard |
+  // Dictionary expects user to pass: (L bits) || discard || (VAL_SIZE bits)  |
+  // ------------------------------------------------------------------------ |
+  // we don't store (dist pts, server) since they are already determined      |
+  // The discarded bits between L and VAL_SIZE are due to the fact we move 1  |
+  // at least. Those we choose to forget them. The last disarded bits are     |
+  // discarded because they will double the dictionary size if we include em  |
   // -------------------------------------------------------------------------|
-  // Note about buckets: 
-  //==========================================================================+
+  // INPUTS:                                                                  |
+  // `*d`:  dictionary that will store state as an element                    |
+  // `*state`: element to be stored in *d in the form                         |
+  //          (L bits) || discard || (VAL_SIZE bits)                          |
+  // -------------------------------------------------------------------------+
+  
 
-  /// Use linear probing to add element to the array d->keys
-  // get bucket number, recall keys[nbuckets*nslots_per_bucket]
-  uint64_t idx = store_as_idx % d->nbuckets; 
+
+  /// Use linear probing to add element to the array d->values
+  // get bucket number, recall keys[nbuckets*nslots_per_bucket
+  u64 idx = 0;
+  memcpy(&idx, state, L_IN_BYTES);
+  /* get the bucket number and scale the index */
+  idx = (idx % d->nbuckets) * d->nslots_per_bucket;
+
+  VAL_TYPE val = 0;
+  memcpy(&val, state+L_IN_BYTES, VAL_SIZE);
+  
   // todo aestheitcs: which version do you like more?
   // idx = idx << (d->scale) ; // get the index of bucket in keys array
   idx = idx * (d->nslots_per_bucket) ; // get the index of bucket in keys array
@@ -116,15 +126,15 @@ int dict_add_element_to(dict* d, uint64_t store_as_idx, u32 val){
   // in insertion we are not going to use buckets explicitly
   for (int i=0; i<NPROBES_MAX; ++i) {
     // found an empty slot inside a bucket
-    if (d->keys[idx] == 0) { // found an empty slot
-      d->keys[idx] = val;
+    if (d->values[idx] == 0) { // found an empty slot
+      d->values[idx] = val;
       return 1;
     }
 
 
     ++idx;
     // reduce mod n->slots
-    if (idx>d->nslots)
+    if (idx > d->nslots)
       idx = 0;
   }
   return 0; // element has been added
@@ -143,22 +153,30 @@ void print_m25i(__m256i a, char* text){
 }
 
 
-
-u32 dict_get_value(dict *d, uint64_t store_as_idx, u32 val){
-  // =========================================================================+
+int dict_has_elm(dict *d, u8* state){
+  // -------------------------------------------------------------------------+
+  // returns 1 if state is found in d, 0 otherwise                            |
   // This dictionary is unusual:                                              |
-  // User have Value = (64bit) || (32bit), the user choses to split as they   |
-  // wish. The reason, we don't do split by ourselves is that we might have   |
-  // clustering if gcd(nbuckets, store_as_idx) > 1, this is likely to happen  |
-  // due to the fact that store_as_idx = 2^b * g.                             |
-  // In the future we might write a cleaner interface that only takes value   |
-  // and dict*                                                                |
-  //==========================================================================+
-  
-  uint64_t h = store_as_idx; // for now we assume indices don't need more than 64 bits 
-  h = h % d->nbuckets; 
-  size_t idx = h * d->nslots_per_bucket ; // get the index of bucket in keys array
-  
+  // User have a value in the form:                                           |
+  // (dist pts, srvr no) || (L bits) || discard || (VAL_SIZE bits) || discard |
+  // Dictionary expects user to pass: (L bits) || discard || (VAL_SIZE bits)  |
+  // ------------------------------------------------------------------------ |
+  // we don't store (dist pts, server) since they are already determined      |
+  // The discarded bits between L and VAL_SIZE are due to the fact we move 1  |
+  // at least. Those we choose to forget them. The last disarded bits are     |
+  // discarded because they will double the dictionary size if we include em  |
+  // -------------------------------------------------------------------------|
+  // INPUTS:                                                                  |
+  // `*d`:  dictionary that will store state as an element                    |
+  // `*state`: element to be looked up  in *d in the form                     |
+  //          (L bits) || discard || (VAL_SIZE bits)                          |
+  // -------------------------------------------------------------------------+
+  u64 idx = 0;
+  memcpy(&idx, state, L_IN_BYTES);
+  idx = (idx % d->nbuckets) * d->nslots_per_bucket;
+
+  VAL_TYPE val = 0;
+
 
 
   int is_key_found = 0;
@@ -166,14 +184,14 @@ u32 dict_get_value(dict *d, uint64_t store_as_idx, u32 val){
   // in this version we don't need to check if we hit zero or not.
   /* int empty_bucket = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd); */
   // we can remove one of the above variables 
-  
-  __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->keys[h]));
-  __m256i lookup_key_simd = _mm256_set1_epi32(val); // (val, val, ..., val) 8times
+  //+ todo we need to adjust simd instruction according to the type 
+  __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->values[h]));
+  __m256i lookup_key_simd = SIMD_SET1_VALTYPE(val); // (val, val, ..., val) 8times
   //__m256i zero_vect = _mm256_setzero_si256(); // no need for this with buckets
   __m256i comp_vect_simd;
 
-  
-  
+
+
   
   // loop at most NPROBES_MAX/SIMD_LEN since we load SIMD_LEN
   // elements from dictionary each loop.
@@ -183,12 +201,12 @@ u32 dict_get_value(dict *d, uint64_t store_as_idx, u32 val){
     // linear probing
 
     // get new fresh keys from one bucket
-    dict_keys_simd = _mm256_load_si256((__m256i*)  &(d->keys[idx]));
+    dict_keys_simd = _mm256_load_si256((__m256i*)  &(d->values[idx]));
     // -----------------------------------------------//
     //                   TEST 1                       //
     /*  Does key equal one of the slots?              */
     //------------------------------------------------//
-    comp_vect_simd = _mm256_cmpeq_epi32(lookup_key_simd, dict_keys_simd);
+    comp_vect_simd = SIMD_CMP_VALTYPE(lookup_key_simd, dict_keys_simd);
     is_key_found = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
 
     #ifdef VERBOSE_LEVEL
@@ -200,26 +218,32 @@ u32 dict_get_value(dict *d, uint64_t store_as_idx, u32 val){
     #endif
     
 
-    if (is_key_found) { // @todo explains theese magical lines!
+    if (is_key_found) {
+      // how about this:
+      return 1; /* we will hash the whole message again */
+
+      
+      // @todo explains theese magical lines!
+      //+ this is more tricky with variable value size 
       // movemask_ps(a) will return 4 bytes m, where m[i] := some mask with ith 64 bit entry
 
       // wi:32-bit,  w8 w7 w6 w5 w4 w3 w2 w1 - move mask ->
       // (hw8||hw7) || (hw6||hw5) || (hw4||hw3) || (hw2||hw1) 
       // hwi: 4-bits extracted as MSB of each consecutive 8bits in wi
-      u32 loc = _mm256_movemask_epi8(comp_vect_simd);
+      /* u32 loc = _mm256_movemask_epi8(comp_vect_simd); */
 
       // We wish to find the wi that is not 0.
       // each wi on the right that equals zero, will add 4 zeros
       // (since movemask gets 4 bits from each 32-bit word)
       // __builtin_ctz(x): Returns the number of trailing 0-bits in x, starting
       // at the least significant bit position. undefined if x==0.
-      size_t idx_val = (__builtin_ctz(loc)>>2) + idx;
+      /* size_t idx_val = (__builtin_ctz(loc)>>2) + idx; */
       // note in our case loc != 0 since a key was found.
-      return d->keys[idx_val];
+      /* return d->values[idx_val]; */
     }
 
     // -------------------------------------------------//
-    //                   TEST 2                         //
+    //                   TEST 2: skipped                //
     /* is one the slots empty? then no point of probing */
     //- ------------------------------------------------//
     // no need for the commented instruction since we only check the first value
@@ -273,9 +297,9 @@ void dict_print(dict* d){
  
   for (size_t b=0; b<(d->nslots); ++b) {
     printf("slot=%lu, "
-	   "key = 0x%016lx\n",
+	   "key = 0x%016x\n",
 	   b,
-	   d->keys[b]);
+	   d->values[b]);
   }
 }
  

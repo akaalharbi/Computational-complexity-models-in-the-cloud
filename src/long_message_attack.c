@@ -424,7 +424,7 @@ void phase_ii(dict* d,
     
 
     u32* servers_ctr = (u32*) malloc(sizeof(u32)*nservers);
-    memset(servers_ctr, 0, sizeof(u32)*nservers);
+    memset(servers_ctr, 0, sizeof(u32)*nservers); /* everything = 0 */
 
 
     /* generate hashes */
@@ -439,7 +439,9 @@ void phase_ii(dict* d,
 	find_hash_distinguished(M, Mstate, difficulty_level);
 	//+ decide to which server to add to? 
 	server_number = to_which_server((u8*) Mstate, difficulty_level, nservers);
-
+	snd_buf_dgst[]
+	++servers_ctr[server_number];
+	
 
 	
 	//+ todo check if a server snd_buf has been filled
