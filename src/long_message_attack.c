@@ -42,9 +42,10 @@ void phase_i_store(const size_t n,
 		   size_t global_difficulty,
 		   size_t nservers){
 
-  // ==================================================================================+
-  // Hash a long message of zeros. Store the digest in a file k where 0<= k < nservers |
-  // To decide where to store the digest h, compute k := h mod  nservers               |
+  // ==========================================================================+
+  // Hash a long message of zeros. Store the digest in a file k where          |
+  // 0<= k < nservers. To decide where to store the digest h,                  |
+  //  compute k := h mod  nservers                                             |
   // We allow each server to adjust its own difficulty level (not sure we need that )  |
   // or its distinguished point format.                                                |
   // Compute h -> decides which server k -> check server difficulty -> decide to store |
@@ -372,35 +373,33 @@ void phase_ii(dict* d,
 
 
   // --------------------- INIT MPI & Shared Variables ------------------------|
-  int nservers, myrank, thread_level_provided;
+  int nservers, myrank;
   
   MPI_Init(NULL, NULL);
 
-
-  
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nservers);
 
   /* send digests, 1 digest ≡ 256 bit */
   // int nthreads = omp_get_max_threads(); // no need for this?!
 
-  // 
+
 
 
   
-  if (myrank >= nservers){
+  if (myrank >= nservers){ /* generate hashes, send them*/
     /* I am a sending processor, I only generate hashes and send them */
     /* flatten u32 snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; */
     u32* snd_buf_dgst = (u32*) malloc(sizeof(u32*)
-						*nservers
-						*PROCESS_QUOTA
-						*NWORDS_DIGEST);
+				      *nservers
+				      *PROCESS_QUOTA
+				      *NWORDS_DIGEST);
 
     /* flatten u32 snf_buf_offst[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
     u32* snd_buf_offst = (u32*) malloc(sizeof(u32*)
-						 *nservers
-						 *PROCESS_QUOTA
-						 *NWORDS_OFFSET);
+				       *nservers
+				       *PROCESS_QUOTA
+				       *NWORDS_OFFSET);
 
     u64 nfound_potential_collisions = 0; 
     u32 M[NWORDS_INPUT]; /* random word */
@@ -424,13 +423,16 @@ void phase_ii(dict* d,
 
     
 
-    
-
+    u32* servers_ctr = (u32*) malloc(sizeof(u32)*nservers);
+    memset(servers_ctr, 0, sizeof(u32)*nservers);
 
 
     /* generate hashes */
-    while (needed_collisions > nfound_potential_collisions) {
-      /* now, we only send  */
+    //while (needed_collisions > nfound_potential_collisions) {
+    while (1) { /* yay, infinite loop */
+
+
+      /* it might be better to have a nested loops */
       for (size_t i=0; i<PROCESS_QUOTA; ++i){
 	
 	/* Find a message that produces distinguished point */
@@ -438,6 +440,8 @@ void phase_ii(dict* d,
 	//+ decide to which server to add to? 
 	server_number = to_which_server((u8*) Mstate, difficulty_level, nservers);
 
+
+	
 	//+ todo check if a server snd_buf has been filled
 	//+ if yes, send it immediately using buffered send 
 	
