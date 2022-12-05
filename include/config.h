@@ -16,10 +16,14 @@
 // The attack parameter n can be chosen below s.t.
 // n <= 8 * WORD_SIZE * NWORDS_DIGEST
 
+// -------------------------------------------------------------------------+
+//                               Assumptions                                |
+// 1- First word of hash is enough to hold the distinguish point and nserver|
+// e.g. with sha256 32bits is enough.                                       |
+// - if this doesn't apply to your case edit to_which_server function       |
+// see type of variable ones and ... in phase i functions                   |
+// -------------------------------------------------------------------------+
 
-// Assumptions:
-// 32bits is enough to accommedate the Distinguished points and nserver
-// see type of variable ones and ... in phase i functions
 
 // -------------------------------------------------------------------------+
 //                     Long message attack main parameters                  |
@@ -36,9 +40,11 @@
 /*  ceil(log2(NSERVERS)) =  */
 #define NSERVERS 128
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
+/* nhashes per server, we take the maximum */
+#define NHASHES (1LL<<34)
 
-
-#define PHASE_III_NPROC 14
+/* how big is our counter */
+#define CTR_TYPE u64
 
 /* How many bytes can accommedate L */
 #define L_IN_BYTES CEILING(L, 8) 
@@ -134,7 +140,8 @@
 
 #endif // define VAL_SIZE
 
-#define DISCARDED_BITS 8*(N - VAL_SIZE - L_IN_BYTES)
+// @todo do we need this?
+#define DISCARDED_BITS (8*(N - VAL_SIZE - L_IN_BYTES))
 
 
  

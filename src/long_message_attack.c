@@ -35,6 +35,82 @@
 #include <mpi.h>
 
 
+//---------------------------- UTILITY FUNCTIONS -------------------------------
+
+
+static void find_hash_distinguished(WORD_TYPE M[NWORDS_INPUT], /* in, out*/
+				    WORD_TYPE Mstate[NWORDS_STATE], /* out*/
+				    const size_t dist_test /* in */)
+{
+  // ==========================================================================+
+  // Summary: Generates hashes till a distinguished point is found. Mutates M  |
+  //          and resests Mstate in the process. Suitable for phase ii use only|
+  // --------------------------------------------------------------------------+
+  // We start with message M, computed hash(M) if it is not a distinguished    |
+  // point then we change M slightly. Increment the first 64 bits of M by 1    |
+  // --------------------------------------------------------------------------+
+  // INPUTS:                                                                   |
+  // - M[16] : initial value of the random message, we hash this in the first  |
+  //           in first trial, then change it to M xor ctr                     |
+  // - Mstate: This should be the initial state of sha256.                     |
+  // - dist_test: (2^nzeros - 1), e.g. a point is distinguished if it has 3    |
+  //              at the end, then the test is 2^3 - 1 = 7                     |
+  // --------------------------------------------------------------------------+
+  // WARNING: this function can't deal with more than 32zeros as dist_test     |
+  // NOTE: we are only working on the first word                               |
+  // --------------------------------------------------------------------------+
+  // TODO: Don't use hash_multiple instead                                     |
+  // --------------------------------------------------------------------------+
+
+  /* no need to construct init state with each call of the function */ 
+  const static WORD_TYPE init_state[NWORDS_STATE] = {HASH_INIT_STATE};
+  
+
+
+  /* increments the first sizeof(CTR_TYPE)*8 bits of M by 1 */
+  CTR_TYPE* ctr_pt = (CTR_TYPE*) M;
+  
+  while (1) { /* loop till a dist pt found */
+    ++(ctr_pt[0]);
+   
+    memcpy(Mstate, init_state, 32);
+    hash_single(Mstate, (u8*) M);
+    
+    /* is its digest is a distinguished pt? */
+    /* see 1st assumption in config.h  */
+    if ( ((u32*) Mstate)[0] && dist_test == 0)
+      return; /* we got our distinguished digest */
+  }
+}
+
+// -----------------------------------------------------------------------------
+
+static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
+{
+  // ==========================================================================+
+  // Summary: Given a state. Decide to which server we send it to.             |   
+  // --------------------------------------------------------------------------+
+  // INPUTS:                                                                   |
+  // `Mstate` : Array of bytes of the digest.                                  |
+  // --------------------------------------------------------------------------+
+  // Given a state. Decide to which server we send to                          |
+  // """ One potential idea is to do:                                          |
+  // server <-- h % nserver                                                    |
+  // h'     <-- h / nserver """                                                |
+  //
+  // --------------------------------------------------------------------------+
+  
+  const static u32 ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
+  /* 1- convert MState to a WORD_TYPE (dist_bits || nserver || rest)32bits */
+  /* 2- remove the distinguished bits by shifting  (nserver || rest ) */
+  /* 3- keep only the bits that holds nserver (nserver) it may have extra bit */
+  /* 4- Compute server number by taking computing mod nservers */
+  u32 snd_to_server  = ( (((WORD_TYPE*)MState)[0] >> DIFFICULTY)
+			 & ones_nservers) % NSERVERS;
+
+  return snd_to_server;
+}
+
 
 
 void phase_i_store(size_t server_capacity[]){
@@ -59,12 +135,11 @@ void phase_i_store(size_t server_capacity[]){
   // --------------------------------------------------------------------------+
   // NOTE: Bits corresponding to distinguished point and server number are not |
   //       stored in the file.                                                 |
-  // NOTE: endinaness: u32 A[2] = {x, y} then (uint64*) A = { (x<<32) | y) }   |
+  // NOTE: endinaness: u32 A[2] = {x, y} then (uint64*) A = { (y<<32) | x) }   |
   // --------------------------------------------------------------------------+
   // TODO:                                                                     |
   // ==========================================================================+
   
-
 
 
 
@@ -75,12 +150,22 @@ void phase_i_store(size_t server_capacity[]){
   size_t k =  0; // server index
   int should_NOT_stop = 1;
   size_t nhashes_stored = 0; // 
-  size_t interval = 1; /* what is this? */
+
   u32 ones = (1LL<<DIFFICULTY) - 1;
-  // extract only the bits that have nserver// add more explanation
-  u32 ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
 
 
+
+  /* Actually we have discussed that we can fix the number of nhashes per */
+  /* Eventhough they have different capacities, since we allow server to  */
+  /* discard excessive hasing */
+  size_t nhashes=0;
+  for (size_t i=0; i<NSERVERS; ++i) {
+    /* this should coincide with number of hashes in config.h */
+    nhashes += server_capacity[i]; 
+  }
+
+  /* record the whole state after each each interval has passed */
+  size_t interval = nhashes>>10; 
   
   /// timing variables
   double start = 0;
@@ -90,10 +175,8 @@ void phase_i_store(size_t server_capacity[]){
   u8 M[NWORDS_INPUT*WORD_SIZE] = {0};
 
   // store the hash value in this variable
-  WORD_TYPE state[NWORDS_STATE] = {
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
-  };
+  WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
+
   /* treat state as bytes (have you considered union?) */
   u8* stream_pt = (u8*) state; 
 
@@ -148,7 +231,8 @@ void phase_i_store(size_t server_capacity[]){
     if ((state[0] & ones) == 0){ /* it is a distinguished point */
       
       /* Decide which server is responsible for storing this digest */
-      k = ( (state[0]>>DIFFICULTY) & ones_nservers) % NSERVERS;
+      k = to_which_server((u8*) state);
+	//( (state[0]>>DIFFICULTY) & ones_nservers) % NSERVERS;
 
       /* Recall that: */
       /* h = (dist_pt) || h1:=b0 ... b_ceil(log2(nservers)) || the rest   */
@@ -176,9 +260,14 @@ void phase_i_store(size_t server_capacity[]){
     
 
       // + save states after required amount of intervals
+      
       if (nhashes_stored % interval == 0) {
+	
 	FILE* states_file = fopen(states_file_name, "a");
-	fwrite(state, sizeof(u32), 8, states_file);
+	/* Record the whole state */
+	fwrite((WORD_TYPE*) stream_pt, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
+
+
 	// We would like to flush the data disk as soon we have them
 	fclose(states_file);
       }
@@ -192,16 +281,14 @@ void phase_i_store(size_t server_capacity[]){
   printf("done in %fsec, ", elapsed);
   /// -------------------///
 
+
 }
 
 //+ edit from here
-void phase_i_load(dict *d,
-		  FILE *fp,
-		  size_t fp_nhashes, 
-		  size_t mem_nhashes/* there is no need for this */) {
-
+void phase_i_load(dict *d, size_t fp_nhashes, FILE *fp)
+{
   // ==========================================================================+
-  // Summary: Load hashes from the file *fp, and store the in dict *d          |
+  // Summary: Load hashes from the file *fp, and store them in dict *d         |
   // --------------------------------------------------------------------------+
   // INPUTS:                                                                   |
   // `*d`: Dictionary that will keep elements from *fp.                        |
@@ -209,142 +296,28 @@ void phase_i_load(dict *d,
   // `fp_nhashes`  : The nhashes available in the file.                        |
   // `mem_nhashes` : The max number of hashes we are allowed to store in this  |
   //                   machine. The dictionary *d may not accepts all elements.|
-  // --------------------------------------------------------------------------+
-  // TODO:                                                                     |
   // ==========================================================================+
 
-  /// Load file of hashes to dictionary d
-  /// this is local function, it doesn't know which server it's
-  //+ check available memory
-  //+ available memeory >= nelements
-  //++ add all elemnets of file to d
-  //+ available memeory < nelements
-  //++ Fix some distinguish points or store first elemnets till
-  //   memeory is full
 
-  // Check that file exists
+  /* Check that file exists, the file comes from external resources */  
   if (!fp){
     puts("I have been given a file that lives in nowhere");
     return; // raise an error instead
   }
 
-
-  u32 digest[3] = {0};
-  // Read the first two elements as one 64bit unsigned int 
-  u64 store_as_idx;
-  
-  // Exit as soon we have exausted the file or the memory
-  for (; (mem_nhashes > 0) && (fp_nhashes > 0); fp_nhashes--){
-    // size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
-    fread(digest, sizeof(u32), 3, fp);
-    // Read the first two elements as one 64bit unsigned int 
-    store_as_idx = ((u64*) digest) [0] ;
-    // remove the distinguished points. They are shared between all 
-    store_as_idx = store_as_idx >> difficulty;
-    //+ should I also remove the server number?
-    //+ I think this will help with clustering
-
-    // Add element to the dictionary. If it is successful,
-    // reduce mem_nhashes by one.
-    mem_nhashes -= dict_add_element_to(d, store_as_idx, digest[2]);
-    
+  u8 stream_pt[N-DEFINED_BYTES];
+  /* add as many hashes as possible */
+  for (;; fp_nhashes--){
+    fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp);
+    /* it adds the hash iff nprobes <= NPROBES_MAX */
+    dict_add_element_to(d, stream_pt); 
   }
   fclose(fp); // close the file
 }
 
 
-static inline void increment_as_128(u32 ctr[4]){
-  // ===========================================================+
-  // Summary: Increment ctr by one  as if it is  128bit number  |
-  // -----------------------------------------------------------+
-  // Probably this is an over kill                              |
-  // -----------------------------------------------------------+
-  
-  unsigned __int128* ctr_128bit = (unsigned __int128*) ctr;
-  ctr_128bit[0] += 1;  
-}
 
 
-//+ todo pass offset as a pointer
-//+ todo use typedef unsigned __int128 u128
-static void find_hash_distinguished(u32 M[16],     /* in,out*/
-				    u32 Mstate[8], /* in,out*/
-				    const size_t dist_test /* in */)
-
-
-{
-  // ==========================================================================+
-  // Summary: Generates hashes till a distinguished point is found.            |
-  //          Mutate M and Mstate in the process                               |
-  // --------------------------------------------------------------------------+
-  // We start with message M, computed sha256(M) if it is not a distinguished  |
-  // point then we change M slightly. We keep a counter ctr, that gets         |
-  // increased by 1 with each tiral. Compute sha256(M xor ctr).                |
-  //                                                                           |
-  // INPUTS:                                                                   |
-  // - M[16] : initial value of the random message, we hash this in the first  |
-  //           in first trial, then change it to M xor ctr                     |
-  // - Mstate: This should be the initial state of sha256.                     |
-  // - dist_test: (2^nzeros - 1), e.g. a point is distinguished if it has 3    |
-  //              at the end, then the test is 2^3 - 1 = 7                     |
-  // --------------------------------------------------------------------------+
-  // WARNING: this function can't deal with more than 32zeros as dist_test     |
-  // WARNING: we are only working on the first word                            |
-  // --------------------------------------------------------------------------+
-
-  // no need to construct init state with each call of the 
-  const static u32 init_state[8] = { 0x6a09e667, 0xbb67ae85,
-					  0x3c6ef372, 0xa54ff53a,
-					  0x510e527f, 0x9b05688c,
-					  0x1f83d9ab, 0x5be0cd19 };
-  
-  /* placeholder to increment 128 bits by one */
-  u128* offset = (u128*) M;
-  
-  
-  while (1) { // loop till a dist pt found
-    ++(offset[0]); /* increase the first 128bits by one */
-    memcpy(Mstate, init_state, 32);
-    sha256_single(Mstate, (unsigned char*) M);
-
-    /* is its digest is a distinguished pt? */
-    if (Mstate[0] && dist_test == 0)
-      return;
-  }
-}
-
-
-
-static inline u8 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE],
-		     u32 difficulty,
-		     u32 nservers)
-{
-  // ==========================================================================+
-  // Summary: Given a state. Decide to which server we send it to.             |   
-  // --------------------------------------------------------------------------+
-  // INPUTS:                                                                   |
-  // `Mstate` : Array of bytes of the digest.                                  |
-  // `difficulty`: Number of left/right most bits that has to be zero          |
-  // `nservers`: How many servers we have.                                     |
-  // --------------------------------------------------------------------------+
-
-
-  /* Given a state. Decide to which server we send to */
-  /* """ One potential idea is to do: */
-  /* server <-- h % nserver           */
-  /* h'     <-- h / nserver """       */
-  /* with the above suggestion it might be better to treat the digest as an */
-  /* array of bytes                                                         */
-
-  /* We assume that the difficulty is a multiple of 8. todo fix this */
-  u32 difficulty_in_bytes = difficulty/8;
-
-  /* this has to be changed is we wisht to change it to u16 */
-  u8 snd_to_server =  MState[difficulty_in_bytes]; /* max 255 servers */
-
-  return snd_to_server;
-  
-}
 
 
 void phase_ii(dict* d,
