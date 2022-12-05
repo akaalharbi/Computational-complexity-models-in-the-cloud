@@ -66,7 +66,7 @@
 
 #define PROCESS_QUOTA 100 // i.e. send 10 digests to each server
 
-#define NWORDS_OFFSET 4 // use 128 bits as offsets to find message
+// #define NWORDS_OFFSET 4 // use 128 bits as offsets to find message
 
 #define NSERVERS 128
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)

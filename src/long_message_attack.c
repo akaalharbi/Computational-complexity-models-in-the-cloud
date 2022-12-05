@@ -24,7 +24,7 @@
 #include <memory.h>
 #include <sys/time.h>
 #include <omp.h>
-
+#include <assert.h>
 #include "config.h"
 #include "timing.h"
 #include "types.h"
@@ -38,7 +38,7 @@
 //---------------------------- UTILITY FUNCTIONS -------------------------------
 
 
-static void find_hash_distinguished(WORD_TYPE M[NWORDS_INPUT], /* in, out*/
+static void find_hash_distinguished(u8 M[NWORDS_INPUT*WORD_SIZE], /* in, out*/
 				    WORD_TYPE Mstate[NWORDS_STATE], /* out*/
 				    const size_t dist_test /* in */)
 {
@@ -275,16 +275,13 @@ void phase_i_store(size_t server_capacity[]){
     
   }
 
-  /// TIMING record PHASE I time elapsed ///
+
   elapsed = wtime() - start;
   /// write it in a file  ///
   printf("done in %fsec, ", elapsed);
-  /// -------------------///
-
-
 }
 
-//+ edit from here
+
 void phase_i_load(dict *d, size_t fp_nhashes, FILE *fp)
 {
   // ==========================================================================+
@@ -343,111 +340,133 @@ void phase_ii(dict* d,
   // - extra arguments to deal with other servers                              |
   // ==========================================================================+
 
-
-
-
-  //+ todo MPI INIT commands
-  
- 
-
-
   // --------------------- INIT MPI & Shared Variables ------------------------|
-  int nservers, myrank;
+  int nproc, myrank;
   
   MPI_Init(NULL, NULL);
 
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-  MPI_Comm_size(MPI_COMM_WORLD, &nservers);
+  MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
+  /* How many procs that are going t send */
+  int nproc_snd = nproc - NSERVERS;
+  
+  
   /* send digests, 1 digest ≡ 256 bit */
   // int nthreads = omp_get_max_threads(); // no need for this?!
 
-
-
-
-  
-  if (myrank >= nservers){ /* generate hashes, send them*/
+  if (myrank >= NSERVERS){ /* generate hashes, send them*/
     /* I am a sending processor, I only generate hashes and send them */
     /* flatten u32 snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; */
-    u32* snd_buf_dgst = (u32*) malloc(sizeof(u32*)
-				      *nservers
-				      *PROCESS_QUOTA
-				      *NWORDS_DIGEST);
+    u8* snd_buf_dgst = (u8*) malloc(sizeof(u8)
+				    *NSERVERS
+				    *PROCESS_QUOTA
+				    *(N-DEFINED_BYTES));
 
-    /* flatten u32 snf_buf_offst[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
-    u32* snd_buf_offst = (u32*) malloc(sizeof(u32*)
-				       *nservers
-				       *PROCESS_QUOTA
-				       *NWORDS_OFFSET);
-
+    /* flatten u32 snf_buf_ctr[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
+    /* its purpose is to send the counters of messages that generate a digest */
+    CTR_TYPE* snd_buf_ctr = (CTR_TYPE*) malloc(sizeof(CTR_TYPE)
+					       *NSERVERS
+					       *PROCESS_QUOTA);
+    
     u64 nfound_potential_collisions = 0; 
-    u32 M[NWORDS_INPUT]; /* random word */
-    u32 Mstate[8];
-    
+    size_t offset = 0;
+    WORD_TYPE Mstate[NWORDS_STATE];
+    /* M = 64bit ctr || 64bit nonce || random value */
+    u8 M[NWORDS_INPUT*WORD_SIZE]; /* random word */
     /* Get a random message only once */
-    getrandom(M, NWORDS_INPUT*WORD_SIZE, 1);
-
-    /* random message = random things || myrank || 64bit nonce || 64bit ctr */
-    u64 ctr = 0; // = 2^64 - 1 = ff...f 
-    u64 nonce;
+    CTR_TYPE* ctr_pt = (CTR_TYPE*) M; /* counter and nonc pointer  */
+    CTR_TYPE nonce;
     int server_number;
-    getrandom(&nonce, sizeof(u64), 1);
 
-    M[0] = 0; /* ctr_l */ 
-    M[1] = 0;/*  ctr_h */
+    getrandom(M, NWORDS_INPUT*WORD_SIZE, 1);
+    getrandom(&nonce, sizeof(CTR_TYPE), 1);
 
-    /* nonce */
-    M[2] = nonce;
-    M[3] = (nonce>>32);
+    ctr_pt[0] = 0; /* zeroing counter part */
+    ctr_pt[1] = nonce; 
 
+    // todo send M immediately.
+
+    const u64 ones = (1LL<<DIFFICULTY) - 1;
     
-
-    u32* servers_ctr = (u32*) malloc(sizeof(u32)*nservers);
-    memset(servers_ctr, 0, sizeof(u32)*nservers); /* everything = 0 */
-
+    /* pos i: How many messages we have generated so far to be sent to erver i? */
+    u32* servers_ctr = (u32*) malloc(sizeof(u32)*NSERVERS);
+    memset(servers_ctr, 0, sizeof(u32)*NSERVERS); /* we have no messages yet 0 */
+    /* send as soon as one of the buffers is has reached the quota */
 
     /* generate hashes */
     //while (needed_collisions > nfound_potential_collisions) {
-    while (1) { /* yay, infinite loop */
+    for(u64 i=0; i < -1; ++i) { /* yay, infinite loop, should be like the above condition */
+      
+
+      /* Find a message that produces distinguished point */
+      find_hash_distinguished( M, Mstate, ones );
+      //+ decide to which server to add to? 
+      server_number = to_which_server((u8*) Mstate);
 
 
-      /* it might be better to have a nested loops */
-      for (size_t i=0; i<PROCESS_QUOTA; ++i){
-	
-	/* Find a message that produces distinguished point */
-	find_hash_distinguished(M, Mstate, difficulty_level);
-	//+ decide to which server to add to? 
-	server_number = to_which_server((u8*) Mstate, difficulty_level, nservers);
-	snd_buf_dgst[]
-	++servers_ctr[server_number];
-	
+      /* offset: between consecutive servers there are */
+      /* sizeof(u8)*PROCESS_QUOTA*(N-DEFINED_BYTES) bytes */
+      offset = server_number*sizeof(u8)*PROCESS_QUOTA*(N-DEFINED_BYTES)
+	     + servers_ctr[server_number];
+      
+      /* save N-DEFINED_BYTES of MState in: snd_buf_dgst[offset] */      
+      memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defien bytes */
+	      (snd_buf_dgst+offset),
+	      N-DEFINED_BYTES );
 
-	
-	//+ todo check if a server snd_buf has been filled
-	//+ if yes, send it immediately using buffered send 
-	
-	/* add it to snd_buf in location reserved for the receiver  */
-	
+      snd_buf_ctr[server_number*PROCESS_QUOTA + servers_ctr[server_number]]
+	= ((CTR_TYPE*) M)[0];
+      
 
+      /* this server has one more digest */
+      ++servers_ctr[server_number];
 
+      if (servers_ctr[server_number] == PROCESS_QUOTA){
+	//+ buffered send
+	//+ zeroizing the buffers // I don't think we need this
+	// ok for debugging purposes
+
+	servers_ctr[server_number] = 0; // this is enough
       }
-  
-    }
-    
-    
+      //+ todo start from here
+      if (i && 0xFFFF == 0){
+	/* Check how many collisions we have found?*/
+	//+ ask to to collect the number founded potential collisions
+      }
+    } /* todo why do I stop? it is not specified! */
   } else {
     /* I am a receiving processor, I only probe the dictionary */
-    u32* rcv_buf = (u32*) malloc(sizeof(u32)
-					   *BUFF_SIZE*NWORDS_DIGEST);
-    // todo fill this 
+
+    u8* rcv_buf_dgst = (u8*) malloc(sizeof(u8)
+				    *nproc_snd/*we've more senders*/
+				    *PROCESS_QUOTA
+				    *(N-DEFINED_BYTES));
+
+    /* flatten u32 snf_buf_ctr[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
+    /* its purpose is to send the counters of messages that generate a digest */
+    CTR_TYPE* rcv_buf_ctr = (CTR_TYPE*) malloc(sizeof(CTR_TYPE)
+					       *nproc_snd /*we've more senders*/
+					       *PROCESS_QUOTA);
+
+    //+ receive messages from different processors
+    
+    //+ probe these messages 
+
+
+    //+ if we have a positive responds from the dictionary
+    //+ reconstruct the messages
+    //+ save it into a file along with its digest
+    //+ 
 
   }
   
 
-} // no idea where it belongs, but it silences flychek
+}
 
 
 // phase iii
+//+ master server has all the potential collisions messages and their digest
 //+ master server combines all files
 //+ master server sort the (hash, message) according to hash
 //+ master server look at the long messag file, and search for
