@@ -10,7 +10,7 @@
 
 // define which sha256 to use 
 #include "numbers_shorthands.h"
-#include "sha256.h"
+#include "hash.h"
 
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
@@ -37,32 +37,32 @@
 
 
 
-void phase_i_store(const size_t n,
-		   size_t server_capacity[],
-		   size_t global_difficulty,
-		   size_t nservers){
-
+void phase_i_store(size_t server_capacity[]){
+		   /* const size_t n, */
+		   /* size_t global_difficulty, */
+		   /* size_t nservers */
+                   /* parameters above moved to config.h */
   // ==========================================================================+
-  // Hash a long message of zeros. Store the digest in a file k where          |
-  // 0<= k < nservers. To decide where to store the digest h,                  |
-  //  compute k := h mod  nservers                                             |
-  // We allow each server to adjust its own difficulty level (not sure we need that )  |
-  // or its distinguished point format.                                                |
-  // Compute h -> decides which server k -> check server difficulty -> decide to store |
-  // h or discard it.                                                                  |
-  // ----------------------------------------------------------------------------------+
-  // INPUTS:                                                                           |
-  // `n`: hash digest length, our goal is 96-bit                                       |
-  // `server_capacity[]` : array of size nservers,  entry i contains how many blocks   |
-  //                      n server i will store in its dictionary                      |
-  // `global_difficulty` : Number of bits that are 0 in the first word A:=state[0]     |
-  //                       i.e. is state[0]&(2**global_difficulty - 1) == 0 or not?    |
-  // `nservers` : how many servers we should prepare for                               |
-  // NOTE: endinaness: u32 A[2] = {x, y} then (uint64*) A = { (x<<32) | y) }           |
-  // ----------------------------------------------------------------------------------+
-  // TODO:                                                                             |
-  // - Load server capacities from a file.                                             |
-  // ==================================================================================+
+  // Summary:                                                                  |
+  // Hash a long message of zeros. Store the digest, h, in a file k where      |
+  // 0<= k < nservers. It will store N bytes of digest (N defined in config.h) |
+  // To decide which server gets the digest h, compute k := h1 mod  nservers   |
+  // where h = (dist_pt) || h1:=b0 ... b_ceil(log2(nservers)) || the rest.     |
+  // --------------------------------------------------------------------------+
+  // INPUTS: CAPITAL LETTERS input are defined in config.h                     |
+  //                                                                           |
+  // `server_capacity[]` : array of size nservers,  entry i contains how many  |
+  //                       blocks server i will store in its dictionary        |
+  // `DIFFICULTY` : Number of bits that are 0 in the first word A:=state[0]    |
+  //                       i.e. is state[0]&(2**global_difficulty - 1) == 0?   |
+  // `NSERVERS` : how many servers we should prepare for                       |
+  // --------------------------------------------------------------------------+
+  // NOTE: Bits corresponding to distinguished point and server number are not |
+  //       stored in the file.                                                 |
+  // NOTE: endinaness: u32 A[2] = {x, y} then (uint64*) A = { (x<<32) | y) }   |
+  // --------------------------------------------------------------------------+
+  // TODO:                                                                     |
+  // ==========================================================================+
   
 
 
@@ -70,43 +70,52 @@ void phase_i_store(const size_t n,
 
   /// ----------------------- INIT ---------------------------///
   /// 1- INIT numerical and bytes variables:
-  size_t ncores = 14; // @tidy @todo get the value directly from config.h
+  /* phase will rehash the long message again in parallel */
+  size_t ncores = 14; /* here we define how many parllel processors in phase iii */
   size_t k =  0; // server index
   int should_NOT_stop = 1;
   size_t nhashes_stored = 0; // 
-  size_t interval = 1;
-  u32 ones = (1LL<<global_difficulty) - 1;
+  size_t interval = 1; /* what is this? */
+  u32 ones = (1LL<<DIFFICULTY) - 1;
+  // extract only the bits that have nserver// add more explanation
+  u32 ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
 
+
+  
   /// timing variables
   double start = 0;
   double elapsed = 0;
 
   // INIT SHA256 
-  BYTE M[64] = {0}; // long_message_zeros(n_of_blocks*512);
+  u8 M[NWORDS_INPUT*WORD_SIZE] = {0};
 
   // store the hash value in this variable
-  
-  u32 state[8] = {
+  WORD_TYPE state[NWORDS_STATE] = {
     0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
     0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19
   };
-  // we can read digest directly from the state
+  /* treat state as bytes (have you considered union?) */
+  u8* stream_pt = (u8*) state; 
 
   /// INIT FILES: server files that will be send later and state
   char file_name[40]; // more than enough to store file name
   char states_file_name[40];
   
-  FILE* data_to_servers[nservers];
+  FILE* data_to_servers[NSERVERS];
   FILE* states_file;
  
   // TOUCH FILES ON THE DISK
  
   fopen("data/states", "w");
-  snprintf(states_file_name, sizeof(states_file_name), "data/%lu_state", (size_t) wtime());
+  snprintf(states_file_name,
+	   sizeof(states_file_name),
+	   "data/%llu_state",
+	   (u64) wtime());
+
   states_file = fopen(states_file_name, "w");
   fclose(states_file); // we will open this file again in few occasions
   
-  for (size_t i=0; i<nservers; ++i) {
+  for (size_t i=0; i<NSERVERS; ++i) {
     //edit file name according to server i
     snprintf(file_name, sizeof(file_name), "data/upload/%lu", i);
     printf("file_name=%s\n", file_name);
@@ -130,82 +139,79 @@ void phase_i_store(const size_t n,
   // M0 M1 ... M_{2^l}, Mi entry will evaluated on the fly
   // Store the hashes in file correspond to some server k
   start = wtime();
-
-
   /* if one server gets filled, it will */
   while (should_NOT_stop) {
     // hash and extract n bits of the digest
-    sha256_single(state, M);
+    hash_single(state, M);
     
 
-    // Decide which server is responsible for storing this digest
+    if ((state[0] & ones) == 0){ /* it is a distinguished point */
+      
+      /* Decide which server is responsible for storing this digest */
+      k = ( (state[0]>>DIFFICULTY) & ones_nservers) % NSERVERS;
 
-    k = (state[0]>>global_difficulty) % nservers;
-    if ((state[0] & ones) == 0){ // it is a distinguished point 
-      /* if (k==0) { */
-      /* 	printf("k=%ld, digest1,0=%016lx%016lx\n", k,digest[1], digest[0]); */
-      /* } */
-
-      // This is a distinguished point, we store maximally 128bits
-      // in the distant future we may regret this decision.
-      fwrite(state, sizeof(u32), 3, data_to_servers[k]);
+      /* Recall that: */
+      /* h = (dist_pt) || h1:=b0 ... b_ceil(log2(nservers)) || the rest   */
+      fwrite(stream_pt+DEFINED_BYTES, /* start  from "the rest" see above */
+	     sizeof(u8), /* smallest moving unit */
+	     N-DEFINED_BYTES, /* len( (dist_pt)|| h1 ) = DEFINED_BITS */
+	     data_to_servers[k]);
+      
       server_capacity[k] -= 1; // We need to store less blocks now
       ++nhashes_stored;
-    }
+
+      
+      // decide should not stop or should stop?
+      /* not the most optimal implementation */
+      should_NOT_stop = 0;
+      for (size_t i=0; i<NSERVERS; ++i) {
+	/*-----------------------------------------------------------------------*/
+	/* Since we reduce the server capacity by one each time when we add it to*/
+	/* its file. If any server has capacity larger than zero then it means   */
+	/* that we should. continue hashing till all servers capacities are met. */
+	/*-----------------------------------------------------------------------*/  
+	/* should_NOT_stop == 0 iff all servers_capacities are 0; */
+	should_NOT_stop |= (server_capacity[i] > 0) ;
+      }
     
 
-    // decide should not stop or should stop?
-    /* not the most optimal implementation */
-    should_NOT_stop = 0;
-    for (size_t i=0; i<nservers; ++i) {
-      /*-----------------------------------------------------------------------*/
-      /* Since we reduce the server capacity by one each time when we add it to*/
-      /* its file. If any server has capacity larger than zero then it means   */
-      /* that we should. continue hashing till all servers capacities are met. */
-      /*-----------------------------------------------------------------------*/  
-      /* should_NOT_stop == 0 iff all servers_capacities are 0; */
-      should_NOT_stop |= (server_capacity[i] > 0) ;
-    }
-    
-
-    // + save states after required amount of intervals
-    if (nhashes_stored % interval == 0) {
-      FILE* states_file = fopen(states_file_name, "a");
-      fwrite(state, sizeof(u32), 8, states_file);
-      // We would like to flush the data disk as soon we have them
-      fclose(states_file);
+      // + save states after required amount of intervals
+      if (nhashes_stored % interval == 0) {
+	FILE* states_file = fopen(states_file_name, "a");
+	fwrite(state, sizeof(u32), 8, states_file);
+	// We would like to flush the data disk as soon we have them
+	fclose(states_file);
+      }
     }
     
   }
 
   /// TIMING record PHASE I time elapsed ///
   elapsed = wtime() - start;
-  ///
   /// write it in a file  ///
   printf("done in %fsec, ", elapsed);
   /// -------------------///
 
 }
 
-
+//+ edit from here
 void phase_i_load(dict *d,
 		  FILE *fp,
-		  size_t fp_nhashes,
-		  size_t mem_nhashes,
-                  size_t difficulty) {
+		  size_t fp_nhashes, 
+		  size_t mem_nhashes/* there is no need for this */) {
 
-  // ===========================================================================+
-  // Summary: Load hashes from the file *fp, and store the in dict *d           |
-  // ---------------------------------------------------------------------------+
-  // INPUTS:                                                                    |
-  // `*d`: Dictionary that will keep elements from *fp.                         |
-  // `*fp` : File contain number of hashes larger than nelements                |
-  // `fp_nhashes`  : The nhashes available in the file.                         |
-  // `mem_nhashes` : The max number of hashes we are allowed to store in this   |
-  //                   machine. The dictionary *d may not accepts all elements. |
-  // ---------------------------------------------------------------------------+
-  // TODO:                                                                      |
-  // ===========================================================================+
+  // ==========================================================================+
+  // Summary: Load hashes from the file *fp, and store the in dict *d          |
+  // --------------------------------------------------------------------------+
+  // INPUTS:                                                                   |
+  // `*d`: Dictionary that will keep elements from *fp.                        |
+  // `*fp` : File contain number of hashes larger than nelements               |
+  // `fp_nhashes`  : The nhashes available in the file.                        |
+  // `mem_nhashes` : The max number of hashes we are allowed to store in this  |
+  //                   machine. The dictionary *d may not accepts all elements.|
+  // --------------------------------------------------------------------------+
+  // TODO:                                                                     |
+  // ==========================================================================+
 
   /// Load file of hashes to dictionary d
   /// this is local function, it doesn't know which server it's

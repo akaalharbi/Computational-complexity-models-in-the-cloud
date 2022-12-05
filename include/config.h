@@ -4,28 +4,42 @@
 #define LONG_MESSAGE_CONFIG
 #include <stdint.h>
 #include "numbers_shorthands.h"
+#include "confg_math_func.h"
 
-
-// hash function specifications
-// Note: we have not defined that attack parametes
-// since we use sha256
-#define WORD_SIZE 4 // bytes = 32 bit  
-#define NWORDS_DIGEST 8 
+/*          Hash function specifications       */
+/* change it only when you change the function */
+#define WORD_SIZE 4 // bytes = 32 bit
+#define WORD_TYPE u32
+#define NWORDS_DIGEST 8
+#define NWORDS_STATE 8
 #define NWORDS_INPUT 16
+// The attack parameter n can be chosen below s.t.
+// n <= 8 * WORD_SIZE * NWORDS_DIGEST
 
 
-/* shamelessly stolen form stackoverflow */
-#define CEILING(x,y) (((x) + (y) - 1) / (y))
+// Assumptions:
+// 32bits is enough to accommedate the Distinguished points and nserver
+// see type of variable ones and ... in phase i functions
 
 // -------------------------------------------------------------------------+
 //                     Long message attack main parameters                  |
 // -------------------------------------------------------------------------+
 // Apologies: only n ≡ 0 mod 8 is allowed. This is not a feature.
 
+/*****************************************************/
+// Let N := n / 8.                                 // *
+#define N 12 /* bytes i.e n := 8*N bits */         // *
+#define L 34 /* store 2^L elements in the dictionary  */
 
-// Let N := n / 8.
-#define N 12 /* bytes i.e n := 8*N bits */
-#define L 34 /* store 2^L elements in the dictionary */
+/*****************************************************/
+
+/*  ceil(log2(NSERVERS)) =  */
+#define NSERVERS 128
+#define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
+
+
+#define PHASE_III_NPROC 14
+
 /* How many bytes can accommedate L */
 #define L_IN_BYTES CEILING(L, 8) 
 
@@ -33,7 +47,31 @@
 
 #if N > WORD_SIZE*NWORDS_DIGEST
   #error "you are trying to attack more bits than the hash function provides"
-#endif 
+#endif
+
+
+
+
+#ifndef LONG_MESSAGE_MPI_CONFIG
+#define LONG_MESSAGE_MPI_CONFIG
+// MPI configurations
+
+#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements.
+
+#define PROCESS_QUOTA 100 // i.e. send 10 digests to each server
+
+#define NWORDS_OFFSET 4 // use 128 bits as offsets to find message
+
+#define NSERVERS 128
+#define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
+
+#define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY)
+#define DEFINED_BYTES CEILING(DEFINED_BITS, 8) 
+#endif // LONG_MESSAGE_MPI_CONFIG
+
+
+
+
 // Assumptions that need to be changed manually
 
 // Dictionary Configurations:
@@ -108,23 +146,6 @@
 // Number of elements per simd register         |
 #define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE))  // |
 // -------------------------------------------- +
-
-
-
-
-#ifndef LONG_MESSAGE_MPI_CONFIG
-#define LONG_MESSAGE_MPI_CONFIG
-// MPI configurations
-// #define NSERVERS 10 we can get it from mpi_comm_size
-#define LOG2_NSERVERS 4 // = ceil(log2(NSERVERS))
-#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements.
-
-#define PROCESS_QUOTA 100 // i.e. send 10 digests to each server
-
-#define NWORDS_OFFSET 4 // use 128 bits as offsets to find message
-#endif // LONG_MESSAGE_MPI_CONFIG
-
-
 
 
 

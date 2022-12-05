@@ -1,7 +1,9 @@
+// hash function implementation
+
 // fast sha256 implementation on intel processeors
 /// 
 /// source: https://github.com/noloader/SHA-Intrinsics/blob/master/sha256-x86.c
-#include "sha256.h"
+#include "hash.h"
 #include <emmintrin.h>
 
 /* Process multiple blocks. The caller is responsible for setting the initial */
@@ -10,7 +12,7 @@
 
 
 
-void sha256_single(uint32_t state[8], const uint8_t data[])
+void hash_single(uint32_t state[8], const uint8_t data[])
 {
     /// Process single block of message 512-bit
     __m128i STATE0, STATE1;

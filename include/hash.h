@@ -6,6 +6,7 @@
 
 
 
+#include "config.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -24,6 +25,6 @@ typedef UINT32 uint32_t;
 typedef UINT8 uint8_t;
 #endif
 
-void sha256_single(uint32_t state[8], const uint8_t data[]);
+void hash_single(WORD_TYPE state[8], const u8 data[]);
 
 #endif
