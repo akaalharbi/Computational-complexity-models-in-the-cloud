@@ -34,7 +34,7 @@
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
 #include <mpi.h>
 
-
+#define TAG_SND_DGST 1 /* send digest tag */
 //---------------------------- UTILITY FUNCTIONS -------------------------------
 
 
@@ -393,7 +393,7 @@ void phase_ii(dict* d,
     } /* clear stack variables */
 
     //------- Part 2 : Init sending buffers of digests and counters -------
-    #define SND_DGST 1 /* send digest tag */
+
     MPI_Request request;
     /* int one_element_size = sizeof(u8)*(N-DEFINED_BYTES) */
     /*                      + sizeof(CTR_TYPE); /\* |dgst| + |ctr| *\/ */
@@ -453,7 +453,7 @@ void phase_ii(dict* d,
 		       PROCESS_QUOTA*one_element_size,
 		       MPI_UNSIGNED_CHAR,
 		       server_number,
-		       SND_DGST,
+		       TAG_SND_DGST,
 		       MPI_COMM_WORLD,
 		       &request);
 	// todo do we need here buffer detach? 
@@ -474,67 +474,44 @@ void phase_ii(dict* d,
     //------- Part 1 : Init receiving buffers of digests and counters -------
     
     //+ add initial random message buffers
-    u8* rcv_buf_dgst = (u8*) malloc(one_element_size
-				    *nproc_snd/*we've more senders*/
-				    *PROCESS_QUOTA);
-
-    /* flatten u32 snf_buf_ctr[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
-    /* its purpose is to send the counters of messages that generate a digest */
-    CTR_TYPE* rcv_buf_ctr = (CTR_TYPE*) malloc(sizeof(CTR_TYPE)
-					       *nproc_snd /*we've more senders*/
-					       *PROCESS_QUOTA);
-
-    //+ receive messages from different processors
+    u8* rcv_buf = (u8*) malloc(one_element_size
+			       *nproc_snd/*we've more senders*/
+			       *PROCESS_QUOTA);
     
+
+
+    MPI_Status* statuses = (MPI_Status*)malloc(sizeof(MPI_Status)*nproc);
+    MPI_Request* requests = (MPI_Request*)malloc(sizeof(MPI_Request)*nproc);
+    int* indices = (int*)malloc(sizeof(int)*nproc);
+    int flag = 0; /* decide if all messages have been received */
+    int outcount = 0;
+    size_t rcv_array_size = one_element_size*PROCESS_QUOTA;
+    
+    // enclose what's below within while loop to receive multiple times
+    //+ receive messages from different processors
+    for (int i = 0; i<nproc; ++i) {
+      MPI_Irecv(rcv_buf+i*rcv_array_size,
+		rcv_array_size,
+		MPI_UNSIGNED_CHAR,
+		i,
+		TAG_SND_DGST,
+		MPI_COMM_WORLD, requests);
+    }
+
     //+ probe these messages 
+    while (!flag) {
+      MPI_Waitsome(nproc, requests, &outcount, indices, statuses);
+      MPI_Testall(nproc, requests, &flag, statuses);
+      for (int j = 0; j<outcount; ++j){
+	/* treat received messages that are completed */
 
-
-    //+ if we have a positive responds from the dictionary
-    //+ reconstruct the messages
-    //+ save it into a file along with its digest
-    //+ 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+	//+ probe dictionary
+	//+ if it is positive:
+	//+ reconstruct the messages
+	//+ record message and digest
+	//+ we need a file to write our results 
+      }
+    } // flag == 1 when buffers have been received, thus call mpi_irecv again
 
   }
   
