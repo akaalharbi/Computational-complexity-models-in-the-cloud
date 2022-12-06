@@ -354,23 +354,18 @@ void phase_ii(dict* d,
   
   /* send digests, 1 digest ≡ 256 bit */
   // int nthreads = omp_get_max_threads(); // no need for this?!
+  int one_element_size = sizeof(u8)*(N-DEFINED_BYTES)
+                       + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
 
   if (myrank >= NSERVERS){ /* generate hashes, send them*/
     /* I am a sending processor, I only generate hashes and send them */
-    /* flatten u32 snf_buf_dgst[NSERVERS][MY_QUOTA*NWORDS_DIGEST]; */
-    u8* snd_buf_dgst = (u8*) malloc(sizeof(u8)
-				    *NSERVERS
-				    *PROCESS_QUOTA
-				    *(N-DEFINED_BYTES));
 
-    /* flatten u32 snf_buf_ctr[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
-    /* its purpose is to send the counters of messages that generate a digest */
-    CTR_TYPE* snd_buf_ctr = (CTR_TYPE*) malloc(sizeof(CTR_TYPE)
-					       *NSERVERS
-					       *PROCESS_QUOTA);
-    
-    u64 nfound_potential_collisions = 0; 
-    size_t offset = 0;
+    // snd_buf ={ dgst1||ctr1, ..., dgst_k||ctr_k}
+    // dgst := N bytes of the digest
+    // ctr  := (this is a shortcut that allows us not to send the whole message)
+
+    // ---- Part 1:
+    //    set up a random message and share it with receiving servers
     WORD_TYPE Mstate[NWORDS_STATE];
     /* M = 64bit ctr || 64bit nonce || random value */
     u8 M[NWORDS_INPUT*WORD_SIZE]; /* random word */
@@ -385,52 +380,89 @@ void phase_ii(dict* d,
     ctr_pt[0] = 0; /* zeroing counter part */
     ctr_pt[1] = nonce; 
 
-    // todo send M immediately.
+    { /* Send M immediately and clear the memory at the end  */
+      #define FIRST_MESSAGE 0
+      MPI_Request requests[NSERVERS]; /* they will be used only here  */
+      MPI_Status statuses[NSERVERS];
+      // how about collective communications? I can't find a simple way using them.
+      for (int i=0; i<NSERVERS; ++i) {
+	MPI_Isend(M, NWORDS_INPUT*WORD_SIZE, MPI_UNSIGNED_CHAR, 0,
+		   FIRST_MESSAGE, MPI_COMM_WORLD, &requests[i]);
+      }
+      MPI_Waitall(NSERVERS, requests, statuses);
+    } /* clear stack variables */
 
-    const u64 ones = (1LL<<DIFFICULTY) - 1;
+    //------- Part 2 : Init sending buffers of digests and counters -------
+    #define SND_DGST 1 /* send digest tag */
+    MPI_Request request;
+    /* int one_element_size = sizeof(u8)*(N-DEFINED_BYTES) */
+    /*                      + sizeof(CTR_TYPE); /\* |dgst| + |ctr| *\/ */
+
+    u8* snd_buf = (u8*) malloc( one_element_size
+				*PROCESS_QUOTA
+				*NSERVERS);
+
+    /* Init attaching buffers for the buffered send */
+    int buf_attached_size = NSERVERS*(MPI_BSEND_OVERHEAD + one_element_size);
+    u8* buf_attached = (u8*) malloc(buf_attached_size);
     
-    /* pos i: How many messages we have generated so far to be sent to erver i? */
+
+    /* Decide where to place the kth digest in server i buffer */
+    size_t offset = 0; 
+    const u64 ones = (1LL<<DIFFICULTY) - 1;
+
+    /* pos i: How many messages we've generated to be sent to server i? */
     u32* servers_ctr = (u32*) malloc(sizeof(u32)*NSERVERS);
-    memset(servers_ctr, 0, sizeof(u32)*NSERVERS); /* we have no messages yet 0 */
-    /* send as soon as one of the buffers is has reached the quota */
+    /* set number of generated messages before sending to 0 */
+    memset(servers_ctr, 0, sizeof(u32)*NSERVERS); 
 
-    /* generate hashes */
-    //while (needed_collisions > nfound_potential_collisions) {
-    for(u64 i=0; i < -1; ++i) { /* yay, infinite loop, should be like the above condition */
-      
 
+    //------- Part 3 : Generate hashes and send them  -------
+    MPI_Buffer_attach(buf_attached, buf_attached_size);
+    
+    for(u64 i=0; i < -1; ++i) { /* when do we break? */
       /* Find a message that produces distinguished point */
       find_hash_distinguished( M, Mstate, ones );
+
       //+ decide to which server to add to? 
       server_number = to_which_server((u8*) Mstate);
 
 
-      /* offset: between consecutive servers there are */
-      /* sizeof(u8)*PROCESS_QUOTA*(N-DEFINED_BYTES) bytes */
-      offset = server_number*sizeof(u8)*PROCESS_QUOTA*(N-DEFINED_BYTES)
-	     + servers_ctr[server_number];
+
+      /* 1st term: go to server booked memory, 2nd: location of 1st free place*/
+      offset = server_number*one_element_size + servers_ctr[server_number];
       
       /* save N-DEFINED_BYTES of MState in: snd_buf_dgst[offset] */      
-      memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defien bytes */
-	      (snd_buf_dgst+offset),
+      memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
+	      (snd_buf+offset),
 	      N-DEFINED_BYTES );
 
-      snd_buf_ctr[server_number*PROCESS_QUOTA + servers_ctr[server_number]]
-	= ((CTR_TYPE*) M)[0];
+      /* record the counter, above we've recorded N-DEFINED_BYTES  */
+      memcpy(M, 
+	     ( (snd_buf+offset) + (N-DEFINED_BYTES) ),
+	     sizeof(CTR_TYPE) );
+
       
 
       /* this server has one more digest */
       ++servers_ctr[server_number];
 
       if (servers_ctr[server_number] == PROCESS_QUOTA){
-	//+ buffered send
-	//+ zeroizing the buffers // I don't think we need this
-	// ok for debugging purposes
-
-	servers_ctr[server_number] = 0; // this is enough
+	/* we have enough messages to send to server (server_number) */
+	MPI_Bsend_init(snd_buf,
+		       PROCESS_QUOTA*one_element_size,
+		       MPI_UNSIGNED_CHAR,
+		       server_number,
+		       SND_DGST,
+		       MPI_COMM_WORLD,
+		       &request);
+	// todo do we need here buffer detach? 
+	/* It is enough to reset the counter. The memroy will be rewritten */  
+	servers_ctr[server_number] = 0;
       }
-      //+ todo start from here
+      /* a check point to see if the generated hashes were enough */
       if (i && 0xFFFF == 0){
+	//+ todo fill these lines! 
 	/* Check how many collisions we have found?*/
 	//+ ask to to collect the number founded potential collisions
       }
@@ -438,10 +470,13 @@ void phase_ii(dict* d,
   } else {
     /* I am a receiving processor, I only probe the dictionary */
 
-    u8* rcv_buf_dgst = (u8*) malloc(sizeof(u8)
+
+    //------- Part 1 : Init receiving buffers of digests and counters -------
+    
+    //+ add initial random message buffers
+    u8* rcv_buf_dgst = (u8*) malloc(one_element_size
 				    *nproc_snd/*we've more senders*/
-				    *PROCESS_QUOTA
-				    *(N-DEFINED_BYTES));
+				    *PROCESS_QUOTA);
 
     /* flatten u32 snf_buf_ctr[NSERVERS][MY_QUOTA*NWORDS_OFFSET]; */
     /* its purpose is to send the counters of messages that generate a digest */
@@ -458,6 +493,48 @@ void phase_ii(dict* d,
     //+ reconstruct the messages
     //+ save it into a file along with its digest
     //+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   }
   
