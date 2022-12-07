@@ -153,9 +153,8 @@ void print_m25i(__m256i a, char* text){
 }
 
 
-int dict_has_elm(dict *d, u8* state){
-  // -------------------------------------------------------------------------+
-  // returns 1 if state is found in d, 0 otherwise                            |
+int dict_has_elm(dict *d, u8 *state)
+{ // returns 1 if state is found in d, 0 otherwise                            |
   // This dictionary is unusual:                                              |
   // User have a value in the form:                                           |
   // (dist pts, srvr no) || (L bits) || discard || (VAL_SIZE bits) || discard |

@@ -38,6 +38,50 @@
 //---------------------------- UTILITY FUNCTIONS -------------------------------
 
 
+static inline int lookup_multi_save(dict *d,
+				    u8 *stream,
+				    u8 init_message[NWORDS_INPUT*WORD_SIZE],
+				    size_t npairs,
+				    FILE *fp)
+{ // Given stream={msg1||dgst1,..} from specific rank, probes each dgst, if   |
+  // prope(dgst)=/=0 store its related msg in fp, and returns the number of   |
+  // stored messages.                                                         |
+  // -------------------------------------------------------------------------+
+  // INPUT:                                                                   |
+  // - dict                                                                   |
+  // - stream                                                                 |
+  // - npairs: how many pairs (msg, dgst) in the stream.                      |
+  // -------------------------------------------------------------------------+
+  // NOTES:                                                                   |
+  // |msg| = NWORDS_INPUT*WORD_SIZE (config.h)                                |
+  // |dgst| = N-DEFINED_BYTES (should be N,but we skip know bits .e.g nserver)|
+  // -------------------------------------------------------------------------+
+  static int one_pair_size = NWORDS_INPUT*WORD_SIZE + (N-DEFINED_BYTES);
+  static int msg_size = NWORDS_INPUT*WORD_SIZE;
+  
+  /* how many messages give positive ans when their dgst gets probes */
+  int npositive_msgs = 0;
+  int tmp = 0;
+  for (size_t i=0; i<npairs; ++i){
+    /* dictionary only read |dgst| bytes by default  */
+    tmp =  dict_has_elm(d, stream+i*one_pair_size+msg_size);
+
+    if (tmp){ /* positive probe */
+      // reconstruct the message:
+      /* I feel we should pass this as an argument */
+      static char M[NWORDS_INPUT*WORD_SIZE];
+      memcpy(M, init_message, NWORDS_INPUT*WORD_SIZE);
+      /* set the counter part */
+      memcpy(M, stream+i*one_pair_size, sizeof(CTR_TYPE));
+      /* finally write the reconstructed message */
+      fwrite(M, sizeof(u8), msg_size, fp);
+      
+      ++npositive_msgs;
+    }
+  }
+  return npositive_msgs;
+}
+
 static void find_hash_distinguished(u8 M[NWORDS_INPUT*WORD_SIZE], /* in, out*/
 				    WORD_TYPE Mstate[NWORDS_STATE], /* out*/
 				    const size_t dist_test /* in */)
@@ -190,6 +234,7 @@ void phase_i_store(size_t server_capacity[]){
   // TOUCH FILES ON THE DISK
  
   fopen("data/states", "w");
+  /* create a string that will become a file name  */
   snprintf(states_file_name,
 	   sizeof(states_file_name),
 	   "data/%llu_state",
@@ -334,12 +379,13 @@ void phase_ii(dict* d,
   //                            message.                                       |
   // NOTE: (64bytes message || 32bytes hash) (64bytes message || 32bytes hash) |
   // `needed_collisions` : How many messages we need that return positive hits |
-  //                       when probe the dictionary.                          |
+  //                       when probing the dictionary with their digests.     |
   //---------------------------------------------------------------------------+
   // TODO:                                                                     |
   // - extra arguments to deal with other servers                              |
   // ==========================================================================+
 
+  size_t nfound_collisions = 0;
   // --------------------- INIT MPI & Shared Variables ------------------------|
   int nproc, myrank;
   
@@ -402,7 +448,7 @@ void phase_ii(dict* d,
 				*PROCESS_QUOTA
 				*NSERVERS);
 
-    /* Init attaching buffers for the buffered send */
+     /* Init attaching buffers for the buffered send */
     int buf_attached_size = NSERVERS*(MPI_BSEND_OVERHEAD + one_element_size);
     u8* buf_attached = (u8*) malloc(buf_attached_size);
     
@@ -467,28 +513,45 @@ void phase_ii(dict* d,
 	//+ ask to to collect the number founded potential collisions
       }
     } /* todo why do I stop? it is not specified! */
-  } else {
-    /* I am a receiving processor, I only probe the dictionary */
 
+    MPI_Buffer_detach(buf_attached, &buf_attached_size);
 
-    //------- Part 1 : Init receiving buffers of digests and counters -------
+    free(snd_buf);
+    free(buf_attached);
+    free(servers_ctr);
     
-    //+ add initial random message buffers
-    u8* rcv_buf = (u8*) malloc(one_element_size
-			       *nproc_snd/*we've more senders*/
-			       *PROCESS_QUOTA);
+    MPI_Finalize();
+    return; // au revoir.
+  }
+  /// else:  ///
+  /// ------ I am a receiving processor, I only probe the dictionary ------  ///
+  // ------- Part 1 : Init receiving buffers of digests and counters -------
+
+  /* create file: data/messages/myrank that will hold messages whose hashes */
+  /* gives a postivie response when probing the dictionary */
+  char file_name[25];
+  snprintf(file_name, sizeof(file_name), "data/messages/%d", myrank );
+  FILE* fp = fopen(file_name, "w");
+    
+  //+ add initial random message buffers
+  u8* rcv_buf = (u8*) malloc(one_element_size
+			     *nproc_snd/*we've more senders*/
+			     *PROCESS_QUOTA);
     
 
+  MPI_Status* statuses = (MPI_Status*)malloc(sizeof(MPI_Status)*nproc);
+  MPI_Request* requests = (MPI_Request*)malloc(sizeof(MPI_Request)*nproc);
+  int* indices = (int*)malloc(sizeof(int)*nproc);
+  size_t idx = 0;
+  int flag = 0; /* decide if all messages have been received */
+  int outcount = 0;
+  size_t rcv_array_size = one_element_size*PROCESS_QUOTA;
 
-    MPI_Status* statuses = (MPI_Status*)malloc(sizeof(MPI_Status)*nproc);
-    MPI_Request* requests = (MPI_Request*)malloc(sizeof(MPI_Request)*nproc);
-    int* indices = (int*)malloc(sizeof(int)*nproc);
-    int flag = 0; /* decide if all messages have been received */
-    int outcount = 0;
-    size_t rcv_array_size = one_element_size*PROCESS_QUOTA;
-    
-    // enclose what's below within while loop to receive multiple times
-    //+ receive messages from different processors
+  // enclose what's below within while loop to receive multiple times
+
+  while (needed_collisions > nfound_collisions) {
+  //+ receive messages from different processors
+  
     for (int i = 0; i<nproc; ++i) {
       MPI_Irecv(rcv_buf+i*rcv_array_size,
 		rcv_array_size,
@@ -503,20 +566,34 @@ void phase_ii(dict* d,
       MPI_Waitsome(nproc, requests, &outcount, indices, statuses);
       MPI_Testall(nproc, requests, &flag, statuses);
       for (int j = 0; j<outcount; ++j){
-	/* treat received messages that are completed */
+	idx = indices[j];
 
+	/* treat received messages that are completed */
 	//+ probe dictionary
 	//+ if it is positive:
 	//+ reconstruct the messages
 	//+ record message and digest
-	//+ we need a file to write our results 
-      }
+	nfound_collisions += lookup_multi_save(d,
+					       &rcv_buf[idx],
+					       ,
+					       PROCESS_QUOTA,
+					       fp);
+
+      } // end treating received messages 
     } // flag == 1 when buffers have been received, thus call mpi_irecv again
+  } // end found enough collisions
 
-  }
+  //+ todo send the messages to the master!
+  free(rcv_buf);
+  free(statuses);
+  free(requests);
+  free(indices);
   
-
+  fclose(fp);
+  MPI_Finalize();
+  return;
 }
+
 
 
 // phase iii
@@ -525,3 +602,8 @@ void phase_ii(dict* d,
 //+ master server sort the (hash, message) according to hash
 //+ master server look at the long messag file, and search for
 //+ hashes in the sorted list above
+
+
+
+
+// huge mistake in the logic of lookup_multi
