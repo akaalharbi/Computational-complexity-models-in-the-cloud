@@ -567,6 +567,7 @@ void phase_ii(dict* d,
 
   // --- Part 3: Receive digests and probe them
   // enclose what's below within while loop to receive multiple times
+  // Warning: not correct! nfound_collisions should be shared between all
   while (needed_collisions > nfound_collisions) {
   //+ receive messages from different processors
   
@@ -574,7 +575,7 @@ void phase_ii(dict* d,
       MPI_Irecv(rcv_buf+i*rcv_array_size,
 		rcv_array_size,
 		MPI_UNSIGNED_CHAR,
-		i,
+		i+NSERVERS,
 		TAG_SND_DGST,
 		MPI_COMM_WORLD, requests);
     }
@@ -603,6 +604,10 @@ void phase_ii(dict* d,
   } // end found enough collisions
 
   //+ todo send the messages to the master!
+  for (int i=0; i<NSERVERS; ++i) {
+    statements
+  }
+  
   free(rcv_buf);
   free(statuses);
   free(requests);
