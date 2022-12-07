@@ -40,7 +40,7 @@
 
 static inline int lookup_multi_save(dict *d,
 				    u8 *stream,
-				    u8 init_message[NWORDS_INPUT*WORD_SIZE],
+				    u8 init_message[HASH_INPUT_SIZE],
 				    size_t npairs,
 				    FILE *fp)
 { // Given stream={msg1||dgst1,..} from specific rank, probes each dgst, if   |
@@ -56,8 +56,8 @@ static inline int lookup_multi_save(dict *d,
   // |msg| = NWORDS_INPUT*WORD_SIZE (config.h)                                |
   // |dgst| = N-DEFINED_BYTES (should be N,but we skip know bits .e.g nserver)|
   // -------------------------------------------------------------------------+
-  static int one_pair_size = NWORDS_INPUT*WORD_SIZE + (N-DEFINED_BYTES);
-  static int msg_size = NWORDS_INPUT*WORD_SIZE;
+  static int one_pair_size = HASH_INPUT_SIZE + (N-DEFINED_BYTES);
+  static int msg_size = HASH_INPUT_SIZE;
   
   /* how many messages give positive ans when their dgst gets probes */
   int npositive_msgs = 0;
@@ -69,8 +69,8 @@ static inline int lookup_multi_save(dict *d,
     if (tmp){ /* positive probe */
       // reconstruct the message:
       /* I feel we should pass this as an argument */
-      static char M[NWORDS_INPUT*WORD_SIZE];
-      memcpy(M, init_message, NWORDS_INPUT*WORD_SIZE);
+      static char M[HASH_INPUT_SIZE];
+      memcpy(M, init_message, HASH_INPUT_SIZE);
       /* set the counter part */
       memcpy(M, stream+i*one_pair_size, sizeof(CTR_TYPE));
       /* finally write the reconstructed message */
@@ -82,7 +82,7 @@ static inline int lookup_multi_save(dict *d,
   return npositive_msgs;
 }
 
-static void find_hash_distinguished(u8 M[NWORDS_INPUT*WORD_SIZE], /* in, out*/
+static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
 				    WORD_TYPE Mstate[NWORDS_STATE], /* out*/
 				    const size_t dist_test /* in */)
 {
@@ -190,7 +190,8 @@ void phase_i_store(size_t server_capacity[]){
   /// ----------------------- INIT ---------------------------///
   /// 1- INIT numerical and bytes variables:
   /* phase will rehash the long message again in parallel */
-  size_t ncores = 14; /* here we define how many parllel processors in phase iii */
+  /* here we define how many parllel processors in phase iii */
+  size_t ncores = 14; 
   size_t k =  0; // server index
   int should_NOT_stop = 1;
   size_t nhashes_stored = 0; // 
@@ -216,7 +217,7 @@ void phase_i_store(size_t server_capacity[]){
   double elapsed = 0;
 
   // INIT SHA256 
-  u8 M[NWORDS_INPUT*WORD_SIZE] = {0};
+  u8 M[HASH_INPUT_SIZE] = {0};
 
   // store the hash value in this variable
   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
@@ -400,8 +401,8 @@ void phase_ii(dict* d,
   
   /* send digests, 1 digest ≡ 256 bit */
   // int nthreads = omp_get_max_threads(); // no need for this?!
-  int one_element_size = sizeof(u8)*(N-DEFINED_BYTES)
-                       + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
+  int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
+                    + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
 
   if (myrank >= NSERVERS){ /* generate hashes, send them*/
     /* I am a sending processor, I only generate hashes and send them */
@@ -410,46 +411,47 @@ void phase_ii(dict* d,
     // dgst := N bytes of the digest
     // ctr  := (this is a shortcut that allows us not to send the whole message)
 
-    // ---- Part 1:
+    // ---- Part 1: init variables 
     //    set up a random message and share it with receiving servers
     WORD_TYPE Mstate[NWORDS_STATE];
     /* M = 64bit ctr || 64bit nonce || random value */
-    u8 M[NWORDS_INPUT*WORD_SIZE]; /* random word */
+    u8 M[HASH_INPUT_SIZE]; /* random word */
     /* Get a random message only once */
     CTR_TYPE* ctr_pt = (CTR_TYPE*) M; /* counter and nonc pointer  */
     CTR_TYPE nonce;
     int server_number;
 
-    getrandom(M, NWORDS_INPUT*WORD_SIZE, 1);
+    getrandom(M, HASH_INPUT_SIZE, 1);
     getrandom(&nonce, sizeof(CTR_TYPE), 1);
 
     ctr_pt[0] = 0; /* zeroing counter part */
-    ctr_pt[1] = nonce; 
+    ctr_pt[1] = nonce;
 
+    //------- Part 2 : Send the initial input to all receiving servers 
     { /* Send M immediately and clear the memory at the end  */
       #define FIRST_MESSAGE 0
       MPI_Request requests[NSERVERS]; /* they will be used only here  */
       MPI_Status statuses[NSERVERS];
       // how about collective communications? I can't find a simple way using them.
       for (int i=0; i<NSERVERS; ++i) {
-	MPI_Isend(M, NWORDS_INPUT*WORD_SIZE, MPI_UNSIGNED_CHAR, 0,
+	MPI_Isend(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, 0,
 		   FIRST_MESSAGE, MPI_COMM_WORLD, &requests[i]);
       }
       MPI_Waitall(NSERVERS, requests, statuses);
     } /* clear stack variables */
+    // ------ end part 2 
 
-    //------- Part 2 : Init sending buffers of digests and counters -------
-
+    // ---- Part1 : continue initializing the variables 
     MPI_Request request;
-    /* int one_element_size = sizeof(u8)*(N-DEFINED_BYTES) */
+    /* int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES) */
     /*                      + sizeof(CTR_TYPE); /\* |dgst| + |ctr| *\/ */
 
-    u8* snd_buf = (u8*) malloc( one_element_size
-				*PROCESS_QUOTA
-				*NSERVERS);
+    u8* snd_buf = (u8*) malloc(one_pair_size
+			       *PROCESS_QUOTA
+			       *NSERVERS);
 
      /* Init attaching buffers for the buffered send */
-    int buf_attached_size = NSERVERS*(MPI_BSEND_OVERHEAD + one_element_size);
+    int buf_attached_size = NSERVERS*(MPI_BSEND_OVERHEAD + one_pair_size);
     u8* buf_attached = (u8*) malloc(buf_attached_size);
     
 
@@ -476,7 +478,7 @@ void phase_ii(dict* d,
 
 
       /* 1st term: go to server booked memory, 2nd: location of 1st free place*/
-      offset = server_number*one_element_size + servers_ctr[server_number];
+      offset = server_number*one_pair_size + servers_ctr[server_number];
       
       /* save N-DEFINED_BYTES of MState in: snd_buf_dgst[offset] */      
       memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
@@ -496,7 +498,7 @@ void phase_ii(dict* d,
       if (servers_ctr[server_number] == PROCESS_QUOTA){
 	/* we have enough messages to send to server (server_number) */
 	MPI_Bsend_init(snd_buf,
-		       PROCESS_QUOTA*one_element_size,
+		       PROCESS_QUOTA*one_pair_size,
 		       MPI_UNSIGNED_CHAR,
 		       server_number,
 		       TAG_SND_DGST,
@@ -534,7 +536,7 @@ void phase_ii(dict* d,
   FILE* fp = fopen(file_name, "w");
     
   //+ add initial random message buffers
-  u8* rcv_buf = (u8*) malloc(one_element_size
+  u8* rcv_buf = (u8*) malloc(one_pair_size
 			     *nproc_snd/*we've more senders*/
 			     *PROCESS_QUOTA);
     
@@ -543,12 +545,28 @@ void phase_ii(dict* d,
   MPI_Request* requests = (MPI_Request*)malloc(sizeof(MPI_Request)*nproc);
   int* indices = (int*)malloc(sizeof(int)*nproc);
   size_t idx = 0;
+  size_t buf_idx = 0;
+  size_t msg_idx = 0;
   int flag = 0; /* decide if all messages have been received */
   int outcount = 0;
-  size_t rcv_array_size = one_element_size*PROCESS_QUOTA;
+  size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
+  u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc);
 
+  // --- part 2: receive the initial inputs from all generating processors 
+  #define FIRST_MESSAGE 0
+  for (int i=0; i<NSERVERS; ++i) 
+    MPI_Recv(initial_inputs+i*HASH_INPUT_SIZE,
+	     HASH_INPUT_SIZE,
+	     MPI_UNSIGNED_CHAR,
+	     NSERVERS+i,
+	     FIRST_MESSAGE,
+	     MPI_COMM_WORLD,
+	     statuses);
+
+
+
+  // --- Part 3: Receive digests and probe them
   // enclose what's below within while loop to receive multiple times
-
   while (needed_collisions > nfound_collisions) {
   //+ receive messages from different processors
   
@@ -566,16 +584,17 @@ void phase_ii(dict* d,
       MPI_Waitsome(nproc, requests, &outcount, indices, statuses);
       MPI_Testall(nproc, requests, &flag, statuses);
       for (int j = 0; j<outcount; ++j){
-	idx = indices[j];
-
+	idx = indices[j]; /* number of sending process */
+	buf_idx = idx*one_pair_size*PROCESS_QUOTA;
+	msg_idx = idx*HASH_INPUT_SIZE;
 	/* treat received messages that are completed */
 	//+ probe dictionary
 	//+ if it is positive:
 	//+ reconstruct the messages
 	//+ record message and digest
 	nfound_collisions += lookup_multi_save(d,
-					       &rcv_buf[idx],
-					       ,
+					       &rcv_buf[buf_idx],
+					       &initial_inputs[msg_idx],
 					       PROCESS_QUOTA,
 					       fp);
 

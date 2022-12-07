@@ -13,6 +13,8 @@
 #define NWORDS_DIGEST 8
 #define NWORDS_STATE 8
 #define NWORDS_INPUT 16
+#define HASH_INPUT_SIZE NWORDS_INPUT*WORD_SIZE /* in bytes */
+
 // The attack parameter n can be chosen below s.t.
 // n <= 8 * WORD_SIZE * NWORDS_DIGEST
 
