@@ -29,3 +29,44 @@
 #define TAG_RANDOM_MESSAGE 1
 #define TAG_SND_DGST 2
 #define TAG_MESSAGES_CANDIDATES 3
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// when a process born:
+
+//+ i am a sender:
+//+ generate hashes and
+//+ keep going
+
+//+ i am a receiver:
+//+ load hashes from the file
+//+ check how many hashes did i generate?
+//+ generate more
+//+ how about a deadlock? when a process generates enough hash
+
+
+//+ i am process with rank NSERVERS (master)
+//+ check how many candidates do i have.
+//+ enough candidate?
+//++ python script try to kill other servers
+//+ not enough:
+//+ keep listening to other receivers, and record any candidates
+//+ update the number of candidate messages 
+
+
