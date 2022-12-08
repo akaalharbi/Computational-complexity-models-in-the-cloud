@@ -21,6 +21,29 @@
     "file": "/home/ifrit/phd_shared/src/long_message_attack.c",
     "output": "/home/ifrit/phd_shared/obj/long_message_attack.o"
   },
+  
+{
+    "arguments": [
+      "/usr/bin/clang",
+      "-c",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+	"-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
+	"-L/usr/lib/x86_64-linux-gnu/openmpi/lib",
+      "-Iinclude",	
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-o",
+      "obj/long_message_attack.o",
+      "src/long_message_attack.c",
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/scratch.c",
+    "output": "/home/ifrit/phd_shared/obj/scratch.o"
+  },
   {
     "arguments": [
       "/usr/bin/clang",

@@ -1,14 +1,9 @@
-// Long message attack on sha256
-
-// this program can't attack more than 128bits
-// we make the following modifications:
-
-// TODO
-// 1- store intermediate values in  sha256.c fil
-// 3- check the code is sound
+// Long message attack
 
 
-// define which sha256 to use 
+
+
+
 #include "numbers_shorthands.h"
 #include "hash.h"
 
@@ -34,7 +29,13 @@
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
 #include <mpi.h>
 
-#define TAG_SND_DGST 1 /* send digest tag */
+
+// MPI sending and receiving tags
+#define TAG_DICT_SND 0 /* send digest tag */
+#define TAG_RANDOM_MESSAGE 1
+#define TAG_SND_DGST 2
+#define TAG_MESSAGES_CANDIDATES 3
+
 //---------------------------- UTILITY FUNCTIONS -------------------------------
 
 
@@ -132,7 +133,7 @@ static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
 static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
 {
   // ==========================================================================+
-  // Summary: Given a state. Decide to which server we send it to.             |   
+  // Summary: Given a state. Decide to which server we send it to.             |
   // --------------------------------------------------------------------------+
   // INPUTS:                                                                   |
   // `Mstate` : Array of bytes of the digest.                                  |
@@ -262,7 +263,6 @@ void phase_i_store(size_t server_capacity[]){
 
 
 
-
   /// ----------------- PHASE I: Part 1/2   ------------------------  ///
   // First phase hash an extremely long message
   // M0 M1 ... M_{2^l}, Mi entry will evaluated on the fly
@@ -272,7 +272,6 @@ void phase_i_store(size_t server_capacity[]){
   while (should_NOT_stop) {
     // hash and extract n bits of the digest
     hash_single(state, M);
-    
 
     if ((state[0] & ones) == 0){ /* it is a distinguished point */
       
@@ -295,11 +294,12 @@ void phase_i_store(size_t server_capacity[]){
       /* not the most optimal implementation */
       should_NOT_stop = 0;
       for (size_t i=0; i<NSERVERS; ++i) {
-	/*-----------------------------------------------------------------------*/
-	/* Since we reduce the server capacity by one each time when we add it to*/
-	/* its file. If any server has capacity larger than zero then it means   */
-	/* that we should. continue hashing till all servers capacities are met. */
-	/*-----------------------------------------------------------------------*/  
+	/*--------------------------------------------------------------------*/
+	/* Since we reduce the server capacity by one each time when we add   */
+	/* to its file. If any server has capacity larger than zero then it   */
+	/* means that we should. continue hashing till all servers capacities */
+	/* have been rached.                                                  */
+	/*------------------------------------------------------------------- */
 	/* should_NOT_stop == 0 iff all servers_capacities are 0; */
 	should_NOT_stop |= (server_capacity[i] > 0) ;
       }
@@ -386,7 +386,7 @@ void phase_ii(dict* d,
   // - extra arguments to deal with other servers                              |
   // ==========================================================================+
 
-  size_t nfound_collisions = 0;
+  size_t nfound_collisions_globally = 0;
   // --------------------- INIT MPI & Shared Variables ------------------------|
   int nproc, myrank;
   
@@ -410,8 +410,9 @@ void phase_ii(dict* d,
     // snd_buf ={ dgst1||ctr1, ..., dgst_k||ctr_k}
     // dgst := N bytes of the digest
     // ctr  := (this is a shortcut that allows us not to send the whole message)
-
-    // ---- Part 1: init variables 
+    //-------------------------------------------------------------------------+
+    // ---- Part 1: init variables                                             |
+    //-------------------------------------------------------------------------+
     //    set up a random message and share it with receiving servers
     WORD_TYPE Mstate[NWORDS_STATE];
     /* M = 64bit ctr || 64bit nonce || random value */
@@ -426,16 +427,17 @@ void phase_ii(dict* d,
 
     ctr_pt[0] = 0; /* zeroing counter part */
     ctr_pt[1] = nonce;
-
-    //------- Part 2 : Send the initial input to all receiving servers 
+    //-------------------------------------------------------------------------+
+    //------- Part 2 : Send the initial input to all receiving servers         |
+    //-------------------------------------------------------------------------+
     { /* Send M immediately and clear the memory at the end  */
-      #define FIRST_MESSAGE 0
+
       MPI_Request requests[NSERVERS]; /* they will be used only here  */
       MPI_Status statuses[NSERVERS];
       // how about collective communications? I can't find a simple way using them.
       for (int i=0; i<NSERVERS; ++i) {
 	MPI_Isend(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, 0,
-		   FIRST_MESSAGE, MPI_COMM_WORLD, &requests[i]);
+		   TAG_RANDOM_MESSAGE, MPI_COMM_WORLD, &requests[i]);
       }
       MPI_Waitall(NSERVERS, requests, statuses);
     } /* clear stack variables */
@@ -464,11 +466,12 @@ void phase_ii(dict* d,
     /* set number of generated messages before sending to 0 */
     memset(servers_ctr, 0, sizeof(u32)*NSERVERS); 
 
-
+    //-------------------------------------------------------------------------+
     //------- Part 3 : Generate hashes and send them  -------
+    //-------------------------------------------------------------------------+
     MPI_Buffer_attach(buf_attached, buf_attached_size);
     
-    for(u64 i=0; i < -1; ++i) { /* when do we break? */
+    while(1) { /* when do we break? never! */
       /* Find a message that produces distinguished point */
       find_hash_distinguished( M, Mstate, ones );
 
@@ -508,12 +511,6 @@ void phase_ii(dict* d,
 	/* It is enough to reset the counter. The memroy will be rewritten */  
 	servers_ctr[server_number] = 0;
       }
-      /* a check point to see if the generated hashes were enough */
-      if (i && 0xFFFF == 0){
-	//+ todo fill these lines! 
-	/* Check how many collisions we have found?*/
-	//+ ask to to collect the number founded potential collisions
-      }
     } /* todo why do I stop? it is not specified! */
 
     MPI_Buffer_detach(buf_attached, &buf_attached_size);
@@ -526,18 +523,20 @@ void phase_ii(dict* d,
     return; // au revoir.
   }
   /// else:  ///
-  /// ------ I am a receiving processor, I only probe the dictionary ------  ///
-  // ------- Part 1 : Init receiving buffers of digests and counters -------
+  //---------------------------------------------------------------------------+
+  // ------- I am a receiving processor, I only probe the dictionary      -----|
+  // ------- Part 1 : Init receiving buffers of digests and counters      -----|
+  //---------------------------------------------------------------------------+
 
   /* create file: data/messages/myrank that will hold messages whose hashes */
   /* gives a postivie response when probing the dictionary */
   char file_name[25];
-  snprintf(file_name, sizeof(file_name), "data/messages/%d", myrank );
+  snprintf(file_name, sizeof(file_name), "data/send/messages/%d", myrank );
   FILE* fp = fopen(file_name, "w");
     
   //+ add initial random message buffers
   u8* rcv_buf = (u8*) malloc(one_pair_size
-			     *nproc_snd/*we've more senders*/
+			     *nproc_snd /* we've more senders */
 			     *PROCESS_QUOTA);
     
 
@@ -548,27 +547,32 @@ void phase_ii(dict* d,
   size_t buf_idx = 0;
   size_t msg_idx = 0;
   int flag = 0; /* decide if all messages have been received */
-  int outcount = 0;
+  int outcount = 0; /* MPI_Waitsome  how many buffers have we received so far */
+  size_t nfounded_collisions_locally = 0;
   size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
   u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc);
 
+  //---------------------------------------------------------------------------+
   // --- part 2: receive the initial inputs from all generating processors 
-  #define FIRST_MESSAGE 0
+  //---------------------------------------------------------------------------+
+
+  
   for (int i=0; i<NSERVERS; ++i) 
     MPI_Recv(initial_inputs+i*HASH_INPUT_SIZE,
 	     HASH_INPUT_SIZE,
 	     MPI_UNSIGNED_CHAR,
 	     NSERVERS+i,
-	     FIRST_MESSAGE,
+	     TAG_RANDOM_MESSAGE,
 	     MPI_COMM_WORLD,
 	     statuses);
 
 
-
+  //---------------------------------------------------------------------------+
   // --- Part 3: Receive digests and probe them
+  //---------------------------------------------------------------------------+
   // enclose what's below within while loop to receive multiple times
   // Warning: not correct! nfound_collisions should be shared between all
-  while (needed_collisions > nfound_collisions) {
+  while (needed_collisions > nfound_collisions_globally) {
   //+ receive messages from different processors
   
     for (int i = 0; i<nproc; ++i) {
@@ -593,27 +597,67 @@ void phase_ii(dict* d,
 	//+ if it is positive:
 	//+ reconstruct the messages
 	//+ record message and digest
-	nfound_collisions += lookup_multi_save(d,
-					       &rcv_buf[buf_idx],
-					       &initial_inputs[msg_idx],
-					       PROCESS_QUOTA,
-					       fp);
-
+	nfounded_collisions_locally += lookup_multi_save(d,
+						       &rcv_buf[buf_idx],
+						       &initial_inputs[msg_idx],
+						       PROCESS_QUOTA,
+						       fp);
       } // end treating received messages 
     } // flag == 1 when buffers have been received, thus call mpi_irecv again
   } // end found enough collisions
 
-  //+ todo send the messages to the master!
-  for (int i=0; i<NSERVERS; ++i) {
-    statements
-  }
-  
+  // good job
   free(rcv_buf);
   free(statuses);
   free(requests);
   free(indices);
-  
   fclose(fp);
+
+  //+ todo send the messages to the master!
+  /* allocate buffer for messages that found s.t. their dgst give postivie ans*/
+  
+  size_t snd_buf_size = sizeof(u8)*HASH_INPUT_SIZE*nfounded_collisions_locally;
+  u8* snd_buf = (u8*) malloc(snd_buf_size);
+
+  char msg_file_name[40];
+  /* file name := myrank_t(time_stamp) */
+  snprintf(msg_file_name, sizeof(msg_file_name),
+	   "data/send/messages/%d_t%llu", myrank, (u64) wtime());
+  
+  fp = fopen(msg_file_name, "r");
+  fread(snd_buf, snd_buf_size, 1, fp); /* should matches with the file size */
+  MPI_Send(snd_buf, snd_buf_size, MPI_UNSIGNED_CHAR,
+	   0, /* to the master server */
+	   TAG_MESSAGES_CANDIDATES,
+	   MPI_COMM_WORLD);
+  fclose(fp);
+  
+
+  if (myrank == 0 ){ /* master receives messages */
+    char recv_name[40];
+    MPI_Status status;
+    int rcv_count = 0;
+    /* maximum possible receiving message  */
+    u8* rcv_buf = malloc(sizeof(u8)*needed_collisions);
+
+    
+    for (int i = 0; i<NSERVERS; ++i) {
+      snprintf(recv_name, sizeof(recv_name),
+	       "data/receive/messages/%d_tmp%llu", i, (u64) wtime());
+      fp = fopen(recv_name, "w");
+      MPI_Recv(rcv_buf,
+	       needed_collisions,
+	       MPI_UNSIGNED_CHAR,
+	       i,
+	       TAG_MESSAGES_CANDIDATES,
+	       MPI_COMM_WORLD,
+	       &status);
+      MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &rcv_count);
+      fwrite(rcv_buf, rcv_count, 1, fp);
+      fclose(fp);
+    }
+  }
+
   MPI_Finalize();
   return;
 }
