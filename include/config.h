@@ -39,6 +39,13 @@
 
 /*****************************************************/
 
+/* if each server has a different memory size then their candidates           */
+/* will have a different false positive probability. The following define     */
+/* scale the number according to the false positive. The main obstacle in     */
+/* writing a formula as a macro is I don't know a way to get the ram size     */
+/* macros. maybe a python script will overwrite the definintion below  */
+#define NNEEDED_CND_THIS_SERVER 1000 /* todo write formula to compute it */
+#define MAX_CND_PER_SERVER 1005 /* make a dynamic estimation */
 /*  ceil(log2(NSERVERS)) =  */
 #define NSERVERS 128
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
@@ -63,6 +70,12 @@
 #ifndef LONG_MESSAGE_MPI_CONFIG
 #define LONG_MESSAGE_MPI_CONFIG
 // MPI configurations
+// MPI sending and receiving tags
+#define TAG_DICT_SND 0 /* send digest tag */
+#define TAG_RANDOM_MESSAGE 1
+#define TAG_SND_DGST 2
+#define TAG_MESSAGES_CANDIDATES 3
+#define ARCHIVE_SERVER NSERVERS
 
 #define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements.
 
