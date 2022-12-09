@@ -659,6 +659,7 @@ void archive_receive()
         fflush(fp);
       } // end treating received messages 
     } // flag == 1 when buffers have been received, thus call mpi_irecv again
+    fclose(fp);
 }
 
 
@@ -733,13 +734,18 @@ void phase_ii(dict* d,
     /* generate hashes and send them to a servers */
     sender_process_task(M, Mstate); /* never ends :) */
   }
-  
+
+  //+ todo receive processors
+  //+ load dgsts from file to dictionary
+
   while (myrank < NSERVERS){ /* receiver, repeat infinitely  */ 
     //-------------------------------------------------------------------------+
     // I'm a receiving process: receive hashes, probe them, and send candidates 
     // Process Numbers: [0,  NSERVERS - 1]
     //-------------------------------------------------------------------------+
 
+
+    
     /* Listen to senders till we accumulated enough candidates */
     receiver_process_task(d, myrank, nproc, nproc_snd);
 
@@ -748,6 +754,8 @@ void phase_ii(dict* d,
   }
 
   while (myrank == NSERVERS) /* I'm THE archive*/
+    //+ todo truncate the messages file if it not multiple to HASH_INPUT_SIZE
+    //+ this happen if the server was shut down during writing
     archive_receive();
       
 
