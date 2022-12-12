@@ -133,7 +133,7 @@ int dict_add_element_to(dict* d, u8* state){
 
 
     ++idx;
-    // reduce mod n->slots
+    // reduce mod n->slots //
     if (idx > d->nslots)
       idx = 0;
   }
