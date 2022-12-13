@@ -765,14 +765,42 @@ void phase_ii(dict* d,
   return;
 }
 
+
+// ------------------- Auxililary functions phase iii --------------------------
 //+ todo complete these functions
-size_t get_file_size(FILE *fp); /* return file size in bytes */
-				   
+size_t get_file_size(FILE *fp){
+  /* return file size in bytes */
+  fseek(fp, 0L, SEEK_END);
+  size_t size = ftell(fp);
+  rewind(fp);
+  return size;
+} 
+
+
 /* 1 if  dgst1 > dgst2, -1 if dgst1<dgist2, 0 if dgst1==dgst2 */
-int cmp_dgst(void const* dgst1, void const* dgst2);
+int cmp_dgst(void const* dgst1, void const* dgst2){
+  return memcmp(dgst1, dgst2, N); /* comparison order: low bytes first */
+}
+
 /* return index of key if it is found, -1 otherwise*/
-size_t linear_search(u8 *key, u8 *array, size_t array_len, size_t key_len);
-void print_byte_array(u8* array, size_t nbytes);
+size_t linear_search(u8 *key, u8 *array, size_t array_len, size_t key_len)
+{
+  for (size_t i=0; i<array_len; i += key_len) {
+    if ( 0 == memcmp(key, &array[i], key_len) )
+      return i;
+  }
+  
+  return -1; /* not found */
+}
+
+
+void print_byte_array(u8* array, size_t nbytes)
+{
+  for (size_t i=0; i<nbytes; ++i) 
+    printf("0x%02x, ",  array[i]);
+  puts("");
+}
+
 // phase iii
 //+ master server has all the potential collisions messages and their digest
 //+ a python script will combine them into a single file
