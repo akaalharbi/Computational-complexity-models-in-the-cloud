@@ -55,7 +55,6 @@ typedef struct  __attribute__((aligned(ALIGNMENT))) {
 //-----------------------------------------------------//
 
 dict *dict_new(size_t nslots);
-void dict_init(dict* d);
 void dict_free(dict* d);
 size_t  dict_memory(size_t nelements);
 int dict_add_element_to(dict *d, u8 *state);

@@ -331,17 +331,15 @@ void phase_i_store(size_t server_capacity[]){
 }
 
 
-void phase_i_load(dict *d, size_t fp_nhashes, FILE *fp)
+void load_file_to_dict(dict *d, FILE *fp)
 {
   // ==========================================================================+
-  // Summary: Load hashes from the file *fp, and store them in dict *d         |
+  // Summary: Load hashes from the file *fp, and try to store them in dict *d  |
+  // Note: dict d has the right to reject inserting element.                   |
   // --------------------------------------------------------------------------+
   // INPUTS:                                                                   |
   // `*d`: Dictionary that will keep elements from *fp.                        |
   // `*fp` : File contain number of hashes larger than nelements               |
-  // `fp_nhashes`  : The nhashes available in the file.                        |
-  // `mem_nhashes` : The max number of hashes we are allowed to store in this  |
-  //                   machine. The dictionary *d may not accepts all elements.|
   // ==========================================================================+
 
 
@@ -353,7 +351,7 @@ void phase_i_load(dict *d, size_t fp_nhashes, FILE *fp)
 
   u8 stream_pt[N-DEFINED_BYTES];
   /* add as many hashes as possible */
-  for (;; fp_nhashes--){
+  while ( !feof(fp) ){
     fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp);
     /* it adds the hash iff nprobes <= NPROBES_MAX */
     dict_add_element_to(d, stream_pt); 
@@ -483,7 +481,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   //---------------------------------------------------------------------------+
   // ------- I am a receiving processor, I only probe the dictionary      -----|
   // Receive messages till we found at least NNEEDED_CND_THIS_SERVER messages  |
-  // candidates. Save all candidates in a file called ?????                    |
+  // candidates. Send candidates to archive process.                           |
   //---------------------------------------------------------------------------+
   // nproc_snd: number of sender processes
   // nproc : number of all processes 
@@ -738,12 +736,19 @@ void phase_ii(dict* d,
   //+ todo receive processors
   //+ load dgsts from file to dictionary
 
-  while (myrank < NSERVERS){ /* receiver, repeat infinitely  */ 
+  while (myrank < NSERVERS){ /* receiver, repeat infinitely  */
+    /* Firstly load hashes to the dictionary */
+    dict* d = dict_new(NSLOTS_MY_NODE);
+    char file_name[40];
+    snprintf(file_name, 40, "data/receive/digests/%d", myrank);
+    FILE* fp = fopen(file_name, "r");
+    load_file_to_dict(d, fp);
+    fclose(fp);
+    
     //-------------------------------------------------------------------------+
     // I'm a receiving process: receive hashes, probe them, and send candidates 
     // Process Numbers: [0,  NSERVERS - 1]
     //-------------------------------------------------------------------------+
-
 
     
     /* Listen to senders till we accumulated enough candidates */
