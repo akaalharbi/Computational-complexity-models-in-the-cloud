@@ -260,7 +260,7 @@
   #define VAL_SIZE 4 /* byte */
   #define VAL_TYPE u32 /* unsigned char */
   // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE SIMD_SET1_EPI21
+  #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
   #define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
 
 #endif // define VAL_SIZE
