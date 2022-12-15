@@ -10,13 +10,16 @@
 //                                                                            |
 // 1- Hash function generic setup                                             |
 // 2- Long message attack main parameters                                     |
-// 3- Configurations affected by MPI4                                          |
+// 3- Configurations affected by MPI                                          |
 // 4- SIMD configurations                                                     |
+// -- a discover avx vector length                                            |
+// -- set types for the vector                                                |
 // ---------------------------------------------------------------------------+
 
 #ifndef LONG_MESSAGE_CONFIG
 #define LONG_MESSAGE_CONFIG
 #include <stdint.h>
+#include <stdio.h>
 #include "numbers_shorthands.h"
 #include "confg_math_func.h"
 
@@ -103,6 +106,93 @@
 #endif // LONG_MESSAGE_MPI_CONFIG
 
 
+
+
+
+
+
+
+
+
+
+
+
+// -------------------------------------------------------------------------+
+//                           3- SIMD configurations                         |
+// -------------------------------------------------------------------------+
+//                           Part a: Find Vector Size                       |
+// -------------------------------------------------------------------------+
+#ifdef __AVX512F__ /* F for Foundation */
+#define REG_TYPE __m512i
+#define AVX_SIZE  512
+#define ALIGNMENT 64
+// Number of elements per simd register
+#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE))
+
+
+#define SIMD_LOAD_SI _mm512_load_si512
+#define SIMD_TEST _mm512_test_epi64_mask
+
+#define SIMD_SET1_EPI32 _mm512_set1_epi32
+#define SIMD_SET1_EPI16 _mm512_set1_epi16
+
+// todo check these 
+#define SIMD_CMP_EPI32 _mm512_cmpeq_epi32_mask
+#define SIMD_CMP_EPI16 _mm512_cmpeq_epi16_mask
+
+#define SIMD_SET1_EPI8 _mm_set1_epi8
+#define SIMD_CMP_EPI8 _mm_cmpeq_epi8
+
+#elifdef __AVX2__
+#define REG_TYPE __m256i
+#define AVX_SIZE  256
+#define ALIGNMENT 32
+#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE))
+
+
+#define SIMD_LOAD_SI _mm256_load_si256
+#define SIMD_TEST _mm256_testz_si256
+
+
+#define SIMD_SET1_EPI32 _mm256_set1_epi32
+#define SIMD_SET1_EPI16 _mm256_set1_epi16
+
+#define SIMD_CMP_EPI32 _mm256_cmpeq_epi32
+#define SIMD_CMP_EPI16 _mm256_cmpeq_epi16
+
+// we better avoid this case :(
+/* #define SIMD_SET1_EPI8 _mm256_set1_epi8 */
+/* #define SIMD_CMP_EPI8 _mm256_cmpeq_epi8 */
+
+#elifdef __SSE__ &&__SSE4_1__
+#define REG_TYPE __m128i
+#define AVX_SIZE  128
+#define ALIGNMENT 16
+#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE))
+
+#define SIMD_LOAD_SI _mm_load_si128
+#define SIMD_TEST _mm_testz_si128 /* as fast as RER C */
+
+
+#define SIMD_SET1_EPI32 _mm_set1_epi32
+#define SIMD_SET1_EPI16 _mm_set1_epi16
+
+#define SIMD_CMP_EPI32 _mm_cmpeq_epi32
+#define SIMD_CMP_EPI16 _mm_cmpeq_epi16
+
+#define SIMD_SET1_EPI8 _mm_set1_epi8
+#define SIMD_CMP_EPI8 _mm_cmpeq_epi8
+
+
+
+#else
+ #error "Please consider buying a modern device"
+#endif // end avx testing 
+
+// -------------------------------------------------------------------------+
+//                     Part b: Set the best vector type                     |
+// -------------------------------------------------------------------------+
+
 // @todo check if the below comments need to be removed 
 
 // Assumptions that need to be changed manually
@@ -125,9 +215,9 @@
 /* Every thing will be stored as idx */
 // #if N*8 <= L this case
 //
-// -------------------------------------------------------------------------+
-//                           3- SIMD configurations                         |
-// -------------------------------------------------------------------------+
+
+
+
 // define intrinsics based on the the available max register size
 // @todo start here 
 #if N <= L_IN_BYTES
@@ -140,16 +230,19 @@
   #define VAL_SIZE 1 /* byte */
   #define VAL_TYPE u8  /* unsigned char */
 
-  // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE _mm256_set1_epi8
-  #define SIMD_CMP_VALTYPE _mm256_cmpeq_epi8
+  #if __AVX512F__
+  #error "we have an issues with comparing u8 words using avx512 in one instruction"
+  #endif 
+   // SIMD instructions has to be adapted according to the size
+  #define SIMD_SET1_VALTYPE  SIMD_SET1_EPI8
+  #define SIMD_CMP_VALTYPE SIMD_CMP_EPI8
 
 #elif (N < L_IN_BYTES + 2) && (N >= L_IN_BYTES + 1) 
-  #define VAL_SIZE 2 /* byte */
+  #define VAL_SIZE 2 /N* byte */
   #define VAL_TYPE u16 /* unsigned char */
   // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE _mm256_set1_epi16
-  #define SIMD_CMP_VALTYPE _mm256_cmpeq_epi16
+  #define SIMD_SET1_VALTYPE SIMD_SET1_EPI16
+  #define SIMD_CMP_VALTYPE SIMD_CMP_EPI16
 
 
 // Typical condition when in terms of MAX_VAL_SIZE
@@ -159,16 +252,16 @@
   #define VAL_SIZE 4 /* byte */
   #define VAL_TYPE u32 /* unsigned char */
   // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE _mm256_set1_epi32
-  #define SIMD_CMP_VALTYPE _mm256_cmpeq_epi32
+  #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
+  #define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
 
 
 #else /* The MAX_VAL_SIZE */
   #define VAL_SIZE 4 /* byte */
   #define VAL_TYPE u32 /* unsigned char */
   // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE _mm256_set1_epi32
-  #define SIMD_CMP_VALTYPE _mm256_cmpeq_epi32
+  #define SIMD_SET1_VALTYPE SIMD_SET1_EPI21
+  #define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
 
 #endif // define VAL_SIZE
 
@@ -177,22 +270,7 @@
 
 
 
-// depending on avx register length, on my laptop 256
-//  Change them together, @todo write a code to automate writing these values
-// @todo automate this 
-// -------------------------------------------- +
-#define AVX_SIZE  256                        // |
-#define ALIGNMENT 32                         // |
-// Number of elements per simd register         |
-#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE))  // |
-// -------------------------------------------- +
-
-
-
-
-
-#endif
-
+#endif 
 
 
 

@@ -185,7 +185,9 @@ int dict_has_elm(dict *d, u8 *state)
   // we can remove one of the above variables 
   //+ todo we need to adjust simd instruction according to the type 
   __m256i dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->values[h]));
-  __m256i lookup_key_simd = SIMD_SET1_VALTYPE(val); // (val, val, ..., val) 8times
+  // val:u32 or val:16 depending on the N and L, as 32 or 16 will be stored
+  // and the other bits will be stored as index thus the dependency on L.
+  __m256i lookup_key_simd = SIMD_SET1_VALTYPE(val); // (val, val, ..., val) 
   //__m256i zero_vect = _mm256_setzero_si256(); // no need for this with buckets
   __m256i comp_vect_simd;
 
@@ -206,15 +208,15 @@ int dict_has_elm(dict *d, u8 *state)
     /*  Does key equal one of the slots?              */
     //------------------------------------------------//
     comp_vect_simd = SIMD_CMP_VALTYPE(lookup_key_simd, dict_keys_simd);
-    is_key_found = 1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd);
+    is_key_found = (0 == _mm256_testz_si256(comp_vect_simd, comp_vect_simd));
 
-    #ifdef VERBOSE_LEVEL
-    printf("step=%d, h=%lu, nslots=%lu\n", step, h, d->nslots);
-    print_m25i(dict_keys_simd, "dict_keys_simd");
-    print_m25i(lookup_key_simd, "lookup_key_simd");
-    print_m25i(comp_vect_simd, "compare with keys");
-    printf("is_key_found? %d\n", is_key_found);
-    #endif
+    /* #ifdef VERBOSE_LEVEL */
+    /* printf("step=%d, h=%lu, nslots=%lu\n", step, h, d->nslots); */
+    /* print_m25i(dict_keys_simd, "dict_keys_simd"); */
+    /* print_m25i(lookup_key_simd, "lookup_key_simd"); */
+    /* print_m25i(comp_vect_simd, "compare with keys"); */
+    /* printf("is_key_found? %d\n", is_key_found); */
+    /* #endif */
     
 
     if (is_key_found) {
@@ -263,21 +265,22 @@ int dict_has_elm(dict *d, u8 *state)
     // Linear probing
     // update the index for keys load
     idx += d->nslots_per_bucket; // move to the next bucket
+
     if (idx >= d->nslots)
       idx = 0;
 
-    #ifdef VERBOSE_LEVEL
-    print_m25i(dict_keys_simd, "dict_keys_simd");
-    print_m25i(zero_vect, "zero_vect");
-    print_m25i(comp_vect_simd, "compare with zeros");
-    printf("has empty slot? %d\n", has_empty_slot);
-    #endif
+    /* #ifdef VERBOSE_LEVEL */
+    /* print_m25i(dict_keys_simd, "dict_keys_simd"); */
+    /* print_m25i(zero_vect, "zero_vect"); */
+    /* print_m25i(comp_vect_simd, "compare with zeros"); */
+    /* printf("has empty slot? %d\n", has_empty_slot); */
+    /* #endif */
 
 
-    #ifdef VERBOSE_LEVEL
-    print_m25i(dict_keys_simd, "fresh dict_keys_simd");
-    printf("has empty slot? %d\n", has_empty_slot);
-    #endif
+    /* #ifdef VERBOSE_LEVEL */
+    /* print_m25i(dict_keys_simd, "fresh dict_keys_simd"); */
+    /* printf("has empty slot? %d\n", has_empty_slot); */
+    /* #endif */
     
     #ifdef NPROBES_COUNT
     ++(d->nprobes_lookup);
