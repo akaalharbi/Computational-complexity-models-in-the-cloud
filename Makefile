@@ -1,9 +1,15 @@
 #CC=clang
 CC=gcc
-LDLIBS  = -lm
-LDFLAGS = -fopenmp
-INCLUDE = include
-INC = -I$(INCLUDE)
+LDLIBS  = -lm -lmpi
+LDFLAGS = -fopenmp -pthread
+MPI_INCLUDE = -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include
+INCLUDE = -Iinclude $(MPI_INCLUDE)
+
+
+# mpicc -show
+#gcc -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -pthread -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
+
+
 
 ifeq ($(CC), clang)
 	CFLAGS = -g -O3 -fopenmp -Wall -march=native -msha  #-Rpass-analysis=loop-vectorize -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Xanalyzer -analyzer-constraints=z3
@@ -43,7 +49,7 @@ $(info CC=$(CC))
 # BUILD OBJECT FILES IN OBJECTDIR directory
 $(OBJDIR)/%.o: $(SRC)/%.c
 	mkdir -p '$(@D)'
-	$(CC) -c $< $(INC) $(CFLAGS)  -o $@
+	$(CC) -c $< $(INCLUDE) $(CFLAGS)  -o $@
 
 
 
