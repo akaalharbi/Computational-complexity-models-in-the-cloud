@@ -53,6 +53,14 @@ OBJECTS := $(FILENAMES:$(SRC)/%.c=$(OBJDIR)/%.o)
 $(OBJDIR)/%.o: $(SRC)/%.c
 	mkdir -p '$(@D)'
 	$(CC) -c $< $(INCLUDE) $(CFLAGS)  -o $@
+ 
+
+
+
+
+
+
+
 
 
 

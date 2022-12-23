@@ -8,6 +8,19 @@
 
 # Part 1: Basic Flags in the compile and linking
 CC=gcc
+<<<<<<< HEAD
+=======
+LDLIBS  = -lm -lmpi
+LDFLAGS = -fopenmp -pthread
+MPI_INCLUDE = -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include
+INCLUDE = -Iinclude $(MPI_INCLUDE)
+
+
+# mpicc -show
+#gcc -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi -I/usr/lib/x86_64-linux-gnu/openmpi/include -pthread -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
+
+
+>>>>>>> 099d30de77ed9e49181e5e8d22793682f5497bca
 
 # Doesn't work
 # MPI_INCLUDE := $(shell mpicc -shome:compile | grep -e . )
@@ -53,6 +66,17 @@ OBJECTS := $(FILENAMES:$(SRC)/%.c=$(OBJDIR)/%.o)
 $(OBJDIR)/%.o: $(SRC)/%.c
 	mkdir -p '$(@D)'
 	$(CC) -c $< $(INCLUDE) $(CFLAGS)  -o $@
+<<<<<<< HEAD
+ 
+=======
+>>>>>>> 099d30de77ed9e49181e5e8d22793682f5497bca
+
+
+
+
+
+
+
 
 
 
