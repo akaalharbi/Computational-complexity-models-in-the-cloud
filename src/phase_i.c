@@ -144,7 +144,7 @@ void phase_i_store(size_t server_capacity[]){
   
   for (size_t i=0; i<NSERVERS; ++i) {
     //edit file name according to server i
-    snprintf(file_name, sizeof(file_name), "data/upload/%lu", i);
+    snprintf(file_name, sizeof(file_name), "data/send/%lu", i);
     printf("file_name=%s\n", file_name);
 
     data_to_servers[i] = fopen(file_name, "w");
@@ -227,3 +227,8 @@ void phase_i_store(size_t server_capacity[]){
   printf("done in %fsec, ", elapsed);
 }
 
+int main(){
+  size_t servers_capacity[NSERVERS] = {NSLOTS_MY_NODE};
+  phase_i_store(servers_capacity);
+  
+}

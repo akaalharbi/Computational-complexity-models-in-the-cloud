@@ -644,3 +644,5 @@ void print_byte_array(u8* array, size_t nbytes)
     printf("0x%02x, ",  array[i]);
   puts("");
 }
+
+int main() {}

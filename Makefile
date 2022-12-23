@@ -1,21 +1,32 @@
-#CC=clang
+##############################################
+#             Table of Contents              #
+# 1: Basic Flags in the compile and linking  #
+# 2: where to put and to find files?         #
+# 3: Compiling and Linking                   #
+##############################################
+
+
+# Part 1: Basic Flags in the compile and linking
 CC=gcc
-LDLIBS  = -lm
-LDFLAGS = -fopenmp
-INCLUDE = include
-INC = -I$(INCLUDE)
 
-ifeq ($(CC), clang)
-	CFLAGS = -g -O3 -fopenmp -Wall -march=native -msha  #-Rpass-analysis=loop-vectorize -Rpass=loop-vectorize -Rpass-missed=loop-vectorize -Xanalyzer -analyzer-constraints=z3
-else
-	CFLAGS  = -g -O3 -fopenmp -Wall -march=native -msha -std=c11 -fanalyzer -fopt-info-vec -fopt-info-omp-vec-optimized-missed #-DVERBOSE_LEVEL=2 
-endif
+# Doesn't work
+# MPI_INCLUDE := $(shell mpicc -shome:compile | grep -e . )
+# MPI_LINK := $(shell mpicc -showme:link)
 
+
+MPI_INCLUDE = -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
+MPI_LINK = -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
+
+INCLUDE = -Iinclude $(MPI_INCLUDE)
+LDLIBS  =  $(MPI_LINK)
+LDFLAGS = -fopenmp -pthread
+# note: -fanalyzer doesn't report when -flto is enabled
+CFLAGS = -flto -O3 -fopenmp -Wall -march=native -msha  -std=c11 -fopt-info-all -fanalyzer
 #CFLAGS += -DVERBOSE_LEVEL=2 
 
 
-#-DVERBOSE_LEVEL=2 
 
+# Part 2: where to put and to find files?
 # store *.o files in obj/
 OBJDIR = obj
 
@@ -32,46 +43,66 @@ FILENAMES +=  $(wildcard $(SRC_UTIL)/*.c)
 # note that it will keep the directory structure
 OBJECTS := $(FILENAMES:$(SRC)/%.c=$(OBJDIR)/%.o)
 
-# save objects in 
-#OBJECTS := $(addprefix $(OBJDIR)/, $(OBJECTS))
-# $(info FILENAMES = $(FILENAMES))
-# $(info OBJECTS = $(OBJECTS))
-$(info CC=$(CC))
-# # list of all *.o
 
+
+
+
+# Part 3: Compiling and Linking
 
 # BUILD OBJECT FILES IN OBJECTDIR directory
 $(OBJDIR)/%.o: $(SRC)/%.c
 	mkdir -p '$(@D)'
-	$(CC) -c $< $(INC) $(CFLAGS)  -o $@
+	$(CC) -c $< $(INCLUDE) $(CFLAGS)  -o $@
+ 
 
 
 
 
 
 
-# todo make complete creating two targets
-TARGETS = long_message_attack verify_hash
 
 
 
-all: long_message_attack
+
+
+TARGETS = phase_i phase_ii phase_iii
+
+# REMOVE TARGETS FROM $(OBJECTS)
+TARGET_OBJECTS = $(addprefix $(OBJDIR)/,  $(addsuffix .o, $(TARGETS)) )
+COMMON_OBJECTS = $(filter-out $(TARGET_OBJECTS), $(OBJECTS) )
+
+$(info common objects = $(COMMON_OBJECTS))
+
+all: $(TARGETS)
 	mkdir -p obj
 	mkdir -p data
-	mkdir -p data/upload
-	mkdir -p data/messages
+	mkdir -p data/send
+	mkdir -p data/send/digests
+	mkdir -p data/send/messages
+	mkdir -p data/receive
+	mkdir -p data/receive/digests
+	mkdir -p data/receive/messages
 	mkdir -p data/stats
-	mkdir -p data/received
 
 
 
-# remove all $(TARGETS) members from dependencies
-# and add long_message_attack.o as a dependency
-long_message_attack: $(OBJDIR)/long_message_attack.o $(filter-out $(addsuffix .o, $(TARGETS)), $(OBJECTS) )
-	$(CC)  $? $(LDFLAGS) $(LDLIBS) -o $@ 
+
+# we wish to build X:
+# 1- remove all $(TARGETS) members from dependencies
+# 2- add X.o as a dependency
+
+
+phase_i: $(OBJDIR)/phase_i.o $(COMMON_OBJECTS)
+	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
+
+phase_ii: $(OBJDIR)/phase_ii.o $(COMMON_OBJECTS)
+	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
+
+phase_iii: $(OBJDIR)/phase_iii.o $(COMMON_OBJECTS)
+	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 
 .PHONY: clean
 clean:
 	rm -f $(OBJECTS)
-	rm -f long_message_attack
+	rm -f $(TARGETS)

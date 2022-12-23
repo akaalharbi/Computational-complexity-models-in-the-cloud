@@ -172,3 +172,6 @@ void phase_iii() /* single machine */
 
   } // end parallel region
 } // quit the function
+
+
+int main(){}

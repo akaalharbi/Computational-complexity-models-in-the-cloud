@@ -1,77 +1,32 @@
 [
   {
     "arguments": [
-      "/usr/bin/clang",
-      "-c",
-      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
-	"-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
-	"-L/usr/lib/x86_64-linux-gnu/openmpi/lib",
-      "-Iinclude",	
-      "-g",
-      "-O3",
-      "-fopenmp",
-      "-Wall",
-      "-march=native",
-      "-msha",
-      "-o",
-      "obj/long_message_attack.o",
-      "src/long_message_attack.c",
-    ],
-    "directory": "/home/ifrit/phd_shared",
-    "file": "/home/ifrit/phd_shared/src/long_message_attack.c",
-    "output": "/home/ifrit/phd_shared/obj/long_message_attack.o"
-  },
-  
-{
-    "arguments": [
-      "/usr/bin/clang",
-      "-c",
-      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
-	"-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
-	"-L/usr/lib/x86_64-linux-gnu/openmpi/lib",
-      "-Iinclude",	
-      "-g",
-      "-O3",
-      "-fopenmp",
-      "-Wall",
-      "-march=native",
-      "-msha",
-      "-o",
-      "obj/long_message_attack.o",
-      "src/long_message_attack.c",
-    ],
-    "directory": "/home/ifrit/phd_shared",
-    "file": "/home/ifrit/phd_shared/src/scratch.c",
-    "output": "/home/ifrit/phd_shared/obj/scratch.o"
-},
-    {
-    "arguments": [
-      "/usr/bin/clang",
-      "-c",
-      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
-	"-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
-	"-L/usr/lib/x86_64-linux-gnu/openmpi/lib",
-      "-Iinclude",	
-      "-g",
-      "-O3",
-      "-fopenmp",
-      "-Wall",
-      "-march=native",
-      "-msha",
-      "-o",
-      "obj/long_message_attack.o",
-      "src/long_message_attack.c",
-    ],
-    "directory": "/home/ifrit/phd_shared",
-    "file": "/home/ifrit/phd_shared/src/phase_ii.c",
-    "output": "/home/ifrit/phd_shared/obj/phase_ii.o"
-  },
-
-  {
-    "arguments": [
-      "/usr/bin/clang",
+      "/usr/bin/gcc",
       "-c",
       "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-o",
+      "obj/phase_i.o",
+      "src/phase_i.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/phase_i.c",
+    "output": "/home/ifrit/phd_shared/obj/phase_i.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
       "-g",
       "-O3",
       "-fopenmp",
@@ -88,9 +43,11 @@
   },
   {
     "arguments": [
-      "/usr/bin/clang",
+      "/usr/bin/gcc",
       "-c",
       "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
       "-g",
       "-O3",
       "-fopenmp",
@@ -98,18 +55,20 @@
       "-march=native",
       "-msha",
       "-o",
-      "obj/sha256.o",
-      "src/sha256.c"
+      "obj/hash.o",
+      "src/hash.c"
     ],
     "directory": "/home/ifrit/phd_shared",
-    "file": "/home/ifrit/phd_shared/src/sha256.c",
-    "output": "/home/ifrit/phd_shared/obj/sha256.o"
+    "file": "/home/ifrit/phd_shared/src/hash.c",
+    "output": "/home/ifrit/phd_shared/obj/hash.o"
   },
   {
     "arguments": [
-      "/usr/bin/clang",
+      "/usr/bin/gcc",
       "-c",
       "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
       "-g",
       "-O3",
       "-fopenmp",
@@ -126,9 +85,11 @@
   },
   {
     "arguments": [
-      "/usr/bin/clang",
+      "/usr/bin/gcc",
       "-c",
       "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
       "-g",
       "-O3",
       "-fopenmp",
@@ -145,9 +106,11 @@
   },
   {
     "arguments": [
-      "/usr/bin/clang",
+      "/usr/bin/gcc",
       "-c",
       "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
       "-g",
       "-O3",
       "-fopenmp",
@@ -164,9 +127,11 @@
   },
   {
     "arguments": [
-      "/usr/bin/clang",
+      "/usr/bin/gcc",
       "-c",
       "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
       "-g",
       "-O3",
       "-fopenmp",
@@ -180,5 +145,47 @@
     "directory": "/home/ifrit/phd_shared",
     "file": "/home/ifrit/phd_shared/src/util/util_char_arrays.c",
     "output": "/home/ifrit/phd_shared/obj/util/util_char_arrays.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-o",
+      "obj/phase_ii.o",
+      "src/phase_ii.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/phase_ii.c",
+    "output": "/home/ifrit/phd_shared/obj/phase_ii.o"
+  },
+  {
+    "arguments": [
+      "/usr/bin/gcc",
+      "-c",
+      "-Iinclude",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include",
+      "-I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi",
+      "-g",
+      "-O3",
+      "-fopenmp",
+      "-Wall",
+      "-march=native",
+      "-msha",
+      "-o",
+      "obj/phase_iii.o",
+      "src/phase_iii.c"
+    ],
+    "directory": "/home/ifrit/phd_shared",
+    "file": "/home/ifrit/phd_shared/src/phase_iii.c",
+    "output": "/home/ifrit/phd_shared/obj/phase_iii.o"
   }
 ]

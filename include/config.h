@@ -51,6 +51,8 @@
 #define L 34 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
+
+
 // sanity check
 #if N > WORD_SIZE*NWORDS_DIGEST
   #error "you are trying to attack more bits than the hash function provides"
@@ -60,21 +62,22 @@
 
 
 // -------------------------------------------------------------------------+
-//                     3- Configurations affected by MPI                    |
+//                     3- Configurations effected by MPI                    |
 // -------------------------------------------------------------------------+
 // lines tagged with @python will be edited by a script                     |
 // -------------------------------------------------------------------------+
 #define MAX_VAL_SIZE 32 // we are not going to hold more than 32 bits
 // nbits are zero, this will be defined accordint to the send latency
 #define DIFFICULTY 4 
-#define NSERVERS 128 /* edit manually */
+#define NSERVERS 2 /* edit manually */
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
 #define DEFINED_BYTES CEILING(DEFINED_BITS, 8) 
 
 /* nhashes per server, we take the maximum */
-#define NHASHES (1LL<<35) /* phase i will generate NSERVES*NHASHES hashes */
+#define NHASHES (1LL<<32) /* phase i will generate NSERVES*NHASHES hashes */
+#define NSLOTS_MY_NODE (NHASHES>>1) // PYTHON SHOULD DO THIS 
 
 /* how big is our counter */
 #define CTR_TYPE u64
@@ -100,6 +103,7 @@
 #define TAG_SND_DGST 2
 #define TAG_MESSAGES_CANDIDATES 3
 #define ARCHIVE_SERVER NSERVERS
+// WHAT IS BUFF_SIZE? It doesn't seem to be used!
 #define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
 #define PROCESS_QUOTA 100 // i.e. send 10 digests to each server @by_hand
 
@@ -143,7 +147,7 @@
 #define SIMD_SET1_EPI8 _mm_set1_epi8
 #define SIMD_CMP_EPI8 _mm_cmpeq_epi8
 
-#elifdef __AVX2__
+#elif defined(__AVX2__)
 #define REG_TYPE __m256i
 #define AVX_SIZE  256
 #define ALIGNMENT 32
@@ -164,7 +168,7 @@
 /* #define SIMD_SET1_EPI8 _mm256_set1_epi8 */
 /* #define SIMD_CMP_EPI8 _mm256_cmpeq_epi8 */
 
-#elifdef __SSE__ &&__SSE4_1__
+#elif defined(__SSE4_1__)
 #define REG_TYPE __m128i
 #define AVX_SIZE  128
 #define ALIGNMENT 16
@@ -182,8 +186,6 @@
 
 #define SIMD_SET1_EPI8 _mm_set1_epi8
 #define SIMD_CMP_EPI8 _mm_cmpeq_epi8
-
-
 
 #else
  #error "Please consider buying a modern device"
