@@ -41,7 +41,7 @@ void human_format(char * target, uint64_t n) {
 }
 
 
-void print_char(char* l, size_t len){
+void print_char(unsigned char* l, size_t len){
   printf("0x");
   for (size_t i = 0; i<len; ++i)
     printf("%02x",(unsigned char) l[i]);
@@ -49,20 +49,20 @@ void print_char(char* l, size_t len){
 }
 
 
-unsigned char* long_message_zeros(size_t n_of_bits){
-  /*     DESCRIPTION        */
-  /// Create array of zeros
-  /// input: n_of_bits: how many bits the output size should been
-  /// output: array of 0 bytes that has `n_of_bits` bits
-  /// e.g. input := 9, we can accommedate 9 bits in two bytes
-  size_t n_of_bytes = (size_t) ceil(n_of_bits/8.0);
-  unsigned char* A = (unsigned char *) malloc(sizeof(unsigned char) * n_of_bytes);
+/* unsigned char* long_message_zeros(size_t n_of_bits){ */
+/*   /\*     DESCRIPTION        *\/ */
+/*   /// Create array of zeros */
+/*   /// input: n_of_bits: how many bits the output size should been */
+/*   /// output: array of 0 bytes that has `n_of_bits` bits */
+/*   /// e.g. input := 9, we can accommedate 9 bits in two bytes */
+/*   size_t n_of_bytes = (size_t) ceil(n_of_bits/8.0); */
+/*   unsigned char* A = (unsigned char *) malloc(sizeof(unsigned char) * n_of_bytes); */
   
-  for (size_t i = 0; i<n_of_bytes; ++i)
-    A[i] = 0;
+/*   for (size_t i = 0; i<n_of_bytes; ++i) */
+/*     A[i] = 0; */
 
-  return A;
-}
+/*   return A; */
+/* } */
 
 
 unsigned char* create_radom_byte_array(int n_of_bytes){

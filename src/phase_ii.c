@@ -611,15 +611,6 @@ void phase_ii(dict* d,
 
 
 // ------------------- Auxililary functions phase iii --------------------------
-//+ todo complete these functions
-size_t get_file_size(FILE *fp){
-  /* return file size in bytes */
-  fseek(fp, 0L, SEEK_END);
-  size_t size = ftell(fp);
-  rewind(fp);
-  return size;
-} 
-
 
 /* 1 if  dgst1 > dgst2, -1 if dgst1<dgist2, 0 if dgst1==dgst2 */
 int cmp_dgst(void const* dgst1, void const* dgst2){
