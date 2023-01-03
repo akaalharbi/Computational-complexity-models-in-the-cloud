@@ -91,16 +91,19 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, WORD_TYPE state[NWORDS_STATE])
 	SEEK_SET);
   
   fread(state, WORD_SIZE, NWORDS_STATE, fp);
-
+  puts("done with states reading");
   fclose(fp);
 
   fp = fopen("data/counters", "r");
-  char* tmp = (char*)malloc(sizeof(char)*10);
+  puts("opened the counter file");
+  char* tmp = (char*)malloc(sizeof(char)*30);
   char* endptr; // for strtoull
   tmp = "";
-  while (fgets(tmp, 10, fp) != NULL) {
+  while (fgets(tmp, 30, fp) != NULL) {
+    puts("inside while");
     *msg_ctr = strtoull(tmp, &endptr, 10);
     tmp = "";
+    
   }
   printf("Loaded from disk: counter=%llu\n", *msg_ctr);
   
@@ -144,7 +147,7 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
   /// 1- INIT numerical and bytes variables:
   /* phase will rehash the long message again in parallel */
   /* here we define how many parllel processors in phase iii */
-  size_t ncores = 14; 
+  //size_t ncores = 14; // deadweight
   size_t k =  0; // server index
   int should_NOT_stop = 1;
   size_t nhashes_stored = 0; // 
@@ -206,8 +209,7 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
 
   // Init coutners before the beginning of the attack
   //interval = nhashes_stored / ncores;
-  printf("interval=%ld, nhashes_stores=%ld, ncores=%ld\n",
-	 interval, nhashes_stored, ncores);
+  printf("interval=%ld, nhashes_stores=%ld\n", interval, nhashes_stored);
   nhashes_stored = 0; // we have not recorded any hash yet
 
 
@@ -226,8 +228,9 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
     // hash and extract n bits of the digest
     hash_single(state, M);
     msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
-    // @todo remove the stupid condition
-    if ( 1 || (state[0] & ones) == 0){ /* it is a distinguished point */
+    /* print_char(M, 64); */
+
+    if ( (state[0] & ones) == 0){ /* it is a distinguished point */
 
       /* Decide which server is responsible for storing this digest */
       k = to_which_server((u8*) state);
@@ -250,6 +253,8 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
 
       // + save states after required amount of intervals
       if (nhashes_stored % interval == 0) {
+        printf("M=");
+
 	end = wtime(); /*  for progress report*/
 	/* FILE* states_file = fopen(states_file_name, "a"); */
 	
@@ -264,7 +269,7 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
 	printf("Generating %lu distinguished points took %0.2fsec DIFFICULTY=%d\n",
 	       interval, end - start, DIFFICULTY);
 
-	elapsed += end - start; 
+	// elapsed += end - start; 
 	start = wtime();
 	
       }
@@ -276,7 +281,7 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
 
   // 
   elapsed = wtime() - elapsed;
-  printf("done in %fsec, ", elapsed);
+  printf("done in %fsec\n", elapsed);
 }
 
 int main(){

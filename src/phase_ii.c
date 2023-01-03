@@ -217,8 +217,7 @@ void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 
 
 
-void sender_process_task(u8 M[HASH_INPUT_SIZE],
-			 WORD_TYPE Mstate[NWORDS_STATE])
+void sender_process_task(u8 M[HASH_INPUT_SIZE])
 {
   /* generate hashes and send them to a server as soon its buffer is complete */
   //---------------------------------------------------------------------------+
@@ -226,14 +225,14 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE],
   // dgst := N bytes of the digest
   // ctr  := (this is a shortcut that allows us not to send the whole message)
   //---------------------------------------------------------------------------+
-
+  WORD_TYPE Mstate[NWORDS_STATE] = {HASH_INIT_STATE};
   int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
-                    + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
+                    + sizeof(CTR_TYPE); /* |dgst| + |ctr| - |known bits|*/
+
   int server_number;
 
 
   // ---- Part1 : initializing sending buffers 
-  MPI_Request request;
   /* int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES) */
   /*                      + sizeof(CTR_TYPE); /\* |dgst| + |ctr| *\/ */
 
@@ -242,13 +241,16 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE],
 			     *NSERVERS);
 
   /* Init attaching buffers for the buffered send */
-  int buf_attached_size = NSERVERS*(MPI_BSEND_OVERHEAD + one_pair_size);
+  int buf_attached_size = NSERVERS
+                        *(one_pair_size*PROCESS_QUOTA + MPI_BSEND_OVERHEAD);
+  
   u8* buf_attached = (u8*) malloc(buf_attached_size);
     
 
   /* Decide where to place the kth digest in server i buffer */
-  size_t offset = 0; 
-  const u64 ones = (1LL<<DIFFICULTY) - 1;
+  size_t offset = 0;
+  // h is distinguished iff (h & mask_test) == 0 
+  const u64 mask_test = (1LL<<DIFFICULTY) - 1;
 
   /* pos i: How many messages we've generated to be sent to server i? */
   u32* servers_ctr = (u32*) malloc(sizeof(u32)*NSERVERS);
@@ -259,43 +261,41 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE],
   //------- Part 2 : Generate hashes and send them  -------
   //-------------------------------------------------------------------------+
   MPI_Buffer_attach(buf_attached, buf_attached_size);
-    
+
+  // find_hash_distinguished_init(); 
   while(1) { /* when do we break? never! */
     /* Find a message that produces distinguished point */
-    find_hash_distinguished( M, Mstate, ones );
+    find_hash_distinguished( M, Mstate, mask_test);
 
     //+ decide to which server to add to? 
     server_number = to_which_server((u8*) Mstate);
 
-
-
     /* 1st term: go to server booked memory, 2nd: location of 1st free place*/
     offset = server_number*one_pair_size + servers_ctr[server_number];
-      
-    /* save N-DEFINED_BYTES of MState in: snd_buf_dgst[offset] */      
-    memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
-	    (snd_buf+offset),
-	    N-DEFINED_BYTES );
+    // recall que one_pair_size =  |dgst| + |ctr| - |known bits|
+    
+    /* save N-DEFINED_BYTES of MState in: snd_buf_dgst[offset] */
+    memcpy( ( (u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
+	      (snd_buf+offset), /* copy digest to snd_buf[offset] */
+	      N-DEFINED_BYTES );
 
     /* record the counter, above we've recorded N-DEFINED_BYTES  */
-    memcpy(M, 
+    memcpy(M,
 	   ( (snd_buf+offset) + (N-DEFINED_BYTES) ),
 	   sizeof(CTR_TYPE) );
-
-      
 
     /* this server has one more digest */
     ++servers_ctr[server_number];
 
     if (servers_ctr[server_number] == PROCESS_QUOTA){
       /* we have enough messages to send to server (server_number) */
-      MPI_Bsend_init(snd_buf,
-		     PROCESS_QUOTA*one_pair_size,
-		     MPI_UNSIGNED_CHAR,
-		     server_number,
-		     TAG_SND_DGST,
-		     MPI_COMM_WORLD,
-		     &request);
+      MPI_Bsend(snd_buf,
+		PROCESS_QUOTA*one_pair_size,
+		MPI_UNSIGNED_CHAR,
+		server_number,
+		TAG_SND_DGST,
+		MPI_COMM_WORLD);
+               
       // todo do we need here buffer detach? 
       /* It is enough to reset the counter. The memroy will be rewritten */  
       servers_ctr[server_number] = 0;
@@ -391,11 +391,12 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
     //+ probe these messages 
     while (!flag) {/*receive from any server and immediately treat their dgst*/
       MPI_Waitsome(nproc_snd, requests, &outcount, indices, statuses);
-      MPI_Testall(nproc_snd, requests, &flag, statuses);
+      /* check if ther is no further messages */
+      MPI_Testall(nproc_snd, requests, &flag, statuses); 
       for (int j = 0; j<outcount; ++j){
 	idx = indices[j]; /* number of sending process */
 	buf_idx = idx*one_pair_size*PROCESS_QUOTA;
-	msg_idx = idx*HASH_INPUT_SIZE;
+	msg_idx = idx*HASH_INPUT_SIZE; // location of message template of sender idx
 	/* treat received messages that are completed */
 	//+ probe dictionary
 	//+ if it is positive:
@@ -411,9 +412,11 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   } // end found enough collisions
 
   // good job
+
   free(rcv_buf);
   free(statuses);
   free(requests);
+  free(initial_inputs);
   free(indices);
   fclose(fp);
 }
@@ -504,34 +507,21 @@ void archive_receive()
 // -----------------------------------------------------------------------------
 
 
-void phase_ii(dict* d,
-	      FILE* fp_possible_collisions,
-	      size_t needed_collisions,
-	      size_t difficulty_level)
+void phase_ii()
 { 
   // some extra arguments to communicate with other
   
   // ==========================================================================+
-  // Summary: Hash many different messages till we found enough collisions     |
-  // --------------------------------------------------------------------------+
-  // INPUTS:                                                                   |
-  // `*d` : dictionary that has hashes from phase i                            |
-  // `*fp_possible_collisions`: store all heashes h that dictionary tells they |
-  //                            might exists. Also, store the corresponding    |
-  //                            message.                                       |
-  // NOTE: (64bytes message || 32bytes hash) (64bytes message || 32bytes hash) |
-  // `needed_collisions` : How many messages we need that return positive hits |
-  //                       when probing the dictionary with their digests.     |
-  //---------------------------------------------------------------------------+
-  // TODO:                                                                     |
-  // - extra arguments to deal with other servers                              |
+  // Summary: Three main characters:                                           |
+  //  1- producers: rank [NSERVERS+1, INF] generate hashes indifinitely.       |
+  //  2- consumers: ranks [0, NSERVERS-1] receive hashes and probe them in the |
+  //                in its dictionary. Save those that return positive answer  |
+  //  3- archive: rank=NSERVER store all messages||hashes that dict(hash) > 0  |
   // ==========================================================================+
-  // process : 0 -> NSERVERS - 1 (receivers),
-  //         : NSERVERS (archive)
-  //         : NSERVERS + 1 -> nproc (senders)
 
 
-  // --------------------- INIT MPI & Shared Variables ------------------------|
+
+  // --------------------- INIT MPI & Shared Variables ------------------------+
   int nproc, myrank;
   
   MPI_Init(NULL, NULL);
@@ -547,14 +537,14 @@ void phase_ii(dict* d,
   // int nthreads = omp_get_max_threads(); // no need for this?!
 
   // Who am I? sender, receiver, or archive.
-  if (myrank >= NSERVERS){
+  if (myrank > NSERVERS){
     // ------------------------------------------------------------------------+
     // I am a sending processor. I only generate hashes and send them.
     // Process Numbers: [NSERVERS + 1,  nproc]
     //-------------------------------------------------------------------------+
      
-    /* init state */
-    WORD_TYPE Mstate[NWORDS_STATE] = {HASH_INIT_STATE};
+    /* init state: this should goes inside sender_process_task */
+
 
     /* set up a random message */
     /* M = 64bit ctr || 64bit nonce || random value */
@@ -569,7 +559,7 @@ void phase_ii(dict* d,
     send_random_message_template(M); 
 
     /* generate hashes and send them to a servers */
-    sender_process_task(M, Mstate); /* never ends :) */
+    sender_process_task(M); /* never ends :) */
   }
 
   //+ todo receive processors
@@ -636,4 +626,6 @@ void print_byte_array(u8* array, size_t nbytes)
   puts("");
 }
 
-int main() {}
+int main() {
+  phase_ii();
+}

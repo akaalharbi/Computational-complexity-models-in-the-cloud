@@ -1,0 +1,18 @@
+1- receivers:
+-- dictionary
+-- rcv_buffer
+--   u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
+2- senders:
+-- snd_buf
+-- buff_attached
+  int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
+                    + sizeof(CTR_TYPE); /* |dgst| + |ctr| - |known bits|*/
+
+  int buf_attached_size = NSERVERS
+                        *(one_pair_size*PROCESS_QUOTA + MPI_BSEND_OVERHEAD);
+
+3- 
+
+
+
+
