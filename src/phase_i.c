@@ -49,8 +49,10 @@ static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
   /* 2- remove the distinguished bits by shifting  (nserver || rest ) */
   /* 3- keep only the bits that holds nserver (nserver) it may have extra bit */
   /* 4- Compute server number by taking computing mod nservers */
-  u32 snd_to_server  = ( (((WORD_TYPE*)MState)[0] >> DIFFICULTY)
+  u32 snd_to_server  = ( (((WORD_TYPE*)MState)[0] >> (DIFFICULTY))
 			 & ones_nservers) % NSERVERS;
+
+  
 
   return snd_to_server;
 }
@@ -230,7 +232,7 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
     msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
     /* print_char(M, 64); */
 
-    if ( (state[0] & ones) == 0){ /* it is a distinguished point */
+    if ( (state[0] & ones) == ones){ /* it is a distinguished point */
 
       /* Decide which server is responsible for storing this digest */
       k = to_which_server((u8*) state);
@@ -253,7 +255,7 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
 
       // + save states after required amount of intervals
       if (nhashes_stored % interval == 0) {
-        printf("M=");
+
 
 	end = wtime(); /*  for progress report*/
 	/* FILE* states_file = fopen(states_file_name, "a"); */
@@ -266,8 +268,9 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
 	fflush(states_file);
 	fflush(counters_file);
 
-	printf("Generating %lu distinguished points took %0.2fsec DIFFICULTY=%d\n",
-	       interval, end - start, DIFFICULTY);
+	
+	printf("%2.4f%% Generating %lu distinguished points took %0.2fsec DIFFICULTY=%d\n",
+	      100 * ((float) nhashes_stored) /  NHASHES,  interval, end - start, DIFFICULTY);
 
 	// elapsed += end - start; 
 	start = wtime();

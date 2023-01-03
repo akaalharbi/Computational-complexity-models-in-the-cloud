@@ -14,7 +14,9 @@ feedback
 obj/*
 .ccls-cache
 .ccls-cache/*
-
+.cache/*
+data/*
+obj/*
 
 # Linker output
 *.ilk

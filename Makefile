@@ -18,10 +18,10 @@ MPI_INCLUDE = -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/usr/lib/x86_64-linu
 MPI_LINK = -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
 
 INCLUDE = -Iinclude $(MPI_INCLUDE)
-LDLIBS  =  $(MPI_LINK)
-LDFLAGS = -fopenmp -pthread
+LDLIBS  =  $(MPI_LINK) -lm
+LDFLAGS = -fopenmp -pthread -O0 -g
 # note: -fanalyzer doesn't report when -flto is enabled
-CFLAGS = -flto -O3 -fopenmp -Wall -march=native -msha  -std=c11 -fopt-info-all -fanalyzer
+CFLAGS =  -g -O0 -fopenmp -Wall -march=native -msha  -std=c11 -fopt-info-all -fanalyzer
 #CFLAGS += -DVERBOSE_LEVEL=2 
 
 
@@ -98,3 +98,7 @@ phase_iii: $(OBJDIR)/phase_iii.o $(COMMON_OBJECTS)
 clean:
 	rm -f $(OBJECTS)
 	rm -f $(TARGETS)
+purge:
+	rm -f $(OBJECTS)
+	rm -f $(TARGETS)
+	rm -rf data

@@ -112,15 +112,14 @@ int dict_add_element_to(dict* d, u8* state){
   // get bucket number, recall keys[nbuckets*nslots_per_bucket
   u64 idx = 0;
   memcpy(&idx, state, L_IN_BYTES);
+
   /* get the bucket number and scale the index */
   idx = (idx % d->nbuckets) * d->nslots_per_bucket;
 
   VAL_TYPE val = 0;
   memcpy(&val, state+L_IN_BYTES, VAL_SIZE);
   
-  // todo aestheitcs: which version do you like more?
-  // idx = idx << (d->scale) ; // get the index of bucket in keys array
-  idx = idx * (d->nslots_per_bucket) ; // get the index of bucket in keys array
+
   // linear probing 
   // locate where to place (key, value)
   // in insertion we are not going to use buckets explicitly

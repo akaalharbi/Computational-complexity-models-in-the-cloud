@@ -47,10 +47,22 @@
 // Apologies: only n ≡ 0 mod 8 is allowed. This is not a feature.
 
 // Let N := n / 8
-#define N 12 /* bytes i.e n := 8*N bits */ 
-#define L 34 /* store 2^L elements in the dictionary  */
+#define N 8 /* bytes i.e n := 8*N bits */
+// will be replaced by the NHASHES below 
+#define L 32 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
+// wlog: we can stick to  power of 2, then dictionary might reject some
+#define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
+
+// nbits are zero, this will be defined according to the send latency
+#define DIFFICULTY 3
+
+/* we are not going to hold more than 32 bits in a dict entry */
+#define MAX_VAL_SIZE 32
+
+/* how big is our counter */
+#define CTR_TYPE u64
 
 
 // sanity check
@@ -66,35 +78,37 @@
 // -------------------------------------------------------------------------+
 // lines tagged with @python will be edited by a script                     |
 // -------------------------------------------------------------------------+
-#define MAX_VAL_SIZE 32 // we are not going to hold more than 32 bits
-// nbits are zero, this will be defined accordint to the send latency
-#define DIFFICULTY 4 
-#define NSERVERS 2 /* edit manually */
+
+
+
+#define NSERVERS 4 /* edit manually */
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
-#define DEFINED_BYTES CEILING(DEFINED_BITS, 8) 
-
-/* nhashes per server, we take the maximum */
-#define NHASHES (1LL<<32) /* phase i will generate NSERVES*NHASHES hashes */
-#define NSLOTS_MY_NODE (NHASHES>>1) // PYTHON SHOULD DO THIS 
-
-/* how big is our counter */
-#define CTR_TYPE u64
+#define DEFINED_BYTES CEILING(DEFINED_BITS, 8)
 
 
-/* if each server has a different memory size then their candidates           */
-/* will have a different false positive probability. The following define     */
-/* scale the number according to the false positive. The main obstacle in     */
-/* writing a formula as a macro is I don't know a way to get the ram size     */
-/* macros. maybe a python script will overwrite the definintion below  */
-#define NNEEDED_CND_THIS_SERVER 1000 /* @python  */
-#define MAX_CND_PER_SERVER 1005 /* @python make a dynamic estimation */
+// How large is the dictionary in a server 
+#define NSLOTS_MY_NODE (NHASHES>>NSERVERS) // @python
 
 
 
 
+/* If each server has a different memory size then their candidates will have */
+/* a different false positive probability since #discarded bits vary.         */
+/* The following define scale the number according to the false positive.     */
+/* The main obstacle in writing a formula as a macro is that I don't know a   */
+/* way to get the ram size  macros. maybe a python script will overwrite the  */
+/* definintion below.                                                         */
 
+
+#define DISCARDED_BITS (8 * (N - 4 - L_IN_BYTES))
+// #define NNEEDED_CND_THIS_SERVER (1<<DISCARDED_BITS) /* @python  */
+#define NNEEDED_CND_THIS_SERVER (1<<DISCARDED_BITS) /* @python  */
+#define MAX_CND_PER_SERVER (1<<DISCARDED_BITS) /* @python make a dynamic estimation */
+
+
+// PLEASE DO NOT EDIT// 
 #ifndef LONG_MESSAGE_MPI_CONFIG
 
 #define LONG_MESSAGE_MPI_CONFIG
@@ -267,8 +281,8 @@
 
 #endif // define VAL_SIZE
 
-// @todo do we need this?
-#define DISCARDED_BITS (8*(N - VAL_SIZE - L_IN_BYTES))
+
+// #define DISCARDED_BITS (8*(N - VAL_SIZE - L_IN_BYTES))
 
 
 

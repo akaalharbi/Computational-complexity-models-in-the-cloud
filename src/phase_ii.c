@@ -198,7 +198,7 @@ void load_file_to_dict(dict *d, FILE *fp)
     /* it adds the hash iff nprobes <= NPROBES_MAX */
     dict_add_element_to(d, stream_pt); 
   }
-  fclose(fp); // close the file
+  // fclose(fp); // don't close the file 
 }
 // -----------------------------------------------------------------
 
@@ -556,9 +556,11 @@ void phase_ii()
 
     
     /* Send the initial input to all receiving servers */
+    printf("I am sender with rank %d i am going to send my template \n", myrank);
     send_random_message_template(M); 
 
     /* generate hashes and send them to a servers */
+    printf("I am sender with rank %d i am going to generate hashes  \n", myrank);
     sender_process_task(M); /* never ends :) */
   }
 
@@ -581,17 +583,23 @@ void phase_ii()
 
     
     /* Listen to senders till we accumulated enough candidates */
+    printf("I am reciever with rank %d i am listening \n", myrank);
     receiver_process_task(d, myrank, nproc, nproc_snd);
+    
+    printf("I am receiver with rank %d is going to send to archive\n", myrank);
 
     /* send the messages to the archive! */
     send_candidates_to_archive(myrank);
+    printf("I am receiver rank %d is done sending to archive\n", myrank);
   }
 
-  while (myrank == NSERVERS) /* I'm THE archive*/
+  while (myrank == NSERVERS){ /* I'm THE archive*/
     //+ todo truncate the messages file if it not multiple to HASH_INPUT_SIZE
     //+ this happen if the server was shut down during writing
+    printf("I am the archive listening \n");
     archive_receive();
-      
+    printf("I am archive registered messages on disk\n");
+  }
 
 
   // The end that will never be reached in any case!
@@ -626,6 +634,4 @@ void print_byte_array(u8* array, size_t nbytes)
   puts("");
 }
 
-int main() {
-  phase_ii();
-}
+int main() {  phase_ii(); }
