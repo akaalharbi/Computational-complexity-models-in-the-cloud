@@ -209,7 +209,7 @@ void send_random_message_template(u8 M[HASH_INPUT_SIZE])
   MPI_Status statuses[NSERVERS];
   // how about collective communications? I can't find a simple way using them.
   for (int i=0; i<NSERVERS; ++i) {
-    MPI_Isend(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, 0,
+    MPI_Isend(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, i,
 	      TAG_RANDOM_MESSAGE, MPI_COMM_WORLD, &requests[i]);
   }
   MPI_Waitall(NSERVERS, requests, statuses);
@@ -261,7 +261,7 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
   //------- Part 2 : Generate hashes and send them  -------
   //-------------------------------------------------------------------------+
   MPI_Buffer_attach(buf_attached, buf_attached_size);
-
+  printf("rank %d: done init mpi, now going to generate hashes \n", myrank);
   // find_hash_distinguished_init(); 
   while(1) { /* when do we break? never! */
     /* Find a message that produces distinguished point */
@@ -355,6 +355,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
   u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
 
+  printf("receiver %d done with initialization for mpi\n", myrank);
   //---------------------------------------------------------------------------+
   // --- part 2: receive the initial inputs from all generating processors 
   //---------------------------------------------------------------------------+
@@ -362,16 +363,18 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   // process : 0 -> NSERVERS - 1 (receivers),
   //         : NSERVERS (archive)
   //         : NSERVERS + 1 -> nproc (senders)
-  for (int i=0; i<nproc_snd; ++i) 
-    MPI_Recv(initial_inputs+i*HASH_INPUT_SIZE,
+  for (int i=0; i<nproc_snd; ++i){
+    printf("receiver %d listening to %d\n", myrank, i + NSERVERS + 1);
+    MPI_Recv(&initial_inputs[i*HASH_INPUT_SIZE],
 	     HASH_INPUT_SIZE,
 	     MPI_UNSIGNED_CHAR,
 	     i + NSERVERS + 1,
 	     TAG_RANDOM_MESSAGE,
 	     MPI_COMM_WORLD,
 	     statuses);
-
-
+    printf("receiver %d has %d template \n", myrank, i + NSERVERS + 1);
+  }
+  printf("receiver %d received all templates\n", myrank);
   //---------------------------------------------------------------------------+
   // --- Part 3: Receive digests and probe them
   //---------------------------------------------------------------------------+
@@ -394,8 +397,12 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
     while (!flag) {/*receive from any server and immediately treat their dgst*/
       MPI_Waitsome(nproc_snd, requests, &outcount, indices, statuses);
       /* check if ther is no further messages */
-      MPI_Testall(nproc_snd, requests, &flag, statuses); 
+      MPI_Testall(nproc_snd, requests, &flag, statuses);
+      
+      printf("receiver %d I received from %d senders", myrank, outcount);
+
       for (int j = 0; j<outcount; ++j){
+	printf("receiver %d going to treat %d", myrank, j);
 	idx = indices[j]; /* number of sending process */
 	buf_idx = idx*one_pair_size*PROCESS_QUOTA;
 	msg_idx = idx*HASH_INPUT_SIZE; // location of message template of sender idx
