@@ -119,7 +119,7 @@ static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
   // WARNING: this function can't deal with more than 32zeros as dist_test     |
   // NOTE: we are only working on the first word                               |
   // --------------------------------------------------------------------------+
-  // TODO: Don't use hash_multiple instead                                     |
+  // TODO: use hash_multiple instead                                           |
   // --------------------------------------------------------------------------+
 
   /* no need to construct init state with each call of the function */ 
@@ -140,8 +140,12 @@ static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
     
     /* is its digest is a distinguished pt? */
     /* see 1st assumption in config.h  */
-    if ( ((u32*) Mstate)[0] && dist_test == 0)
-      return; /* we got our distinguished digest */
+    /* if ( ((WORD_TYPE*) Mstate)[0] && dist_test == 0){ */
+    /*   puts("found a dist point"); */
+    /*   return; /\* we got our distinguished digest *\/ */
+    /* } */
+    return;
+      
   }
 }
 
@@ -231,7 +235,7 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 
   int server_number;
 
-
+  
   // ---- Part1 : initializing sending buffers 
   /* int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES) */
   /*                      + sizeof(CTR_TYPE); /\* |dgst| + |ctr| *\/ */
@@ -287,6 +291,8 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
     /* this server has one more digest */
     ++servers_ctr[server_number];
 
+
+    
     if (servers_ctr[server_number] == PROCESS_QUOTA){
       printf("rank %d: sending to %d\n", myrank, server_number);
       /* we have enough messages to send to server (server_number) */
@@ -355,7 +361,12 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
   u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
 
+  long vmrss_kb, vmsize_kb;
+  get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
+  printf("reciver #%d memory usage after mpi init: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
+
   printf("receiver %d done with initialization for mpi\n", myrank);
+  
   //---------------------------------------------------------------------------+
   // --- part 2: receive the initial inputs from all generating processors 
   //---------------------------------------------------------------------------+
@@ -364,7 +375,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   //         : NSERVERS (archive)
   //         : NSERVERS + 1 -> nproc (senders)
   for (int i=0; i<nproc_snd; ++i){
-    printf("receiver %d listening to %d\n", myrank, i + NSERVERS + 1);
+    printf("receiver %d is listening to %d\n", myrank, i + NSERVERS + 1);
     MPI_Recv(&initial_inputs[i*HASH_INPUT_SIZE],
 	     HASH_INPUT_SIZE,
 	     MPI_UNSIGNED_CHAR,
@@ -372,9 +383,13 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
 	     TAG_RANDOM_MESSAGE,
 	     MPI_COMM_WORLD,
 	     statuses);
-    printf("receiver %d has %d template \n", myrank, i + NSERVERS + 1);
+    printf("recv #%d has template of sender #%d \n", myrank, i + NSERVERS + 1);
+    print_char(&initial_inputs[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
   }
   printf("receiver %d received all templates\n", myrank);
+  get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
+  printf("reciver #%d memory usage after receiving temp: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
+
   //---------------------------------------------------------------------------+
   // --- Part 3: Receive digests and probe them
   //---------------------------------------------------------------------------+
@@ -392,6 +407,8 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
 		MPI_COMM_WORLD,
 	       &requests[i]);
     }
+    get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
+    // printf("reciver #%d memory usage after irecv: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
 
     //+ probe these messages 
     while (!flag) {/*receive from any server and immediately treat their dgst*/
@@ -399,7 +416,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
       /* check if ther is no further messages */
       MPI_Testall(nproc_snd, requests, &flag, statuses);
       
-      printf("receiver %d I received from %d senders", myrank, outcount);
+      // printf("receiver %d I received from %d senders", myrank, outcount);
 
       for (int j = 0; j<outcount; ++j){
 	printf("receiver %d going to treat %d", myrank, j);
@@ -562,6 +579,8 @@ void phase_ii()
     CTR_TYPE* ctr_pt = (CTR_TYPE*) M; /* counter pointer  */
     getrandom(M, HASH_INPUT_SIZE, 1);
     ctr_pt[0] = 0; /* zeroing the first 64bits of M */
+    printf("sender %d got template\n", myrank);
+    print_char(M,HASH_INPUT_SIZE);
 
     
     /* Send the initial input to all receiving servers */
@@ -577,14 +596,23 @@ void phase_ii()
   //+ load dgsts from file to dictionary
 
   while (myrank < NSERVERS){ /* receiver, repeat infinitely  */
+    long vmrss_kb, vmsize_kb;
+    get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
+
     /* Firstly load hashes to the dictionary */
+    printf("reciver #%d memory usage beginning: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
     dict* d = dict_new(NSLOTS_MY_NODE); /* This is done by python script */
+    get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
+    printf("reciver #%d memory usage after dict creation: ram: %ld kb vm: %ld kb\n", myrank, vmrss_kb, vmsize_kb);
     char file_name[40];
     snprintf(file_name, 40, "data/receive/digests/%d", myrank);
     FILE* fp = fopen(file_name, "r");
     load_file_to_dict(d, fp);
     fclose(fp);
+
     
+    get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
+    printf("reciver #%d memory usage after load: ram: %ld kb vm: %ld kb\n", myrank, vmrss_kb, vmsize_kb);
     //-------------------------------------------------------------------------+
     // I'm a receiving process: receive hashes, probe them, and send candidates 
     // Process Numbers: [0,  NSERVERS - 1]

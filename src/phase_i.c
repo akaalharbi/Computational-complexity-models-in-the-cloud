@@ -172,7 +172,7 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
 
   // INIT SHA256 
   u8 M[HASH_INPUT_SIZE] = {0};
-  CTR_TYPE* msg_ctr_pt = (u64*) M; /* increment the message by one each time */
+  CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* increment the message by one each time */
   *msg_ctr_pt = msg_ctr; /* update the message counter as the given input */
   // store the hash value in this variable
   /* WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE}; */
@@ -181,7 +181,7 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
   u8* stream_pt = (u8*) state; 
 
   /// INIT FILES: server files that will be send later and state
-  char file_name[50]; // more than enough to store file name
+  char file_name[50]; // more thnan enough to store file name
   char states_file_name[40];
   
   FILE* data_to_servers[NSERVERS];
