@@ -217,7 +217,7 @@ void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 
 
 
-void sender_process_task(u8 M[HASH_INPUT_SIZE])
+void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 {
   /* generate hashes and send them to a server as soon its buffer is complete */
   //---------------------------------------------------------------------------+
@@ -288,6 +288,7 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE])
     ++servers_ctr[server_number];
 
     if (servers_ctr[server_number] == PROCESS_QUOTA){
+      printf("rank %d: sending to %d\n", myrank, server_number);
       /* we have enough messages to send to server (server_number) */
       MPI_Bsend(snd_buf,
 		PROCESS_QUOTA*one_pair_size,
@@ -380,12 +381,13 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
     //+ receive messages from different processors
   
     for (int i = 0; i<nproc_snd; ++i) {
-      MPI_Irecv(rcv_buf+i*rcv_array_size,
-		rcv_array_size,
+      MPI_Irecv(&rcv_buf[i*rcv_array_size], /* store in this location */
+		rcv_array_size, 
 		MPI_UNSIGNED_CHAR,
-		i + NSERVERS + 1,
-		TAG_SND_DGST,
-		MPI_COMM_WORLD, requests);
+		i + NSERVERS + 1, /* sender */
+		TAG_SND_DGST, 
+		MPI_COMM_WORLD,
+	       &requests[i]);
     }
 
     //+ probe these messages 
@@ -530,7 +532,7 @@ void phase_ii()
   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
   /* How many procs that are going t send */
-  int nproc_snd = nproc - NSERVERS;
+  int nproc_snd = nproc - NSERVERS - 1;
   
   
   /* send digests, 1 digest ≡ 256 bit */
@@ -561,7 +563,7 @@ void phase_ii()
 
     /* generate hashes and send them to a servers */
     printf("I am sender with rank %d i am going to generate hashes  \n", myrank);
-    sender_process_task(M); /* never ends :) */
+    sender_process_task(M, myrank); /* never ends :) */
   }
 
   //+ todo receive processors

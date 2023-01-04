@@ -17,6 +17,10 @@ obj/*
 .cache/*
 data/*
 obj/*
+phase_i
+phase_ii
+phase_iii
+
 
 # Linker output
 *.ilk
