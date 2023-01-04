@@ -343,14 +343,18 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
                     + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
   
-  //+ add initial random message buffers
-  u8* rcv_buf = (u8*) malloc(one_pair_size
-			     *nproc_snd /* we've more senders */
-			     *PROCESS_QUOTA);
-    
+  //+ receive message in this buffer
+  u8* rcv_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
+  //+ copy rcv_buf to lookup_buf then listen to other sender using rcv_buf
+  u8* lookup_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
 
-  MPI_Status* statuses = (MPI_Status*)malloc(sizeof(MPI_Status)*nproc_snd);
-  MPI_Request* requests = (MPI_Request*)malloc(sizeof(MPI_Request)*nproc_snd);
+  size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
+  u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
+
+  
+  MPI_Status status;
+  MPI_Request request;
+
   int* indices = (int*)malloc(sizeof(int)*nproc);
   size_t idx = 0;
   size_t buf_idx = 0;
@@ -358,12 +362,12 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   int flag = 0; /* decide if all messages have been received */
   int outcount = 0; /* MPI_Waitsome  how many buffers have we received so far */
   size_t nfound_cnd = 0;
-  size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
-  u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
-
+  int sender_name = 0;
+  
   long vmrss_kb, vmsize_kb;
   get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
-  printf("reciver #%d memory usage after mpi init: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
+  printf("reciver #%d memory usage after mpi init: ram: %ld kb vm: %ld kb\n",
+	 myrank, vmrss_kb, vmsize_kb);
 
   printf("receiver %d done with initialization for mpi\n", myrank);
   
@@ -382,10 +386,12 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
 	     i + NSERVERS + 1,
 	     TAG_RANDOM_MESSAGE,
 	     MPI_COMM_WORLD,
-	     statuses);
+	     &status);
+    
     printf("recv #%d has template of sender #%d \n", myrank, i + NSERVERS + 1);
     print_char(&initial_inputs[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
   }
+  
   printf("receiver %d received all templates\n", myrank);
   get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
   printf("reciver #%d memory usage after receiving temp: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
@@ -393,55 +399,49 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   //---------------------------------------------------------------------------+
   // --- Part 3: Receive digests and probe them
   //---------------------------------------------------------------------------+
-  // enclose what's below within while loop to receive multiple times
-  // Warning: not correct! nfound_collisions should be shared between all
+
+  // listen the first time
+  MPI_Recv(rcv_buf,
+	   rcv_array_size,
+	   MPI_UNSIGNED_CHAR,
+	   MPI_ANY_SOURCE,
+	   TAG_SND_DGST,
+	   MPI_COMM_WORLD,
+	   &status);
+  // copy the received message and listen immediately
+  memcpy(lookup_buf, rcv_buf, rcv_array_size);
+  sender_name = status.MPI_SOURCE; // who sent the message?
+  
   while (NNEEDED_CND_THIS_SERVER  > nfound_cnd) {
     //+ receive messages from different processors
-  
-    for (int i = 0; i<nproc_snd; ++i) {
-      MPI_Irecv(&rcv_buf[i*rcv_array_size], /* store in this location */
-		rcv_array_size, 
-		MPI_UNSIGNED_CHAR,
-		i + NSERVERS + 1, /* sender */
-		TAG_SND_DGST, 
-		MPI_COMM_WORLD,
-	       &requests[i]);
+    MPI_Irecv(rcv_buf, /* store in this location */
+	      rcv_array_size, 
+	      MPI_UNSIGNED_CHAR,
+	      MPI_ANY_SOURCE, /* sender */
+	      TAG_SND_DGST, 
+	      MPI_COMM_WORLD,
+	      &request);
+
+    //+ probe these messages and update the founded candidates
+
+    nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
+				    rcv_buf, /* messages to search in d */
+				    &initial_inputs[sender_name],
+				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
+				    fp); /* file to record cadidates */
+
+    MPI_Wait(&request, &status);
+    sender_name = status.MPI_SOURCE; // get the name of the new sender
+    memcpy(lookup_buf, rcv_buf, rcv_array_size);
     }
-    get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
-    // printf("reciver #%d memory usage after irecv: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
 
-    //+ probe these messages 
-    while (!flag) {/*receive from any server and immediately treat their dgst*/
-      MPI_Waitsome(nproc_snd, requests, &outcount, indices, statuses);
-      /* check if ther is no further messages */
-      MPI_Testall(nproc_snd, requests, &flag, statuses);
-      
-      // printf("receiver %d I received from %d senders", myrank, outcount);
 
-      for (int j = 0; j<outcount; ++j){
-	printf("receiver %d going to treat %d", myrank, j);
-	idx = indices[j]; /* number of sending process */
-	buf_idx = idx*one_pair_size*PROCESS_QUOTA;
-	msg_idx = idx*HASH_INPUT_SIZE; // location of message template of sender idx
-	/* treat received messages that are completed */
-	//+ probe dictionary
-	//+ if it is positive:
-	//+ reconstruct the messages
-	//+ record message and digest in file fp
-	nfound_cnd += lookup_multi_save(d,
-					&rcv_buf[buf_idx],
-					&initial_inputs[msg_idx],
-					PROCESS_QUOTA,
-					fp);
-      } // end treating received messages 
-    } // flag == 1 when buffers have been received, thus call mpi_irecv again
-  } // end found enough collisions
+
+
 
   // good job
-
   free(rcv_buf);
-  free(statuses);
-  free(requests);
+  free(request);
   free(initial_inputs);
   free(indices);
   fclose(fp);
