@@ -140,11 +140,11 @@ static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
     
     /* is its digest is a distinguished pt? */
     /* see 1st assumption in config.h  */
-    /* if ( ((WORD_TYPE*) Mstate)[0] && dist_test == 0){ */
-    /*   puts("found a dist point"); */
-    /*   return; /\* we got our distinguished digest *\/ */
-    /* } */
-    return;
+    if ( (((WORD_TYPE*) Mstate)[0] & dist_test) == 0){
+
+      return; /* we got our distinguished digest */
+    }
+
       
   }
 }
@@ -202,6 +202,7 @@ void load_file_to_dict(dict *d, FILE *fp)
     /* it adds the hash iff nprobes <= NPROBES_MAX */
     dict_add_element_to(d, stream_pt); 
   }
+  
   // fclose(fp); // don't close the file 
 }
 // -----------------------------------------------------------------
@@ -235,7 +236,7 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 
   int server_number;
 
-  
+  double time_start;
   // ---- Part1 : initializing sending buffers 
   /* int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES) */
   /*                      + sizeof(CTR_TYPE); /\* |dgst| + |ctr| *\/ */
@@ -245,15 +246,12 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 			     *NSERVERS);
 
   /* Init attaching buffers for the buffered send */
-  int buf_attached_size = NSERVERS
-                        *(one_pair_size*PROCESS_QUOTA + MPI_BSEND_OVERHEAD);
-  
+  int buf_attached_size = one_pair_size*PROCESS_QUOTA + MPI_BSEND_OVERHEAD;
   u8* buf_attached = (u8*) malloc(buf_attached_size);
-    
+  MPI_Buffer_attach(buf_attached, buf_attached_size);   
 
   /* Decide where to place the kth digest in server i buffer */
   size_t offset = 0;
-  // h is distinguished iff (h & mask_test) == 0 
   const u64 mask_test = (1LL<<DIFFICULTY) - 1;
 
   /* pos i: How many messages we've generated to be sent to server i? */
@@ -264,11 +262,16 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
   //-------------------------------------------------------------------------+
   //------- Part 2 : Generate hashes and send them  -------
   //-------------------------------------------------------------------------+
-  MPI_Buffer_attach(buf_attached, buf_attached_size);
-  printf("rank %d: done init mpi, now going to generate hashes \n", myrank);
+ 
+  printf("send #%d: done init mpi, now going to generate hashes \n", myrank);
+  
   // find_hash_distinguished_init(); 
+  int snd_ctr = 0;
+
+  time_start = wtime();
   while(1) { /* when do we break? never! */
     /* Find a message that produces distinguished point */
+
     find_hash_distinguished( M, Mstate, mask_test);
 
     //+ decide to which server to add to? 
@@ -279,30 +282,35 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
     // recall que one_pair_size =  |dgst| + |ctr| - |known bits|
     
     /* save N-DEFINED_BYTES of MState in: snd_buf_dgst[offset] */
-    memcpy( ( (u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
-	      (snd_buf+offset), /* copy digest to snd_buf[offset] */
-	      N-DEFINED_BYTES );
+    memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
+	     &snd_buf[offset], /* copy digest to snd_buf[offset] */
+	     N-DEFINED_BYTES );
 
     /* record the counter, above we've recorded N-DEFINED_BYTES  */
     memcpy(M,
-	   ( (snd_buf+offset) + (N-DEFINED_BYTES) ),
+	   &snd_buf[ offset + (N-DEFINED_BYTES) ],
 	   sizeof(CTR_TYPE) );
 
     /* this server has one more digest */
     ++servers_ctr[server_number];
 
-
     
     if (servers_ctr[server_number] == PROCESS_QUOTA){
-      printf("rank %d: sending to %d\n", myrank, server_number);
+      ++snd_ctr;
+      
+      /* printf("rank %d: sending to %d, snd_ctr=%d, it took %fsec\n", */
+      /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
+      /* time_start = wtime(); */
       /* we have enough messages to send to server (server_number) */
-      MPI_Bsend(snd_buf,
+      MPI_Send(snd_buf,
 		PROCESS_QUOTA*one_pair_size,
 		MPI_UNSIGNED_CHAR,
 		server_number,
 		TAG_SND_DGST,
 		MPI_COMM_WORLD);
-               
+      /* printf("rank %d: sending done to %d, snd_ctr=%d, it took %fsec\n", */
+      /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
+      /* time_start = wtime(); */
       // todo do we need here buffer detach? 
       /* It is enough to reset the counter. The memroy will be rewritten */  
       servers_ctr[server_number] = 0;
@@ -350,19 +358,15 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
 
   size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
   u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
-
   
   MPI_Status status;
   MPI_Request request;
 
   int* indices = (int*)malloc(sizeof(int)*nproc);
-  size_t idx = 0;
-  size_t buf_idx = 0;
-  size_t msg_idx = 0;
-  int flag = 0; /* decide if all messages have been received */
-  int outcount = 0; /* MPI_Waitsome  how many buffers have we received so far */
   size_t nfound_cnd = 0;
   int sender_name = 0;
+
+  double time_start, time_end;
   
   long vmrss_kb, vmsize_kb;
   get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
@@ -411,8 +415,10 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   // copy the received message and listen immediately
   memcpy(lookup_buf, rcv_buf, rcv_array_size);
   sender_name = status.MPI_SOURCE; // who sent the message?
-  
+
+  size_t old_nfound_candidates = 0;
   while (NNEEDED_CND_THIS_SERVER  > nfound_cnd) {
+
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */
 	      rcv_array_size, 
@@ -430,9 +436,15 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
 				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
 				    fp); /* file to record cadidates */
 
+    if (nfound_cnd - old_nfound_candidates > 0) {
+      printf("receiver #%d found %lu candidates\n", myrank, nfound_cnd);
+      old_nfound_candidates = nfound_cnd;
+    }
     MPI_Wait(&request, &status);
     sender_name = status.MPI_SOURCE; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
+
+    
     }
 
 
@@ -475,7 +487,7 @@ void send_candidates_to_archive(int myrank)
 
 
 void archive_receive()
-{
+{ //+ todo restructure the receiving way
 
     char archive_file_name[] = "data/receive/messages/archive";
     int actual_rcv_count = 0;
@@ -486,12 +498,18 @@ void archive_receive()
     int* indices = (int*)malloc(sizeof(int)*NSERVERS);
 
     int flag = 0; /* decide if all messages have been received */
-    int outcount = 0; /* MPI_Waitsome  how many buffers have we received so far */
+    int outcount = 0; /* MPI_Waitsome  how many buffers have we received so far*/
 
+    printf("archive says val_size_byte=%d, L=%d, N=%d\n\n", VAL_SIZE_BYTES, L, N);
+    printf(" archive says the max_cnd_per_server = %llu, NDISCARDED_BITS=%d\n",
+	   MAX_CND_PER_SERVER, DISCARDED_BITS);
+    
+
+    
     /* maximum possible receiving message  */
     u8* rcv_buf = malloc(sizeof(u8)*MAX_CND_PER_SERVER*NSERVERS);
     FILE* fp = fopen(archive_file_name, "a");
-    
+
     for (int i = 0; i<NSERVERS; ++i) {
       MPI_Irecv(rcv_buf+i*MAX_CND_PER_SERVER,
 		MAX_CND_PER_SERVER,
@@ -510,6 +528,7 @@ void archive_receive()
       MPI_Waitsome(NSERVERS, requests, &outcount, indices, statuses);
       MPI_Testall(NSERVERS, requests, &flag, statuses);
       for (int j = 0; j<outcount; ++j){
+	printf("archive received a message from recveiver #%d\n", indices[j]);
 	/* How many messages have we received? */
 	MPI_Get_count(&statuses[indices[j]],
 		      MPI_UNSIGNED_CHAR,
@@ -596,18 +615,31 @@ void phase_ii()
   //+ load dgsts from file to dictionary
 
   while (myrank < NSERVERS){ /* receiver, repeat infinitely  */
+
     long vmrss_kb, vmsize_kb;
     get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
+    printf("reciver #%d memory usage beginning: ram: %ld kb vm: %ld kb\n"
+	   ,myrank, vmrss_kb, vmsize_kb);
 
+    
     /* Firstly load hashes to the dictionary */
-    printf("reciver #%d memory usage beginning: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
     dict* d = dict_new(NSLOTS_MY_NODE); /* This is done by python script */
+
     get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
-    printf("reciver #%d memory usage after dict creation: ram: %ld kb vm: %ld kb\n", myrank, vmrss_kb, vmsize_kb);
+    printf("reciver #%d memory usage after dict creation: ram:"
+	   "%ld kb vm: %ld kb\n",
+	   myrank, vmrss_kb, vmsize_kb);
+
     char file_name[40];
     snprintf(file_name, 40, "data/receive/digests/%d", myrank);
     FILE* fp = fopen(file_name, "r");
     load_file_to_dict(d, fp);
+
+    printf("recv #%d dict has %lu elms, file has %lu elms."
+	   " dict.nslots = %lu, filling rate=%f \n",
+	   myrank, d->nelements, d->nelements_asked_to_be_inserted,
+	   d->nslots, ((float) d->nelements)/d->nslots);
+    
     fclose(fp);
 
     

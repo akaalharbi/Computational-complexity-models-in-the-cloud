@@ -42,9 +42,11 @@ typedef struct  __attribute__((aligned(ALIGNMENT))) {
   size_t nbuckets; // a bucket contains x0 slots depending avx register length
   size_t nslots_per_bucket; // = nslots / nbuckets
   //size_t scale; // = log2(nslots_per_bucket)
-  size_t nprobes_insert;
-  size_t nprobes_lookup;
-  size_t nelments_succ_lookup;
+  size_t nelements;
+  size_t nelements_asked_to_be_inserted;
+  /* size_t nprobes_insert; */
+  /* size_t nprobes_lookup; */
+  /* size_t nelments_succ_lookup; */
 } dict;
 
 

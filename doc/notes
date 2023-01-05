@@ -1,3 +1,9 @@
+Wednesday 5 Jan 2023
+- Dictionary can't find digests!
+- Dictionary has more elements than the available number of slots!
+recv #1 dict has 65537 elms, file has 218008 elms. dict.nslots = 65536, filling rate=1.000015 
+
+_____________________
 Wednesday 14 Dec 2022
 - Rewrite the README file
 - Implement the counter

@@ -47,19 +47,20 @@
 // Apologies: only n ≡ 0 mod 8 is allowed. This is not a feature.
 
 // Let N := n / 8
-#define N 8 /* bytes i.e n := 8*N bits */
+#define N 7 /* bytes i.e n := 8*N bits */
 // will be replaced by the NHASHES below 
-#define L 32 /* store 2^L elements in the dictionary  */
+#define L 20 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
-// nbits are zero, this will be defined according to the send latency
-#define DIFFICULTY 3
+// nbits are zero, tphis will be defined according to the send latency
+#define DIFFICULTY 4
 
 /* we are not going to hold more than 32 bits in a dict entry */
-#define MAX_VAL_SIZE 32
+#define MAX_VAL_SIZE 32 /* in bits */
+#define MAX_VAL_SIZE_BYTES 8 
 
 /* how big is our counter */
 #define CTR_TYPE u64
@@ -102,10 +103,6 @@
 /* definintion below.                                                         */
 
 
-#define DISCARDED_BITS (8 * (N - 4 - L_IN_BYTES))
-// #define NNEEDED_CND_THIS_SERVER (1<<DISCARDED_BITS) /* @python  */
-#define NNEEDED_CND_THIS_SERVER (1<<DISCARDED_BITS) /* @python  */
-#define MAX_CND_PER_SERVER (1<<DISCARDED_BITS) /* @python make a dynamic estimation */
 
 
 // PLEASE DO NOT EDIT// 
@@ -118,8 +115,8 @@
 #define TAG_MESSAGES_CANDIDATES 3
 #define ARCHIVE_SERVER NSERVERS
 // WHAT IS BUFF_SIZE? It doesn't seem to be used!
-#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
-#define PROCESS_QUOTA 100 // i.e. send 10 digests to each server @by_hand
+//#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
+#define PROCESS_QUOTA 100000LL // i.e. send 10 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
 
@@ -145,7 +142,7 @@
 #define AVX_SIZE  512
 #define ALIGNMENT 64
 // Number of elements per simd register
-#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE))
+#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES))
 
 
 #define SIMD_LOAD_SI _mm512_load_si512
@@ -165,7 +162,7 @@
 #define REG_TYPE __m256i
 #define AVX_SIZE  256
 #define ALIGNMENT 32
-#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE))
+#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES))
 
 
 #define SIMD_LOAD_SI _mm256_load_si256
@@ -186,7 +183,7 @@
 #define REG_TYPE __m128i
 #define AVX_SIZE  128
 #define ALIGNMENT 16
-#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE))
+#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES))
 
 #define SIMD_LOAD_SI _mm_load_si128
 #define SIMD_TEST _mm_testz_si128 /* as fast as RER C */
@@ -227,7 +224,7 @@
 // B0, B1, ..., B7, B8 mod 2^L will neglect 6 bits
 
 // #define IDX_DISCARDED_BITS (L % 8) /* Values */
-// Define VAL_SIZE and decide what is the best type to use
+// Define VAL_SIZE_BYTES and decide what is the best type to use
 /* Every thing will be stored as idx */
 // #if N*8 <= L this case
 //
@@ -237,13 +234,13 @@
 // define intrinsics based on the the available max register size
 // @todo start here 
 #if N <= L_IN_BYTES
-  #pragma message ("Please decrease MAX_VAL_SIZE")
+  #pragma message ("Please decrease MAX_VAL_SIZE_BYTES")
   #error "The code is not flexible to store every bit as index!"
 
 // we store everything as index except one byte
-//+ @todo when changing MAX_VAL_SIZE adopt the conditions below
+//+ @todo when changing MAX_VAL_SIZE_BYTES adopt the conditions below
 #elif (N  < L_IN_BYTES + 1) && (N >= L_IN_BYTES) 
-  #define VAL_SIZE 1 /* byte */
+  #define VAL_SIZE_BYTES 1 /* byte */
   #define VAL_TYPE u8  /* unsigned char */
 
   #if __AVX512F__
@@ -254,35 +251,42 @@
   #define SIMD_CMP_VALTYPE SIMD_CMP_EPI8
 
 #elif (N < L_IN_BYTES + 2) && (N >= L_IN_BYTES + 1) 
-  #define VAL_SIZE 2 /N* byte */
+  #define VAL_SIZE_BYTES 2 /N* byte */
   #define VAL_TYPE u16 /* unsigned char */
   // SIMD instructions has to be adapted according to the size
   #define SIMD_SET1_VALTYPE SIMD_SET1_EPI16
   #define SIMD_CMP_VALTYPE SIMD_CMP_EPI16
 
 
-// Typical condition when in terms of MAX_VAL_SIZE
-// #elif (N  < L_IN_BYTES + MAX_VAL_SIZE_BYTES) && (N >= L_IN_BYTES + (MAX_VAL_SIZE_BYTES/2) )
+// Typical condition when in terms of MAX_VAL_SIZE_BYTES
+// #elif (N  < L_IN_BYTES + MAX_VAL_SIZE_BYTES_BYTES) && (N >= L_IN_BYTES + (MAX_VAL_SIZE_BYTES_BYTES/2) )
 
 #elif (N  < L_IN_BYTES + 4) && (N >= L_IN_BYTES + 2 )
-  #define VAL_SIZE 4 /* byte */
+  #define VAL_SIZE_BYTES 4 /* byte */
   #define VAL_TYPE u32 /* unsigned char */
   // SIMD instructions has to be adapted according to the size
   #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
   #define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
 
 
-#else /* The MAX_VAL_SIZE */
-  #define VAL_SIZE 4 /* byte */
+#else /* The MAX_VAL_SIZE_BYTES */
+  #define VAL_SIZE_BYTES 4 /* byte */
   #define VAL_TYPE u32 /* unsigned char */
   // SIMD instructions has to be adapted according to the size
   #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
   #define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
 
-#endif // define VAL_SIZE
+#endif // define VAL_SIZE_BYTES
 
+#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
+//#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
+// We need 2^#disacrded_bits candidates, we expect each server generate
+// (2^#disacrded_bits) / NSERVERS, however, it's not a strict requirement.
+#define NNEEDED_CND_THIS_SERVER ((1LL << DISCARDED_BITS) >> NSERVERS) /* @python  */
+// a candidate is a hash that was found in the dictionary.
+// since we may have false positive, we need to get generat number of them
+#define MAX_CND_PER_SERVER (1LL<<DISCARDED_BITS) /* @python make a dynamic estimation */
 
-// #define DISCARDED_BITS (8*(N - VAL_SIZE - L_IN_BYTES))
 
 
 
