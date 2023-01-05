@@ -281,11 +281,13 @@
 #define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
+
+#define NNEEDED_CND (1LL << DISCARDED_BITS)  /* @python  */
 // (2^#disacrded_bits) / NSERVERS, however, it's not a strict requirement.
 #define NNEEDED_CND_THIS_SERVER ((1LL << DISCARDED_BITS) >> NSERVERS) /* @python  */
 // a candidate is a hash that was found in the dictionary.
 // since we may have false positive, we need to get generat number of them
-#define MAX_CND_PER_SERVER (1LL<<DISCARDED_BITS) /* @python make a dynamic estimation */
+
 
 
 

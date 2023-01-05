@@ -236,7 +236,7 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 
   int server_number;
 
-  double time_start;
+
   // ---- Part1 : initializing sending buffers 
   /* int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES) */
   /*                      + sizeof(CTR_TYPE); /\* |dgst| + |ctr| *\/ */
@@ -268,7 +268,7 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
   // find_hash_distinguished_init(); 
   int snd_ctr = 0;
 
-  time_start = wtime();
+
   while(1) { /* when do we break? never! */
     /* Find a message that produces distinguished point */
 
@@ -366,7 +366,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   size_t nfound_cnd = 0;
   int sender_name = 0;
 
-  double time_start, time_end;
+
   
   long vmrss_kb, vmsize_kb;
   get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
@@ -453,10 +453,10 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
 
   // good job
   free(rcv_buf);
-  free(request);
   free(initial_inputs);
   free(indices);
   fclose(fp);
+  printf("recv #%d done a good job\n", myrank);
 }
 
 
@@ -471,11 +471,18 @@ void send_candidates_to_archive(int myrank)
   char msg_file_name[40];
   /* file name := myrank_t(time_stamp) */
   snprintf(msg_file_name, sizeof(msg_file_name),
-	   "data/send/messages/%d_t%llu", myrank, (u64) wtime());
-  
+	   "data/send/messages/%d", myrank);
+
+
+   
   FILE* fp = fopen(msg_file_name, "r");
+  printf("recv#%d walked here file=%s\n", myrank, msg_file_name);
+  
   fread(snd_buf, snd_buf_size, 1, fp); /* should matches with the file size */
-  MPI_Send(snd_buf, snd_buf_size, MPI_UNSIGNED_CHAR,
+
+  MPI_Send(snd_buf,
+	   snd_buf_size,
+	   MPI_UNSIGNED_CHAR,
 	   ARCHIVE_SERVER,
 	   TAG_MESSAGES_CANDIDATES,
 	   MPI_COMM_WORLD);
@@ -493,57 +500,55 @@ void archive_receive()
     int actual_rcv_count = 0;
     
     /* MPI_Status status; */
-    MPI_Status* statuses = (MPI_Status*)malloc(sizeof(MPI_Status)*NSERVERS);
-    MPI_Request* requests = (MPI_Request*)malloc(sizeof(MPI_Request)*NSERVERS);
-    int* indices = (int*)malloc(sizeof(int)*NSERVERS);
+    MPI_Status status;
 
-    int flag = 0; /* decide if all messages have been received */
-    int outcount = 0; /* MPI_Waitsome  how many buffers have we received so far*/
 
     printf("archive says val_size_byte=%d, L=%d, N=%d\n\n", VAL_SIZE_BYTES, L, N);
-    printf(" archive says the max_cnd_per_server = %llu, NDISCARDED_BITS=%d\n",
-	   MAX_CND_PER_SERVER, DISCARDED_BITS);
+    printf(" archive says the #needed_candidates = %llu, NDISCARDED_BITS=%d\n",
+	   NNEEDED_CND_THIS_SERVER, DISCARDED_BITS);
     
 
     
     /* maximum possible receiving message  */
-    u8* rcv_buf = malloc(sizeof(u8)*MAX_CND_PER_SERVER*NSERVERS);
+    size_t rcv_buf_size = HASH_INPUT_SIZE*NNEEDED_CND;
+    u8* rcv_buf = malloc(sizeof(u8)*rcv_buf_size);
     FILE* fp = fopen(archive_file_name, "a");
 
-    for (int i = 0; i<NSERVERS; ++i) {
-      MPI_Irecv(rcv_buf+i*MAX_CND_PER_SERVER,
-		MAX_CND_PER_SERVER,
-		MPI_UNSIGNED_CHAR,
-		i,
-		TAG_MESSAGES_CANDIDATES,
-		MPI_COMM_WORLD,
-		&requests[i]);
-    }
 
-    /* MPI_Get_count(&status, MPI_UNSIGNED_CHAR, &rcv_count); */
-    /* fwrite(rcv_buf, rcv_count, 1, fp); */
-    /* fclose(fp); */
-    
-    while (!flag) {/*receive from any server and immediately treat their dgst*/
-      MPI_Waitsome(NSERVERS, requests, &outcount, indices, statuses);
-      MPI_Testall(NSERVERS, requests, &flag, statuses);
-      for (int j = 0; j<outcount; ++j){
-	printf("archive received a message from recveiver #%d\n", indices[j]);
-	/* How many messages have we received? */
-	MPI_Get_count(&statuses[indices[j]],
-		      MPI_UNSIGNED_CHAR,
-		      &actual_rcv_count);
+    while (1) {
+      
+      /*receive from any server and immediately treat their dgst*/
+      MPI_Recv(rcv_buf,
+	       rcv_buf_size,
+	       MPI_UNSIGNED_CHAR,
+	       MPI_ANY_SOURCE,
+	       TAG_MESSAGES_CANDIDATES,
+	       MPI_COMM_WORLD,
+	       &status);
 
-	/* Number of received messages */
-	actual_rcv_count = actual_rcv_count / HASH_INPUT_SIZE;
-	fwrite(&rcv_buf[indices[j]],
-	       actual_rcv_count*HASH_INPUT_SIZE,
-	       1,
-	       fp);
 
-        fflush(fp);
-      } // end treating received messages 
-    } // flag == 1 when buffers have been received, thus call mpi_irecv again
+
+
+
+      
+      /* How many messages have we received? */
+      MPI_Get_count(&status,
+		    MPI_UNSIGNED_CHAR,
+		    &actual_rcv_count);
+
+      printf("archive received %0.2f messages from recveiver #%d\n",
+	     ((float)actual_rcv_count)/HASH_INPUT_SIZE, status.MPI_SOURCE);
+	
+      /* Number of received messages */
+      actual_rcv_count = actual_rcv_count / HASH_INPUT_SIZE;
+      fwrite(rcv_buf,
+	     actual_rcv_count*HASH_INPUT_SIZE,
+	     1,
+	     fp);
+
+      fflush(fp);
+    } // end treating received messages 
+
     fclose(fp);
 }
 
@@ -704,3 +709,5 @@ void print_byte_array(u8* array, size_t nbytes)
 }
 
 int main() {  phase_ii(); }
+// @todo get the number of stored candidates at each run
+// @todo unexpected behavior receivers are listening to archive!
