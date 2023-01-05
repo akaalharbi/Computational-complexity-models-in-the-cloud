@@ -44,8 +44,8 @@ typedef struct  __attribute__((aligned(ALIGNMENT))) {
   //size_t scale; // = log2(nslots_per_bucket)
   size_t nelements;
   size_t nelements_asked_to_be_inserted;
-  /* size_t nprobes_insert; */
-  /* size_t nprobes_lookup; */
+  size_t nprobes_insert;
+  size_t nprobes_lookup;
   /* size_t nelments_succ_lookup; */
 } dict;
 
