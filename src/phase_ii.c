@@ -45,6 +45,7 @@
 #include "util_char_arrays.h"
 #include "shared.h" // shared variables for duplicate 
 #include "memory.h"
+#include "util_files.h"
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
 #include <mpi.h>
 
@@ -195,9 +196,9 @@ void load_file_to_dict(dict *d, FILE *fp)
     return; // raise an error instead
   }
 
-  // @todo address sanitizer detected stack buffer overflow 
+  // @todo address sanitizer detected stack buffer overflow, stream_pt[6], L_IN_BYTES=3, VAL_SIZE_BYTES=4
   u8 stream_pt[N-DEFINED_BYTES]; /* @todo I believe the issue is in here */
-  /* add as many hashes as possible */
+  /* add as many hashes as possible */ 
   while ( !feof(fp) ){
     fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp);
     /* it adds the hash iff nprobes <= NPROBES_MAX */
@@ -329,8 +330,36 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 
 
 
+static inline void receiver_process_get_template(int myrank, int nproc, int nproc_snd, u8* templates)
+{
+  //---------------------------------------------------------------------------+
+  // --- : receive the initial inputs from all generating processors 
+  //---------------------------------------------------------------------------+
 
-void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
+  // process : 0 -> NSERVERS - 1 (receivers),
+  //         : NSERVERS (archive)
+  //         : NSERVERS + 1 -> nproc (senders)
+
+  MPI_Status status;
+
+  for (int i=0; i<nproc_snd; ++i){
+    printf("receiver %d is listening to %d for the template\n", myrank, i + NSERVERS + 1);
+    MPI_Recv(&templates[i*HASH_INPUT_SIZE],
+	     HASH_INPUT_SIZE,
+	     MPI_UNSIGNED_CHAR,
+	     i + NSERVERS + 1,
+	     TAG_RANDOM_MESSAGE,
+	     MPI_COMM_WORLD,
+	     &status);
+
+    
+    /* print_char(&initial_inputs[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE); */
+  }
+}
+
+
+
+void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* templates )
 {
   // todo check the loops, currently they are errornous!
   //---------------------------------------------------------------------------+
@@ -358,7 +387,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
   u8* lookup_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
 
   size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
-  u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
+  /* u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd); */
   
   MPI_Status status;
   MPI_Request request;
@@ -376,30 +405,6 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
 
   printf("receiver %d done with initialization for mpi\n", myrank);
   
-  //---------------------------------------------------------------------------+
-  // --- part 2: receive the initial inputs from all generating processors 
-  //---------------------------------------------------------------------------+
-
-  // process : 0 -> NSERVERS - 1 (receivers),
-  //         : NSERVERS (archive)
-  //         : NSERVERS + 1 -> nproc (senders)
-  for (int i=0; i<nproc_snd; ++i){
-    printf("receiver %d is listening to %d\n", myrank, i + NSERVERS + 1);
-    MPI_Recv(&initial_inputs[i*HASH_INPUT_SIZE],
-	     HASH_INPUT_SIZE,
-	     MPI_UNSIGNED_CHAR,
-	     i + NSERVERS + 1,
-	     TAG_RANDOM_MESSAGE,
-	     MPI_COMM_WORLD,
-	     &status);
-    
-    printf("recv #%d has template of sender #%d \n", myrank, i + NSERVERS + 1);
-    print_char(&initial_inputs[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
-  }
-  
-  printf("receiver %d received all templates\n", myrank);
-  get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
-  printf("reciver #%d memory usage after receiving temp: ram: %ld kb vm: %ld kb\n",myrank, vmrss_kb, vmsize_kb);
 
   //---------------------------------------------------------------------------+
   // --- Part 3: Receive digests and probe them
@@ -433,7 +438,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
 
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
 				    rcv_buf, /* messages to search in d */
-				    &initial_inputs[sender_name],
+				    &templates[sender_name],
 				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
 				    fp); /* file to record cadidates */
 
@@ -449,12 +454,8 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd )
     }
 
 
-
-
-
   // good job
   free(rcv_buf);
-  free(initial_inputs);
   free(indices);
   fclose(fp);
   printf("recv #%d done a good job\n", myrank);
@@ -517,7 +518,7 @@ void archive_receive()
     FILE* fp = fopen(archive_file_name, "a");
 
 
-    while (1) {
+    while ( NNEEDED_CND > actual_rcv_count ) {
       
       /*receive from any server and immediately treat their dgst*/
       MPI_Recv(rcv_buf,
@@ -527,6 +528,8 @@ void archive_receive()
 	       TAG_MESSAGES_CANDIDATES,
 	       MPI_COMM_WORLD,
 	       &status);
+
+      printf("archive received a message from #%d!\n", status.MPI_SOURCE);
 
 
 
@@ -553,7 +556,6 @@ void archive_receive()
 
     fclose(fp);
 }
-
 
 // 
 // -----------------------------------------------------------------------------
@@ -610,18 +612,18 @@ void phase_ii()
 
     
     /* Send the initial input to all receiving servers */
-    printf("I am sender with rank %d i am going to send my template \n", myrank);
+    printf("sender #%d is going to send its template\n", myrank);
     send_random_message_template(M); 
-
+    printf("sender #%d done sending template!\n", myrank);
     /* generate hashes and send them to a servers */
-    printf("I am sender with rank %d i am going to generate hashes  \n", myrank);
+
     sender_process_task(M, myrank); /* never ends :) */
   }
 
   //+ todo receive processors
   //+ load dgsts from file to dictionary
 
-  while (myrank < NSERVERS){ /* receiver, repeat infinitely  */
+  else if (myrank < NSERVERS){ /* receiver, repeat infinitely  */
 
     long vmrss_kb, vmsize_kb;
     get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
@@ -630,21 +632,26 @@ void phase_ii()
 
     
     /* Firstly load hashes to the dictionary */
+    
+    
     dict* d = dict_new(NSLOTS_MY_NODE); /* This is done by python script */
 
     get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
-    printf("reciver #%d memory usage after dict creation: ram:"
+    printf("recv #%d memory usage after dict creation: ram:"
 	   "%ld kb vm: %ld kb\n",
 	   myrank, vmrss_kb, vmsize_kb);
 
+    double start_time = 0;
     char file_name[40];
     snprintf(file_name, 40, "data/receive/digests/%d", myrank);
     FILE* fp = fopen(file_name, "r");
     load_file_to_dict(d, fp);
 
-    printf("recv #%d dict has %lu elms, file has %lu elms."
+
+    printf("recv #%d dict read in %0.2fsec. It has %lu elms, file has %lu elms."
 	   " dict.nslots = %lu, filling rate=%f \n",
-	   myrank, d->nelements, d->nelements_asked_to_be_inserted,
+	   myrank, wtime() - start_time, d->nelements,
+	   d->nelements_asked_to_be_inserted,
 	   d->nslots, ((float) d->nelements)/d->nslots);
     
     fclose(fp);
@@ -656,24 +663,32 @@ void phase_ii()
     // I'm a receiving process: receive hashes, probe them, and send candidates 
     // Process Numbers: [0,  NSERVERS - 1]
     //-------------------------------------------------------------------------+
-
+    // Receive templates from all senders only once:
     
-    /* Listen to senders till we accumulated enough candidates */
-    printf("I am reciever with rank %d i am listening \n", myrank);
-    receiver_process_task(d, myrank, nproc, nproc_snd);
+    u8* templates = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
+    receiver_process_get_template(myrank, nproc, nproc_snd, templates);
     
-    printf("I am receiver with rank %d is going to send to archive\n", myrank);
+    while (1) { 
+      /* listen to sender and  when accumulated enough candidates send them  */
+      /* to archive  */
+      printf("I am reciever with rank %d i am listening \n", myrank);
+      receiver_process_task(d, myrank, nproc, nproc_snd, templates);
+    
 
-    /* send the messages to the archive! */
-    send_candidates_to_archive(myrank);
-    printf("I am receiver rank %d is done sending to archive\n", myrank);
+      /* send the messages to the archive! */
+      printf("I am receiver with rank %d is going to send to archive\n", myrank);
+      send_candidates_to_archive(myrank);
+      printf("I am receiver rank %d is done sending to archive\n", myrank);
+
+    }
+    free(templates);
   }
 
-  while (myrank == NSERVERS){ /* I'm THE archive*/
+  else if (myrank == NSERVERS){ /* I'm THE archive*/
     //+ todo truncate the messages file if it not multiple to HASH_INPUT_SIZE
     //+ this happen if the server was shut down during writing
     printf("I am the archive listening \n");
-    archive_receive();
+    archive_receive(); /* exits when we have enoug candidates */
     printf("I am archive registered messages on disk\n");
   }
 
@@ -709,6 +724,9 @@ void print_byte_array(u8* array, size_t nbytes)
     printf("0x%02x, ",  array[i]);
   puts("");
 }
+
+
+
 
 int main() {  phase_ii(); }
 // @todo get the number of stored candidates at each run

@@ -55,12 +55,14 @@ dict* dict_new(size_t nelements){
 
   d->nbuckets = (nelements/nslots_per_bucket) + 1;
   d->nslots_per_bucket = nslots_per_bucket;
-  d->nslots = d->nbuckets*d->nslots_per_bucket;
-  d->nelements = 0;
+  d->nslots = (d->nbuckets)*(d->nslots_per_bucket);
+
+  d->nelements = 0; /* how many elements currently in the dictionary */
   d->nelements_asked_to_be_inserted = 0;
+
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
-  /* d->nelments_succ_lookup = 0; // what is this ? */
+
   d->values = (VAL_TYPE*) aligned_alloc(ALIGNMENT,
 				      (nslots)*(sizeof(VAL_TYPE)));
 
