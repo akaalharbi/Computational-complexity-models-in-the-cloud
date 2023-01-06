@@ -34,7 +34,7 @@
 #define NWORDS_STATE 8
 #define NWORDS_INPUT 16
 #define HASH_INPUT_SIZE NWORDS_INPUT * WORD_SIZE /* in bytes */
-
+#define FILE_NAME_MAX_LENGTH 256
 
 
 

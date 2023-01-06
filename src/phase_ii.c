@@ -69,7 +69,7 @@ static inline int lookup_multi_save(dict *d,
   // |msg| = NWORDS_INPUT*WORD_SIZE (config.h)                                |
   // |dgst| = N-DEFINED_BYTES (should be N,but we skip know bits .e.g nserver)|
   // -------------------------------------------------------------------------+
-  static int one_pair_size = HASH_INPUT_SIZE + (N-DEFINED_BYTES);
+  static int one_pair_size = sizeof(CTR_TYPE) + (N-DEFINED_BYTES)*sizeof(u8);
   static int msg_size = HASH_INPUT_SIZE;
   
   /* how many messages give positive ans when their dgst gets probes */
@@ -77,8 +77,10 @@ static inline int lookup_multi_save(dict *d,
   int tmp = 0;
   for (size_t i=0; i<npairs; ++i){
     /* dictionary only read |dgst| bytes by default  */
-    tmp =  dict_has_elm(d, stream+i*one_pair_size+msg_size);
-
+    printf("probing pair%lu/%lu\n", i, npairs);
+    tmp =  dict_has_elm(d, &stream[i*one_pair_size]);
+    
+    
     if (tmp){ /* positive probe */
       // reconstruct the message:
       /* I feel we should pass this as an argument */
@@ -197,6 +199,7 @@ void load_file_to_dict(dict *d, FILE *fp)
   u8 stream_pt[N-DEFINED_BYTES]; /* @todo I believe the issue is in here */
   /* add as many hashes as possible */ 
   while ( !feof(fp) ){
+    // use fread with a larger buffer @todo 
     fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp);
     /* it adds the hash iff nprobes <= NPROBES_MAX */
     dict_add_element_to(d, stream_pt); 
@@ -371,7 +374,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   /* create file: data/messages/myrank that will hold messages whose hashes */
   /* gives a postivie response when probing the dictionary */
   
-  char file_name[128]; /* "data/send/messages/%d" */
+  char file_name[FILE_NAME_MAX_LENGTH]; /* "data/send/messages/%d" */
   snprintf(file_name, sizeof(file_name), "data/send/messages/%d", myrank );
   FILE* fp = fopen(file_name, "a");
   int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
@@ -548,8 +551,8 @@ void phase_ii()
 	   myrank, vmrss_kb, vmsize_kb);
 
     double start_time = wtime();
-    char file_name[40];
-    snprintf(file_name, 40, "data/receive/digests/%d", myrank);
+    char file_name[FILE_NAME_MAX_LENGTH];
+    snprintf(file_name, sizeof(file_name), "data/receive/digests/%d", myrank);
     FILE* fp = fopen(file_name, "r");
     load_file_to_dict(d, fp);
 

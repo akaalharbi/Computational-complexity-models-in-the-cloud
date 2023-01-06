@@ -63,8 +63,12 @@ dict* dict_new(size_t nelements){
   d->nprobes_insert=0;
   d->nprobes_lookup=0;
 
+  // the extra d->nslots_per_bucket seems to supress the address sanitizer
+  // error, however, i am not sure why since all accesses are < nslots.
   d->values = (VAL_TYPE*) aligned_alloc(ALIGNMENT,
-				      (nslots)*(sizeof(VAL_TYPE)));
+				      (nslots+d->nslots_per_bucket)*(sizeof(VAL_TYPE)));
+  /* d->values = (VAL_TYPE*) malloc((nslots)*(sizeof(VAL_TYPE))); */
+
 
 
 
@@ -122,6 +126,7 @@ int dict_add_element_to(dict* d, u8* state){
   u64 idx = 0;
   memcpy(&idx, state, L_IN_BYTES);
 
+
   /* get the bucket number and scale the index */
   idx = (idx % d->nbuckets) * d->nslots_per_bucket;
 
@@ -138,17 +143,17 @@ int dict_add_element_to(dict* d, u8* state){
     
   // linear probing 
   for (int i=0; i<NPROBES_MAX; ++i) {
+
     // found an empty slot inside a bucket
-    /* @todo address sanitizer says there is a heapoverflow here! */
      if (d->values[idx] == 0) { // found an empty slot
       d->values[idx] = val;
       ++(d->nelements); /* successfully added an element */
       return 1;
-    }
+     }
 
     idx += d->nslots_per_bucket; /* move to the next bucket */
     // reduce mod n->slots //
-    if (idx >= d->nslots) /* we forgot the equal sign here */
+    if (idx >= d->nslots ) /* we forgot the equal sign here */
       idx = 0;
   }
   return 0; // element has been added

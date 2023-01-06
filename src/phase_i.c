@@ -181,8 +181,8 @@ void phase_i_store(CTR_TYPE msg_ctr, WORD_TYPE state[NWORDS_STATE]){
   u8* stream_pt = (u8*) state; 
 
   /// INIT FILES: server files that will be send later and state
-  char file_name[50]; // more thnan enough to store file name
-  char states_file_name[40];
+  char file_name[FILE_NAME_MAX_LENGTH]; // more thnan enough to store file name
+  char states_file_name[FILE_NAME_MAX_LENGTH];
   
   FILE* data_to_servers[NSERVERS];
   FILE* states_file;
