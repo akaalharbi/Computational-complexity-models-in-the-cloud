@@ -19,9 +19,9 @@ MPI_LINK = -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
 
 INCLUDE = -Iinclude $(MPI_INCLUDE)
 LDLIBS  =  $(MPI_LINK) -lm
-LDFLAGS = -fopenmp -pthread -O0 -g
+LDFLAGS = -fopenmp -pthread -O0 -g -fsanitize=address
 # note: -fanalyzer doesn't report when -flto is enabled
-CFLAGS =  -g -O0 -fopenmp -Wall -march=native -msha  -std=c11 -fopt-info-all -fanalyzer
+CFLAGS =  -g -O0 -fopenmp -Wall -march=native -msha  -std=c11 -fopt-info-all -fanalyzer -fsanitize=address 
 #CFLAGS += -DVERBOSE_LEVEL=2 
 
 

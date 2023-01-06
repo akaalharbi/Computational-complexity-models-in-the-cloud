@@ -195,7 +195,8 @@ void load_file_to_dict(dict *d, FILE *fp)
     return; // raise an error instead
   }
 
-  u8 stream_pt[N-DEFINED_BYTES];
+  // @todo address sanitizer detected stack buffer overflow 
+  u8 stream_pt[N-DEFINED_BYTES]; /* @todo I believe the issue is in here */
   /* add as many hashes as possible */
   while ( !feof(fp) ){
     fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp);
@@ -503,7 +504,8 @@ void archive_receive()
     MPI_Status status;
 
 
-    printf("archive says val_size_byte=%d, L=%d, N=%d\n\n", VAL_SIZE_BYTES, L, N);
+    printf("archive says val_size_byte=%d, L=%d, L_BYTES=%d, N=%d\n",
+	   VAL_SIZE_BYTES, L, L_IN_BYTES, N);
     printf(" archive says the #needed_candidates = %llu, NDISCARDED_BITS=%d\n",
 	   NNEEDED_CND_THIS_SERVER, DISCARDED_BITS);
     

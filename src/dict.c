@@ -3,6 +3,7 @@
 // the input values are not hashed since we assume that keys have been
 // already hashed (context: long message attack)
 
+#include "confg_math_func.h"
 #include "numbers_shorthands.h"
 #include "dict.h"
 #include "config.h"
@@ -47,13 +48,14 @@ dict* dict_new(size_t nelements){
   size_t nslots = nelements;
 
   //+ todo does negative gives the correct result here?
-   nslots = nslots + (-nslots % nslots_per_bucket);
+  //nslots = nslots + (-nslots % nslots_per_bucket);
 
 
   /// Save configured variables as dictionary entries 
-  d->nslots = nslots;
-  d->nbuckets = nslots/nslots_per_bucket;
+
+  d->nbuckets = (nelements/nslots_per_bucket) + 1;
   d->nslots_per_bucket = nslots_per_bucket;
+  d->nslots = d->nbuckets*d->nslots_per_bucket;
   d->nelements = 0;
   d->nelements_asked_to_be_inserted = 0;
   d->nprobes_insert=0;
@@ -105,7 +107,10 @@ int dict_add_element_to(dict* d, u8* state){
   // INPUTS:                                                                  |
   // `*d`:  dictionary that will store state as an element                    |
   // `*state`: element to be stored in *d in the form                         |
-  //          (L bits) || discard || (VAL_SIZE bits)                          |
+  //          (L bits) || discard || (VAL_SIZE bits) more precisely:          |
+  //          (L_IN_BYTES bytes)  || (VAL_SIZE bits)                          |
+  // issues may aris when VAL_SIZE is larger then what is left in the state   |
+  //                                                                          |
   // -------------------------------------------------------------------------+
   
   ++(d->nelements_asked_to_be_inserted);
@@ -119,13 +124,21 @@ int dict_add_element_to(dict* d, u8* state){
   idx = (idx % d->nbuckets) * d->nslots_per_bucket;
 
   VAL_TYPE val = 0;
-  memcpy(&val, &state[L_IN_BYTES], VAL_SIZE_BYTES);
-  
+  /* @todo address sanitizer detected stack overflow here  */
+  /* fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp); */
+  // L_IN_BYTES=3, N=7, L=20, VAL_SIZE_BYTES=4, state[6]
+  // why do we skpid L_IN_BYTES BYTES 
+  /* memcpy(&val, &state[L_IN_BYTES], VAL_SIZE_BYTES); */
 
+  memcpy(&val,
+	 &state[L_IN_BYTES],
+	 MIN(VAL_SIZE_BYTES, N - L_IN_BYTES - DEFINED_BYTES )); 
+    
   // linear probing 
   for (int i=0; i<NPROBES_MAX; ++i) {
     // found an empty slot inside a bucket
-    if (d->values[idx] == 0) { // found an empty slot
+    /* @todo address sanitizer says there is a heapoverflow here! */
+     if (d->values[idx] == 0) { // found an empty slot
       d->values[idx] = val;
       ++(d->nelements); /* successfully added an element */
       return 1;
@@ -133,7 +146,7 @@ int dict_add_element_to(dict* d, u8* state){
 
     idx += d->nslots_per_bucket; /* move to the next bucket */
     // reduce mod n->slots //
-    if (idx > d->nslots)
+    if (idx >= d->nslots) /* we forgot the equal sign here */
       idx = 0;
   }
   return 0; // element has been added
