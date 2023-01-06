@@ -1,6 +1,5 @@
 // phase ii: high level overview 
 // four types of processors: senders (the majority), receivers (#NSERVERS),
-// and archive (1).
 // Upon starting the program:
 //
 // `receiver`:- (init) load digests into a dictionary(once), receive messages
@@ -16,8 +15,6 @@
 //              is reach the quota, send that buffer to receiver x.
 //              repeat infinitely
 //
-// `archive`: -(listen) stay posted for a message to be received from `receiver`
-//             when receiving a message, write them immediately to a file.
 
 
 
@@ -337,17 +334,16 @@ static inline void receiver_process_get_template(int myrank, int nproc, int npro
   //---------------------------------------------------------------------------+
 
   // process : 0 -> NSERVERS - 1 (receivers),
-  //         : NSERVERS (archive)
-  //         : NSERVERS + 1 -> nproc (senders)
+  //         : NSERVERS -> nproc (senders)
 
   MPI_Status status;
 
   for (int i=0; i<nproc_snd; ++i){
-    printf("receiver %d is listening to %d for the template\n", myrank, i + NSERVERS + 1);
+    printf("receiver %d is listening to %d for the template\n", myrank, i + NSERVERS);
     MPI_Recv(&templates[i*HASH_INPUT_SIZE],
 	     HASH_INPUT_SIZE,
 	     MPI_UNSIGNED_CHAR,
-	     i + NSERVERS + 1,
+	     i + NSERVERS,
 	     TAG_RANDOM_MESSAGE,
 	     MPI_COMM_WORLD,
 	     &status);
@@ -375,9 +371,9 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   /* create file: data/messages/myrank that will hold messages whose hashes */
   /* gives a postivie response when probing the dictionary */
   
-  char file_name[25]; /* "data/send/messages/%d" */
+  char file_name[128]; /* "data/send/messages/%d" */
   snprintf(file_name, sizeof(file_name), "data/send/messages/%d", myrank );
-  FILE* fp = fopen(file_name, "w");
+  FILE* fp = fopen(file_name, "a");
   int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
                     + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
   
@@ -393,23 +389,26 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   MPI_Request request;
 
   int* indices = (int*)malloc(sizeof(int)*nproc);
-  size_t nfound_cnd = 0;
+  size_t nfound_cnd = get_file_size(fp) / HASH_INPUT_SIZE ;
+  size_t old_nfound_candidates = nfound_cnd;
   int sender_name = 0;
 
 
+  
   
   long vmrss_kb, vmsize_kb;
   get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
   printf("reciver #%d memory usage after mpi init: ram: %ld kb vm: %ld kb\n",
 	 myrank, vmrss_kb, vmsize_kb);
-
-  printf("receiver %d done with initialization for mpi\n", myrank);
   
+
+
+
 
   //---------------------------------------------------------------------------+
   // --- Part 3: Receive digests and probe them
   //---------------------------------------------------------------------------+
-
+  printf("recv#%d is listening\n", myrank);
   // listen the first time
   MPI_Recv(rcv_buf,
 	   rcv_array_size,
@@ -422,7 +421,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   memcpy(lookup_buf, rcv_buf, rcv_array_size);
   sender_name = status.MPI_SOURCE; // who sent the message?
 
-  size_t old_nfound_candidates = 0;
+
   while (NNEEDED_CND_THIS_SERVER  > nfound_cnd) {
 
     //+ receive messages from different processors
@@ -435,7 +434,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 	      &request);
 
     //+ probe these messages and update the founded candidates
-
+    printf("recv#%d is going to probe the dict\n", myrank);
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
 				    rcv_buf, /* messages to search in d */
 				    &templates[sender_name],
@@ -449,8 +448,6 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
     MPI_Wait(&request, &status);
     sender_name = status.MPI_SOURCE; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
-
-    
     }
 
 
@@ -463,99 +460,8 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 
 
 
-void send_candidates_to_archive(int myrank)
-{
-  /* allocate buffer for messages that found s.t. their dgst give postivie ans*/
-  
-  size_t snd_buf_size = sizeof(u8)*HASH_INPUT_SIZE*NNEEDED_CND_THIS_SERVER;
-  u8* snd_buf = (u8*) malloc(snd_buf_size);
-
-  char msg_file_name[40];
-  /* file name := myrank_t(time_stamp) */
-  snprintf(msg_file_name, sizeof(msg_file_name),
-	   "data/send/messages/%d", myrank);
 
 
-   
-  FILE* fp = fopen(msg_file_name, "r");
-  printf("recv#%d walked here file=%s\n", myrank, msg_file_name);
-  
-  fread(snd_buf, snd_buf_size, 1, fp); /* should matches with the file size */
-
-  MPI_Send(snd_buf,
-	   snd_buf_size,
-	   MPI_UNSIGNED_CHAR,
-	   ARCHIVE_SERVER,
-	   TAG_MESSAGES_CANDIDATES,
-	   MPI_COMM_WORLD);
-  fclose(fp);
-  
-  return;
-
-}
-
-
-void archive_receive()
-{ //+ todo restructure the receiving way
-
-    char archive_file_name[] = "data/receive/messages/archive";
-    int actual_rcv_count = 0;
-    
-    /* MPI_Status status; */
-    MPI_Status status;
-
-
-    printf("archive says val_size_byte=%d, L=%d, L_BYTES=%d, N=%d\n",
-	   VAL_SIZE_BYTES, L, L_IN_BYTES, N);
-    printf(" archive says the #needed_candidates = %llu, NDISCARDED_BITS=%d\n",
-	   NNEEDED_CND_THIS_SERVER, DISCARDED_BITS);
-    
-
-    
-    /* maximum possible receiving message  */
-    size_t rcv_buf_size = HASH_INPUT_SIZE*NNEEDED_CND;
-    u8* rcv_buf = malloc(sizeof(u8)*rcv_buf_size);
-    FILE* fp = fopen(archive_file_name, "a");
-
-
-    while ( NNEEDED_CND > actual_rcv_count ) {
-      
-      /*receive from any server and immediately treat their dgst*/
-      MPI_Recv(rcv_buf,
-	       rcv_buf_size,
-	       MPI_UNSIGNED_CHAR,
-	       MPI_ANY_SOURCE,
-	       TAG_MESSAGES_CANDIDATES,
-	       MPI_COMM_WORLD,
-	       &status);
-
-      printf("archive received a message from #%d!\n", status.MPI_SOURCE);
-
-
-
-
-
-      
-      /* How many messages have we received? */
-      MPI_Get_count(&status,
-		    MPI_UNSIGNED_CHAR,
-		    &actual_rcv_count);
-
-      printf("archive received %0.2f messages from recveiver #%d\n",
-	     ((float)actual_rcv_count)/HASH_INPUT_SIZE, status.MPI_SOURCE);
-	
-      /* Number of received messages */
-      actual_rcv_count = actual_rcv_count / HASH_INPUT_SIZE;
-      fwrite(rcv_buf,
-	     actual_rcv_count*HASH_INPUT_SIZE,
-	     1,
-	     fp);
-
-      fflush(fp);
-    } // end treating received messages 
-
-    fclose(fp);
-}
 
 // 
 // -----------------------------------------------------------------------------
@@ -584,25 +490,25 @@ void phase_ii()
   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
   /* How many procs that are going t send */
-  int nproc_snd = nproc - NSERVERS - 1;
+  int nproc_snd = nproc - NSERVERS;
   
   
   /* send digests, 1 digest ≡ 256 bit */
   // int nthreads = omp_get_max_threads(); // no need for this?!
 
   // Who am I? sender, receiver, or archive.
-  if (myrank > NSERVERS){
+  if (myrank >= NSERVERS){
     // ------------------------------------------------------------------------+
     // I am a sending processor. I only generate hashes and send them.
     // Process Numbers: [NSERVERS + 1,  nproc]
     //-------------------------------------------------------------------------+
-     
+
     /* init state: this should goes inside sender_process_task */
-
-
     /* set up a random message */
+
     /* M = 64bit ctr || 64bit nonce || random value */
     u8 M[HASH_INPUT_SIZE]; /* random word */
+
     /* Get a random message only once */
     CTR_TYPE* ctr_pt = (CTR_TYPE*) M; /* counter pointer  */
     getrandom(M, HASH_INPUT_SIZE, 1);
@@ -641,7 +547,7 @@ void phase_ii()
 	   "%ld kb vm: %ld kb\n",
 	   myrank, vmrss_kb, vmsize_kb);
 
-    double start_time = 0;
+    double start_time = wtime();
     char file_name[40];
     snprintf(file_name, 40, "data/receive/digests/%d", myrank);
     FILE* fp = fopen(file_name, "r");
@@ -658,7 +564,9 @@ void phase_ii()
 
     
     get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
-    printf("reciver #%d memory usage after load: ram: %ld kb vm: %ld kb\n", myrank, vmrss_kb, vmsize_kb);
+    printf("reciver #%d memory usage after load: ram: %ld kb vm: %ld kb\n"
+	   "============================================================\n",
+	   myrank, vmrss_kb, vmsize_kb);
     //-------------------------------------------------------------------------+
     // I'm a receiving process: receive hashes, probe them, and send candidates 
     // Process Numbers: [0,  NSERVERS - 1]
@@ -668,32 +576,25 @@ void phase_ii()
     u8* templates = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
     receiver_process_get_template(myrank, nproc, nproc_snd, templates);
     
-    while (1) { 
-      /* listen to sender and  when accumulated enough candidates send them  */
-      /* to archive  */
-      printf("I am reciever with rank %d i am listening \n", myrank);
-      receiver_process_task(d, myrank, nproc, nproc_snd, templates);
+
+    /* listen to sender and save candidates */
+    printf("I am reciever with rank %d i am listening \n", myrank);
+    receiver_process_task(d, myrank, nproc, nproc_snd, templates);
     
 
-      /* send the messages to the archive! */
-      printf("I am receiver with rank %d is going to send to archive\n", myrank);
-      send_candidates_to_archive(myrank);
-      printf("I am receiver rank %d is done sending to archive\n", myrank);
+    /* send the messages to the archive! */
+    /* printf("I am receiver with rank %d is going to send to archive\n", myrank); */
+    /* send_candidates_to_archive(myrank); */
+    /* printf("I am receiver rank %d is done sending to archive\n", myrank); */
 
-    }
+
     free(templates);
   }
 
-  else if (myrank == NSERVERS){ /* I'm THE archive*/
-    //+ todo truncate the messages file if it not multiple to HASH_INPUT_SIZE
-    //+ this happen if the server was shut down during writing
-    printf("I am the archive listening \n");
-    archive_receive(); /* exits when we have enoug candidates */
-    printf("I am archive registered messages on disk\n");
-  }
 
 
   // The end that will never be reached in any case!
+  printf("process #%d reached the end (should be a receiver)\n", myrank);
   MPI_Finalize();
   return;
 }
@@ -730,4 +631,4 @@ void print_byte_array(u8* array, size_t nbytes)
 
 int main() {  phase_ii(); }
 // @todo get the number of stored candidates at each run
-// @todo unexpected behavior receivers are listening to archive!
+
