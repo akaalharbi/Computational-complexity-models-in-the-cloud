@@ -65,7 +65,7 @@ void print_byte_array(u8* array, size_t nbytes)
 
 
 
-void phase_iii() /* single machine */
+int main(int argc, char* argv[]) /* single machine */
 {
   // 1- load message candidates and hahs them
   // -- copy the hashes, and sort the copied hashes 
@@ -81,10 +81,12 @@ void phase_iii() /* single machine */
   FILE* fp = fopen("data/receive/messages/archive", "r");
   size_t nmsgs = get_file_size(fp)/HASH_INPUT_SIZE;
   const WORD_TYPE state_init[NWORDS_STATE] = {HASH_INIT_STATE};
+  printf("we have %lu candidates\n", nmsgs);
   
   /* We have three arrays: */
   u8* msgs  = (u8*) malloc( sizeof(u8)*nmsgs*HASH_INPUT_SIZE );
   u8* dgsts = (u8*) malloc(sizeof(u8)*nmsgs*(N) );
+
   u8* dgsts_orderd = (u8*) malloc(sizeof(u8)*nmsgs*(N) );
   
   fread(msgs, nmsgs, HASH_INPUT_SIZE, fp);
@@ -112,13 +114,13 @@ void phase_iii() /* single machine */
   
   // ----------------------------- PART 2 ------------------------------------
   // hash the long message with each hashing probe 
-  fp = fopen("long_message_middle_states", "r");
+  fp = fopen("data/states", "r");
   size_t nmiddle_states  = get_file_size(fp)/(NWORDS_STATE*WORD_SIZE);
   /* How many state does a thread handle */
   size_t thread_load = nmiddle_states/omp_get_max_threads();
   
 
- #pragma omp parallel
+  #pragma omp parallel
   {
     void* ptr; // result of binary search
     int thread_num = omp_get_thread_num();
@@ -163,7 +165,11 @@ void phase_iii() /* single machine */
     } // end for loop, thread's main work
 
   } // end parallel region
+  free(fp);
+  free(msgs);
+  free(dgsts);
+  free(dgsts_orderd);
 } // quit the function
 
 
-int main(){}
+

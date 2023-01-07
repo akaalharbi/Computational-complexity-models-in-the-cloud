@@ -49,7 +49,7 @@
 // Let N := n / 8
 #define N 7 /* bytes i.e n := 8*N bits */
 // will be replaced by the NHASHES below 
-#define L 20 /* store 2^L elements in the dictionary  */
+#define L 25 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
@@ -64,6 +64,8 @@
 
 /* how big is our counter */
 #define CTR_TYPE u64
+/* record the whole state after each each interval has passed */
+#define INTERVAL (NHASHES>>10)
 
 
 // sanity check
