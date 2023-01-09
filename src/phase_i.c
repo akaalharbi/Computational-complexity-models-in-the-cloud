@@ -44,20 +44,22 @@ static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
   // """ One potential idea is to do:                                          |
   // server <-- h % nserver                                                    |
   // h'     <-- h / nserver """                                                |
+  //
   // --------------------------------------------------------------------------+
   
-  const static WORD_TYPE ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
+  const static u32 ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
+
   /* 1- convert MState to a WORD_TYPE (dist_bits || nserver || rest)32bits */
   /* 2- remove the distinguished bits by shifting  (nserver || rest ) */
   /* 3- keep only the bits that holds nserver (nserver) it may have extra bit */
   /* 4- Compute server number by taking computing mod nservers */
-  u32 snd_to_server  = ( (((WORD_TYPE*)MState)[0] >> (DIFFICULTY))
-			 & ones_nservers) % NSERVERS;
+  u32 snd_to_server  = ((WORD_TYPE*)MState)[0] ;
 
-  
+  snd_to_server = (( snd_to_server >> DIFFICULTY) & ones_nservers) % NSERVERS;
 
   return snd_to_server;
 }
+
 
 void was_state_written_on_disk(CTR_TYPE* msg_ctr,
 			       size_t* nhashes_stored,

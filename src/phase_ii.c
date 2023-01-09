@@ -97,8 +97,8 @@ static inline int lookup_multi_save(dict *d,
       // reconstruct the message:
       /* I feel we should pass this as an argument */
 
-      printf("found a candidate at counter=");
-      print_char(&stream[i*one_pair_size], sizeof(CTR_TYPE));
+      /* printf("found a candidate at counter="); */
+      /* print_char(&stream[i*one_pair_size], sizeof(CTR_TYPE)); */
 
       /* reconstructing the message: get the template */
       memcpy(M, init_message, HASH_INPUT_SIZE);
@@ -189,8 +189,9 @@ static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
   /* 2- remove the distinguished bits by shifting  (nserver || rest ) */
   /* 3- keep only the bits that holds nserver (nserver) it may have extra bit */
   /* 4- Compute server number by taking computing mod nservers */
-  u32 snd_to_server  = ( (((WORD_TYPE*)MState)[0] >> DIFFICULTY)
-			 & ones_nservers) % NSERVERS;
+  u32 snd_to_server  = ((WORD_TYPE*)MState)[0] ;
+
+  snd_to_server = (( snd_to_server >> DIFFICULTY) & ones_nservers) % NSERVERS;
 
   return snd_to_server;
 }
@@ -265,8 +266,10 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   CTR_TYPE* ctr_pt = (CTR_TYPE*) M; /* counter pointer  */
   getrandom(M, HASH_INPUT_SIZE, 1);
   ctr_pt[0] = 0; /* zeroing the first 64bits of M */
-  printf("sender %d got template\n", myrank);
-  print_char(M,HASH_INPUT_SIZE);
+
+  char txt[50];
+  snprintf(txt, sizeof(txt), "sender #%d got template", myrank);
+  print_byte_txt(txt, M,HASH_INPUT_SIZE);
 
     
   /* Send the initial input to all receiving servers */
@@ -311,7 +314,7 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   const u64 mask_test = (1LL<<DIFFICULTY) - 1;
 
   /* pos i: How many messages we've generated to be sent to server i? */
-  u32* servers_ctr = (u32*) malloc(sizeof(u32)*NSERVERS);
+  u64 servers_ctr[NSERVERS] = {0};
   /* set number of generated messages before sending to 0 */
   memset(servers_ctr, 0, sizeof(u32)*NSERVERS); 
 
@@ -325,8 +328,8 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   int snd_ctr = 0;
 
   int i = 0;
-  /* while(1) { /\* when do we break? never! *\/ */
-  while(i<1) { /* when do we break? never! */
+  while(1) { /* when do we break? never! */
+  /* while(i<1) { /\* when do we break? never! *\/ */
 
     /* Find a message that produces distinguished point */
     find_hash_distinguished( M, Mstate, &msg_ctr, mask_test);
@@ -353,8 +356,10 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 	    ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
 	    N-DEFINED_BYTES );
 
-    printf("sender#%d, #one_pair=%dbytes, snd_buf=",myrank, one_pair_size);
-    print_char(&snd_buf[offset], one_pair_size);
+
+
+    
+
     
 
     /* this server has one more digest */
@@ -368,13 +373,19 @@ void sender(int myrank, MPI_Comm mpi_communicator)
       /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
       /* time_start = wtime(); */
       /* we have enough messages to send to server (server_number) */
-      MPI_Send(snd_buf,
+      MPI_Send(&snd_buf[offset],
 		PROCESS_QUOTA*one_pair_size,
 		MPI_UNSIGNED_CHAR,
 		server_number,
 		TAG_SND_DGST,
 		MPI_COMM_WORLD);
       ++i;
+
+      char txt[50];
+      snprintf(txt, sizeof(txt), "sender#%d,  server=%d, snd_buf=",
+	       myrank, server_number );
+      print_byte_txt(txt, &snd_buf[offset], one_pair_size*PROCESS_QUOTA);
+
       /* printf("rank %d: sending done to %d, snd_ctr=%d, it took %fsec\n", */
       /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
       /* time_start = wtime(); */
@@ -388,7 +399,7 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
   free(snd_buf);
   /* free(buf_attached); */
-  free(servers_ctr);
+
   return; // au revoir.
 
 } // MPI_Finalize
@@ -471,8 +482,8 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   
   long vmrss_kb, vmsize_kb;
   get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
-  printf("reciver #%d memory usage after mpi init: ram: %ld kb vm: %ld kb\n",
-	 myrank, vmrss_kb, vmsize_kb);
+  /* printf("reciver #%d memory usage after mpi init: ram: %ld kb vm: %ld kb\n", */
+  /* 	 myrank, vmrss_kb, vmsize_kb); */
   
 
 
@@ -481,7 +492,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   //---------------------------------------------------------------------------+
   // --- Part 3: Receive digests and probe them
   //---------------------------------------------------------------------------+
-  printf("recv#%d is listening\n", myrank);
+  /* printf("recv#%d is listening\n", myrank); */
   // listen the first time
   MPI_Recv(rcv_buf,
 	   rcv_array_size,
@@ -498,10 +509,14 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   // @todo restore the while loop
   /* while (NNEEDED_CND  > nfound_cnd) {  */ // @todo fix this line
   // strange behavior nneeded_cnd = 0
-  printf("rcv #%d, receive buffer=", myrank);
-  print_char(rcv_buf, rcv_array_size);
+
+  /* char txt[50]; */
+  /* snprintf(txt, sizeof(txt), "rcv #%d, receive buffer=", myrank); */
+  /* print_byte_txt(txt,rcv_buf, rcv_array_size); */
+
+
   while (4  > nfound_cnd) {    
-    printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank);
+    /* printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank); */
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */
 	      rcv_array_size, 
@@ -520,12 +535,14 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 				    fp); /* file to record cadidates */
 
     if (nfound_cnd - old_nfound_candidates > 0) {
-      printf("receiver #%d found %lu candidates\n", myrank, nfound_cnd);
+      /* printf("receiver #%d found %lu candidates\n", myrank, nfound_cnd); */
       old_nfound_candidates = nfound_cnd;
     }
     MPI_Wait(&request, &status);
-    printf("rcv #%d, receive buffer=", myrank);
-    print_char(rcv_buf, rcv_array_size);
+
+
+
+
 
     sender_name = status.MPI_SOURCE; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);

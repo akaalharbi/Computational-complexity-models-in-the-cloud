@@ -2,6 +2,7 @@
 /// extracted while making the long message attack
 
 #include "util_char_arrays.h"
+#include <stddef.h>
 #include <stdint.h>
 
 
@@ -47,6 +48,14 @@ void print_char(unsigned char* l, size_t len){
     printf("%02x",(unsigned char) l[i]);
   puts("");
 }
+
+void print_byte_txt(char* txt, unsigned char* a, size_t len){
+  printf("%s 0x", txt);
+  for (size_t i = 0; i<len; ++i)
+    printf("%02x",(unsigned char) a[i]);
+  puts("");
+}
+  
 
 
 /* unsigned char* long_message_zeros(size_t n_of_bits){ */
@@ -212,3 +221,4 @@ void inline truncate_state32bit_get_digest(uint64_t* dst, uint32_t state[8], int
     
   
 }
+
