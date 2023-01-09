@@ -48,15 +48,20 @@
 
 
 
+//
+// checklist: msg||dgst 
+
 //---------------------------- UTILITY FUNCTIONS -------------------------------
 
 
 static inline int lookup_multi_save(dict *d,
-				    u8 *stream,
-				    u8 init_message[HASH_INPUT_SIZE],
-				    size_t npairs,
+				    u8 *stream, /* state */
+                                    u8 init_message[HASH_INPUT_SIZE],
+                                    size_t npairs,
 				    FILE *fp)
-{ // Given stream={msg1||dgst1,..} from specific rank, probes each dgst, if   |
+{
+  // -------------------------------------------------------------------------+
+  // Given stream={msg1||dgst1,..} from specific rank, probes each dgst, if   |
   // prope(dgst)=/=0 store its related msg in fp, and returns the number of   |
   // stored messages.                                                         |
   // -------------------------------------------------------------------------+
@@ -66,32 +71,42 @@ static inline int lookup_multi_save(dict *d,
   // - npairs: how many pairs (msg, dgst) in the stream.                      |
   // -------------------------------------------------------------------------+
   // NOTES:                                                                   |
-  // |msg| = NWORDS_INPUT*WORD_SIZE (config.h)                                |
+  // |msg| = sizeof(CTR_TYPE) since we receive the counter                    |
+  // |full-msg| = NWORDS_INPUT*WORD_SIZE (config.h) it can be constructed     |
+  // using msg and template.                                                  |
   // |dgst| = N-DEFINED_BYTES (should be N,but we skip know bits .e.g nserver)|
   // -------------------------------------------------------------------------+
+  /* the stream size is multiple of one_pair size */
   static int one_pair_size = sizeof(CTR_TYPE) + (N-DEFINED_BYTES)*sizeof(u8);
   static int msg_size = HASH_INPUT_SIZE;
   
   /* how many messages give positive ans when their dgst gets probes */
   int npositive_msgs = 0;
   int tmp = 0;
+  static char M[HASH_INPUT_SIZE]; /* construct the full message here */
+  
   for (size_t i=0; i<npairs; ++i){
     /* dictionary only read |dgst| bytes by default  */
-    printf("probing pair%lu/%lu\n", i, npairs);
-    tmp =  dict_has_elm(d, &stream[i*one_pair_size]);
+    /* probing pair #i */
+    // this is wrong we are probing the messgae not the digest, lmfao!
+    tmp =  dict_has_elm(d, &stream[i*one_pair_size + sizeof(CTR_TYPE)]);
     
+
     
-    if (tmp){ /* positive probe */
+    if (tmp){ /* positive probe, i.e. we found a candidate msg||dgst  */
       // reconstruct the message:
       /* I feel we should pass this as an argument */
-      static char M[HASH_INPUT_SIZE];
+
+      printf("found a candidate at counter=");
+      print_char(&stream[i*one_pair_size], sizeof(CTR_TYPE));
+
+      /* reconstructing the message: get the template */
       memcpy(M, init_message, HASH_INPUT_SIZE);
       /* set the counter part */
       memcpy(M, stream+i*one_pair_size, sizeof(CTR_TYPE));
       /* finally write the reconstructed message */
       fwrite(M, sizeof(u8), msg_size, fp);
       fflush(fp); /* ensures it's written */
-      
       ++npositive_msgs;
     }
   }
@@ -282,16 +297,19 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
     /* 1st term: go to server booked memory, 2nd: location of 1st free place*/
     offset = server_number*one_pair_size + servers_ctr[server_number];
     // recall que one_pair_size =  |dgst| + |ctr| - |known bits|
-    
-    /* save N-DEFINED_BYTES of MState in: snd_buf_dgst[offset] */
-    memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
-	     &snd_buf[offset], /* copy digest to snd_buf[offset] */
-	     N-DEFINED_BYTES );
 
-    /* record the counter, above we've recorded N-DEFINED_BYTES  */
+
+    // record a pair (msg, dgst), msg is just the counter in our case
+    /* record the counter  */
     memcpy(M,
-	   &snd_buf[ offset + (N-DEFINED_BYTES) ],
+	   &snd_buf[ offset ],
 	   sizeof(CTR_TYPE) );
+
+
+    /* After the counter save N-DEFINED_BYTES of MState */
+    memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
+	     &snd_buf[offset + sizeof(CTR_TYPE)], /* copy digest to snd_buf[offset] */
+	     N-DEFINED_BYTES );
 
     /* this server has one more digest */
     ++servers_ctr[server_number];
@@ -425,7 +443,8 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   sender_name = status.MPI_SOURCE; // who sent the message?
 
 
-  while (NNEEDED_CND_THIS_SERVER  > nfound_cnd) {
+  
+  while (NNEEDED_CND  > nfound_cnd) {
 
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */

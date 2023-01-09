@@ -57,7 +57,7 @@ $(OBJDIR)/%.o: $(SRC)/%.c
 
 
 
-TARGETS = phase_i phase_ii phase_iii
+TARGETS = test phase_i phase_ii phase_iii
 
 # REMOVE TARGETS FROM $(OBJECTS)
 TARGET_OBJECTS = $(addprefix $(OBJDIR)/,  $(addsuffix .o, $(TARGETS)) )
@@ -82,6 +82,9 @@ all: $(TARGETS)
 # we wish to build X:
 # 1- remove all $(TARGETS) members from dependencies
 # 2- add X.o as a dependency
+
+test: $(OBJDIR)/test.o $(COMMON_OBJECTS)
+	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 
 phase_i: $(OBJDIR)/phase_i.o $(COMMON_OBJECTS)

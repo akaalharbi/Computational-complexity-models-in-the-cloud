@@ -46,7 +46,7 @@ static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
   // h'     <-- h / nserver """                                                |
   // --------------------------------------------------------------------------+
   
-  const static u32 ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
+  const static WORD_TYPE ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
   /* 1- convert MState to a WORD_TYPE (dist_bits || nserver || rest)32bits */
   /* 2- remove the distinguished bits by shifting  (nserver || rest ) */
   /* 3- keep only the bits that holds nserver (nserver) it may have extra bit */
@@ -244,7 +244,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
     msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
     /* print_char(M, 64); */
 
-    if ( (state[0] & ones) == ones){ /* it is a distinguished point */
+    if ( (state[0] & ones) == 0){ /* it is a distinguished point */
 
       /* Decide which server is responsible for storing this digest */
       k = to_which_server((u8*) state);
@@ -313,7 +313,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
 int main(){
   /// Generate distinguished points to be stored in dictionaries
   /// inside each server.
-  
+   
   // -INIT: The number of Hashes each server will get
   CTR_TYPE msg_ctr = 0;
   size_t nhashes_stored = 0;

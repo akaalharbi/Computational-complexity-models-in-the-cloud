@@ -3,8 +3,10 @@
 #ifndef LONG_MESSAGE_CONFIG_MATH_H
 #define LONG_MESSAGE_CONFIG_MATH_H
 
-#define CEILING(x,y) (((x) + (y) - 1) / (y))
-#define MIN(x ,y) (((x) > (y)) ? (y) : (x))
+#define CEILING(X,Y) (((X) + (Y) - 1) / (Y))
+#define MIN(X ,Y) (((X) > (Y)) ? (Y) : (X))
+#define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
+
 
 /* https://stackoverflow.com/a/39920811/20495595 */
 #define NEEDS_BIT(N, B)     (((unsigned long)N >> B) > 0)
