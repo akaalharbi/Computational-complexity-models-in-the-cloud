@@ -1,3 +1,9 @@
+Monday 9 Jan 2023
+- assumption: N-DEFINED_BYTES > 0
+- assumption: log2(nservers) + difficulty <= 32
+
+
+____________________
 Wednesday 5 Jan 2023
 - Dictionary can't find digests!
 - Dictionary has more elements than the available number of slots!

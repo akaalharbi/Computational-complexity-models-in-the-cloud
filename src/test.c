@@ -53,6 +53,7 @@ int main(int argc, char* argv[]){
   puts("------------------------------\n");
   int nmsgs = 0;
   const static u32 ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
+  int server = 0;
   
   for (; nmsgs<20;){
     hash_single(state, M);
@@ -62,15 +63,26 @@ int main(int argc, char* argv[]){
 
 
     
-
-    if ( (state[0] & ones) == 0){ /* it is a distinguished point */
+    server =  ( (((WORD_TYPE*)state)[0] >> (DIFFICULTY)) & ones_nservers)
+      % NSERVERS;
+    
+    if ( (state[0] & ones) == 0 && (server == 1) ){ /* it is a distinguished point */
       ++nmsgs;
-      printf("msg_ctr=%llu, nserver=%d\n", msg_ctr_pt[0],
-	     ( (((WORD_TYPE*)state)[0] >> (DIFFICULTY)) & ones_nservers) % NSERVERS
-);
+      printf("msg_ctr=%llu, nserver=%d\n", msg_ctr_pt[0], server);
       puts("YAY");
       print_char((u8*) state, 32);
       puts("--------------------------------------------\n");
     }
    }
+
+  puts("=========================");
+  FILE* fp = fopen("data/send/digests/1", "r");
+
+  u8 stream_pt[N-DEFINED_BYTES];
+  for (int i = 0; i<nmsgs; i++){
+    fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp);
+    print_char(stream_pt, N-DEFINED_BYTES);
+    
+  }
+
 }

@@ -55,9 +55,9 @@
 
 
 static inline int lookup_multi_save(dict *d,
-				    u8 *stream, /* state */
+				    u8 *stream, /* rcv_buf  */ 
                                     u8 init_message[HASH_INPUT_SIZE],
-                                    size_t npairs,
+                                    size_t npairs, /* #pairs in rcv_buf */
 				    FILE *fp)
 {
   // -------------------------------------------------------------------------+
@@ -104,6 +104,7 @@ static inline int lookup_multi_save(dict *d,
       memcpy(M, init_message, HASH_INPUT_SIZE);
       /* set the counter part */
       memcpy(M, stream+i*one_pair_size, sizeof(CTR_TYPE));
+
       /* finally write the reconstructed message */
       fwrite(M, sizeof(u8), msg_size, fp);
       fflush(fp); /* ensures it's written */
@@ -182,6 +183,7 @@ static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
   // --------------------------------------------------------------------------+
   
   const static u32 ones_nservers = (1LL<<LOG2_NSERVERS) - 1;
+
   /* 1- convert MState to a WORD_TYPE (dist_bits || nserver || rest)32bits */
   /* 2- remove the distinguished bits by shifting  (nserver || rest ) */
   /* 3- keep only the bits that holds nserver (nserver) it may have extra bit */
@@ -191,6 +193,7 @@ static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
 
   return snd_to_server;
 }
+
 // -----------------------------------------------------------------------------
 void load_file_to_dict(dict *d, FILE *fp)
 {
@@ -210,8 +213,8 @@ void load_file_to_dict(dict *d, FILE *fp)
     return; // raise an error instead
   }
 
-  // @todo address sanitizer detected stack buffer overflow, stream_pt[6], L_IN_BYTES=3, VAL_SIZE_BYTES=4
-  u8 stream_pt[N-DEFINED_BYTES]; /* @todo I believe the issue is in here */
+
+  u8 stream_pt[N-DEFINED_BYTES];
   /* add as many hashes as possible */ 
   while ( !feof(fp) ){
     // use fread with a larger buffer @todo 
@@ -231,16 +234,50 @@ void send_random_message_template(u8 M[HASH_INPUT_SIZE])
   MPI_Status statuses[NSERVERS];
   // how about collective communications? I can't find a simple way using them.
   for (int i=0; i<NSERVERS; ++i) {
-    MPI_Isend(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, i,
-	      TAG_RANDOM_MESSAGE, MPI_COMM_WORLD, &requests[i]);
+    MPI_Isend(M,/* snd_buf */
+	      HASH_INPUT_SIZE,
+	      MPI_UNSIGNED_CHAR,
+	      i /* to whom */,
+	      TAG_RANDOM_MESSAGE,
+	      MPI_COMM_WORLD, &requests[i]);
   }
   MPI_Waitall(NSERVERS, requests, statuses);
 } /* clear stack variables */
 
 
 
-void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
+void sender(int myrank, MPI_Comm mpi_communicator)
 {
+
+  // ------------------------------------------------------------------------+
+  // I am a sending processor. I only generate hashes and send them.
+  // Process Numbers: [NSERVERS + 1,  nproc]
+  //-------------------------------------------------------------------------+
+
+  /* init state: this should goes inside sender_process_task */
+  /* set up a random message */
+
+  /* M = 64bit ctr || 64bit nonce || random value */
+  u8 M[HASH_INPUT_SIZE]; /* random word */
+
+  /* Get a random message only once */
+  CTR_TYPE* ctr_pt = (CTR_TYPE*) M; /* counter pointer  */
+  getrandom(M, HASH_INPUT_SIZE, 1);
+  ctr_pt[0] = 0; /* zeroing the first 64bits of M */
+  printf("sender %d got template\n", myrank);
+  print_char(M,HASH_INPUT_SIZE);
+
+    
+  /* Send the initial input to all receiving servers */
+  printf("sender #%d is going to send its template\n", myrank);
+  send_random_message_template(M); 
+  printf("sender #%d done sending template!\n", myrank);
+  printf("sender #%d template=\n", myrank);
+  print_char(M, 64);
+
+  /* generate hashes and send them to a servers */
+
+
   /* generate hashes and send them to a server as soon its buffer is complete */
   //---------------------------------------------------------------------------+
   // snd_buf ={ dgst1||ctr1, ..., dgst_k||ctr_k}
@@ -263,9 +300,9 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 			     *NSERVERS);
 
   /* Init attaching buffers for the buffered send */
-  int buf_attached_size = one_pair_size*PROCESS_QUOTA + MPI_BSEND_OVERHEAD;
-  u8* buf_attached = (u8*) malloc(buf_attached_size);
-  MPI_Buffer_attach(buf_attached, buf_attached_size);   
+  /* int buf_attached_size = one_pair_size*PROCESS_QUOTA + MPI_BSEND_OVERHEAD; */
+  /* u8* buf_attached = (u8*) malloc(buf_attached_size); */
+  /* MPI_Buffer_attach(buf_attached, buf_attached_size);    */
 
   /* Decide where to place the kth digest in server i buffer */
   size_t offset = 0;
@@ -301,6 +338,8 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 
     // record a pair (msg, dgst), msg is just the counter in our case
     /* record the counter  */
+    puts("M=");
+    print_char(M, 64);
     memcpy(M,
 	   &snd_buf[ offset ],
 	   sizeof(CTR_TYPE) );
@@ -337,10 +376,10 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
     }
   } /* todo why do I stop? it is not specified!pp */
 
-  MPI_Buffer_detach(buf_attached, &buf_attached_size);
+  /* MPI_Buffer_detach(buf_attached, &buf_attached_size); */
 
   free(snd_buf);
-  free(buf_attached);
+  /* free(buf_attached); */
   free(servers_ctr);
   return; // au revoir.
 
@@ -350,6 +389,9 @@ void sender_process_task(u8 M[HASH_INPUT_SIZE], int myrank)
 
 static inline void receiver_process_get_template(int myrank, int nproc, int nproc_snd, u8* templates)
 {
+
+
+  // 000000000000000000000000000000000000000000000000000000000000000000000000000 //
   //---------------------------------------------------------------------------+
   // --- : receive the initial inputs from all generating processors 
   //---------------------------------------------------------------------------+
@@ -360,7 +402,7 @@ static inline void receiver_process_get_template(int myrank, int nproc, int npro
   MPI_Status status;
 
   for (int i=0; i<nproc_snd; ++i){
-    printf("receiver %d is listening to %d for the template\n", myrank, i + NSERVERS);
+    //printf("receiver %d is listening to %d for the template\n", myrank, i + NSERVERS);
     MPI_Recv(&templates[i*HASH_INPUT_SIZE],
 	     HASH_INPUT_SIZE,
 	     MPI_UNSIGNED_CHAR,
@@ -369,6 +411,7 @@ static inline void receiver_process_get_template(int myrank, int nproc, int npro
 	     MPI_COMM_WORLD,
 	     &status);
 
+    //print_char(&templates[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
     
     /* print_char(&initial_inputs[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE); */
   }
@@ -410,6 +453,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   MPI_Request request;
 
   int* indices = (int*)malloc(sizeof(int)*nproc);
+
   size_t nfound_cnd = get_file_size(fp) / HASH_INPUT_SIZE ;
   size_t old_nfound_candidates = nfound_cnd;
   int sender_name = 0;
@@ -444,8 +488,10 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 
 
   
-  while (NNEEDED_CND  > nfound_cnd) {
-
+  /* while (NNEEDED_CND  > nfound_cnd) {  */ // @todo fix this line
+  // strange behavior nneeded_cnd = 0
+  while (4  > nfound_cnd) {    
+    printf("nfound_cnd = %d, myrank=%d\n", nfound_cnd, myrank);
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */
 	      rcv_array_size, 
@@ -456,7 +502,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 	      &request);
 
     //+ probe these messages and update the founded candidates
-    printf("recv#%d is going to probe the dict\n", myrank);
+    //printf("recv#%d is going to probe the dict\n", myrank);
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
 				    rcv_buf, /* messages to search in d */
 				    &templates[sender_name],
@@ -489,8 +535,12 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 // -----------------------------------------------------------------------------
 
 
-void phase_ii()
-{ 
+int main(int argc, char* argv[])
+{
+
+  // the program is a bit stupid, it can't handle when N <= DEFINED_BYTES 
+  assert(N - DEFINED_BYTES > 0);
+
   // some extra arguments to communicate with other
   
   // ==========================================================================+
@@ -513,44 +563,12 @@ void phase_ii()
 
   /* How many procs that are going t send */
   int nproc_snd = nproc - NSERVERS;
-  
-  
-  /* send digests, 1 digest ≡ 256 bit */
-  // int nthreads = omp_get_max_threads(); // no need for this?!
 
-  // Who am I? sender, receiver, or archive.
+
+  // Who am I? a sender,  or a receiver?
   if (myrank >= NSERVERS){
-    // ------------------------------------------------------------------------+
-    // I am a sending processor. I only generate hashes and send them.
-    // Process Numbers: [NSERVERS + 1,  nproc]
-    //-------------------------------------------------------------------------+
-
-    /* init state: this should goes inside sender_process_task */
-    /* set up a random message */
-
-    /* M = 64bit ctr || 64bit nonce || random value */
-    u8 M[HASH_INPUT_SIZE]; /* random word */
-
-    /* Get a random message only once */
-    CTR_TYPE* ctr_pt = (CTR_TYPE*) M; /* counter pointer  */
-    getrandom(M, HASH_INPUT_SIZE, 1);
-    ctr_pt[0] = 0; /* zeroing the first 64bits of M */
-    printf("sender %d got template\n", myrank);
-    print_char(M,HASH_INPUT_SIZE);
-
-    
-    /* Send the initial input to all receiving servers */
-    printf("sender #%d is going to send its template\n", myrank);
-    send_random_message_template(M); 
-    printf("sender #%d done sending template!\n", myrank);
-    /* generate hashes and send them to a servers */
-
-    sender_process_task(M, myrank); /* never ends :) */
+    sender(myrank, MPI_COMM_WORLD); /* never ends :) */
   }
-
-  //+ todo receive processors
-  //+ load dgsts from file to dictionary
-
   else if (myrank < NSERVERS){ /* receiver, repeat infinitely  */
 
     long vmrss_kb, vmsize_kb;
@@ -589,6 +607,7 @@ void phase_ii()
     printf("reciver #%d memory usage after load: ram: %ld kb vm: %ld kb\n"
 	   "============================================================\n",
 	   myrank, vmrss_kb, vmsize_kb);
+    // 000000000000000000000000000000000000000000000000000000000000000000000000000
     //-------------------------------------------------------------------------+
     // I'm a receiving process: receive hashes, probe them, and send candidates 
     // Process Numbers: [0,  NSERVERS - 1]
@@ -597,7 +616,7 @@ void phase_ii()
     
     u8* templates = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd);
     receiver_process_get_template(myrank, nproc, nproc_snd, templates);
-    
+
 
     /* listen to sender and save candidates */
     printf("I am reciever with rank %d i am listening \n", myrank);
@@ -618,7 +637,7 @@ void phase_ii()
   // The end that will never be reached in any case!
   printf("process #%d reached the end (should be a receiver)\n", myrank);
   MPI_Finalize();
-  return;
+  return 0;
 }
 
 
@@ -651,6 +670,4 @@ void print_byte_array(u8* array, size_t nbytes)
 
 
 
-int main() {  phase_ii(); }
-// @todo get the number of stored candidates at each run
 

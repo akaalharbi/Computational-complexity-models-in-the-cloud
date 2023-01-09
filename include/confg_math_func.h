@@ -5,7 +5,7 @@
 
 #define CEILING(X,Y) (((X) + (Y) - 1) / (Y))
 #define MIN(X ,Y) (((X) > (Y)) ? (Y) : (X))
-#define MAX(X, Y) (((X) > (Y)) ? (X) : (Y))
+#define MAX(X, Y) (((X) > (Y)) ? (X) : (X))
 
 
 /* https://stackoverflow.com/a/39920811/20495595 */

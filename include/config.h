@@ -92,9 +92,6 @@
 /* we might ignore few bits due to ceiling  */
 #define DEFINED_BYTES CEILING(DEFINED_BITS, 8)
 
-/* #if N < DEFINED_BYTES */
-/*   #error "We have N < DEFINED_BYTES, this program is a bit stupid" */
-/* #endif */
 
 
 
@@ -128,6 +125,11 @@
 #define PROCESS_QUOTA 100000LL // i.e. send 10 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
+
+
+/* #if LOG2_NSERVERS > N */
+/*   #error "We have N < DEFINED_BYTES, this program is a bit stupid" */
+/* #endif */
 
 
 
@@ -298,7 +300,7 @@
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
 
-#define NNEEDED_CND (1LL << DISCARDED_BITS)  /* @python  */
+#define NNEEDED_CND MAX((1LL << DISCARDED_BITS), 1)  /* @python  */
 // (2^#disacrded_bits) / NSERVERS, however, it's not a strict requirement.
 //#define NNEEDED_CND_THIS_SERVER MAX(((1LL << DISCARDED_BITS) >> NSERVERS), 1)
   
