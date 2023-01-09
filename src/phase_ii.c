@@ -116,6 +116,7 @@ static inline int lookup_multi_save(dict *d,
 
 static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
 				    WORD_TYPE Mstate[NWORDS_STATE], /* out*/
+				    CTR_TYPE* ctr, /* in, out */
 				    const size_t dist_test /* in */)
 {
   // ==========================================================================+
@@ -147,12 +148,12 @@ static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
   CTR_TYPE* ctr_pt = (CTR_TYPE*) M;
   
   while (1) { /* loop till a dist pt found */
-    ++(ctr_pt[0]);
+    ctr_pt[0] = ++(*ctr);
    
     memcpy(Mstate, init_state, 32);
     /* todo  use hash multiple */
     /* figure out the number of words from config.h */
-    hash_single(Mstate, (u8*) M);
+    hash_single(Mstate,  M);
     
     /* is its digest is a distinguished pt? */
     /* see 1st assumption in config.h  */
@@ -288,6 +289,7 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
                     + sizeof(CTR_TYPE); /* |dgst| + |ctr| - |known bits|*/
 
+  CTR_TYPE msg_ctr = 0;
   int server_number;
 
 
@@ -322,33 +324,37 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   // find_hash_distinguished_init(); 
   int snd_ctr = 0;
 
-
+  int i = 0;
   while(1) { /* when do we break? never! */
+  /* while(i<20) { /\* when do we break? never! *\/ */
+    ++i;
     /* Find a message that produces distinguished point */
-
-    find_hash_distinguished( M, Mstate, mask_test);
+    find_hash_distinguished( M, Mstate, &msg_ctr, mask_test);
 
     //+ decide to which server to add to? 
     server_number = to_which_server((u8*) Mstate);
 
+    // @bug probably here 
     /* 1st term: go to server booked memory, 2nd: location of 1st free place*/
-    offset = server_number*one_pair_size + servers_ctr[server_number];
+    offset = server_number*PROCESS_QUOTA*one_pair_size
+           + servers_ctr[server_number]*one_pair_size;
     // recall que one_pair_size =  |dgst| + |ctr| - |known bits|
 
+    /* printf("ctr=0x%llx, server_number=%d\n", msg_ctr, server_number); */
 
     // record a pair (msg, dgst), msg is just the counter in our case
-    /* record the counter  */
-    puts("M=");
-    print_char(M, 64);
-    memcpy(M,
-	   &snd_buf[ offset ],
+    /* record the counter  */ 
+    memcpy(&snd_buf[ offset ],
+	   M,
 	   sizeof(CTR_TYPE) );
 
-
+    printf("snd_buf=");
+    print_char(&snd_buf[offset], one_pair_size);
+    
     /* After the counter save N-DEFINED_BYTES of MState */
-    memcpy( ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
-	     &snd_buf[offset + sizeof(CTR_TYPE)], /* copy digest to snd_buf[offset] */
-	     N-DEFINED_BYTES );
+    memcpy( &snd_buf[offset + sizeof(CTR_TYPE)], /* copy digest to snd_buf[offset] */
+	    ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
+	    N-DEFINED_BYTES );
 
     /* this server has one more digest */
     ++servers_ctr[server_number];
@@ -487,11 +493,11 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   sender_name = status.MPI_SOURCE; // who sent the message?
 
 
-  
+  // @todo restore the while loop
   /* while (NNEEDED_CND  > nfound_cnd) {  */ // @todo fix this line
   // strange behavior nneeded_cnd = 0
   while (4  > nfound_cnd) {    
-    printf("nfound_cnd = %d, myrank=%d\n", nfound_cnd, myrank);
+    printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank);
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */
 	      rcv_array_size, 
@@ -500,7 +506,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 	      TAG_SND_DGST, 
 	      MPI_COMM_WORLD,
 	      &request);
-
+    
     //+ probe these messages and update the founded candidates
     //printf("recv#%d is going to probe the dict\n", myrank);
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
