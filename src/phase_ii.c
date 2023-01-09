@@ -325,9 +325,9 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   int snd_ctr = 0;
 
   int i = 0;
-  while(1) { /* when do we break? never! */
-  /* while(i<20) { /\* when do we break? never! *\/ */
-    ++i;
+  /* while(1) { /\* when do we break? never! *\/ */
+  while(i<1) { /* when do we break? never! */
+
     /* Find a message that produces distinguished point */
     find_hash_distinguished( M, Mstate, &msg_ctr, mask_test);
 
@@ -348,13 +348,14 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 	   M,
 	   sizeof(CTR_TYPE) );
 
-    printf("snd_buf=");
-    print_char(&snd_buf[offset], one_pair_size);
-    
     /* After the counter save N-DEFINED_BYTES of MState */
     memcpy( &snd_buf[offset + sizeof(CTR_TYPE)], /* copy digest to snd_buf[offset] */
 	    ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
 	    N-DEFINED_BYTES );
+
+    printf("sender#%d, #one_pair=%dbytes, snd_buf=",myrank, one_pair_size);
+    print_char(&snd_buf[offset], one_pair_size);
+    
 
     /* this server has one more digest */
     ++servers_ctr[server_number];
@@ -373,6 +374,7 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 		server_number,
 		TAG_SND_DGST,
 		MPI_COMM_WORLD);
+      ++i;
       /* printf("rank %d: sending done to %d, snd_ctr=%d, it took %fsec\n", */
       /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
       /* time_start = wtime(); */
@@ -496,6 +498,8 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   // @todo restore the while loop
   /* while (NNEEDED_CND  > nfound_cnd) {  */ // @todo fix this line
   // strange behavior nneeded_cnd = 0
+  printf("rcv #%d, receive buffer=", myrank);
+  print_char(rcv_buf, rcv_array_size);
   while (4  > nfound_cnd) {    
     printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank);
     //+ receive messages from different processors
@@ -520,6 +524,9 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
       old_nfound_candidates = nfound_cnd;
     }
     MPI_Wait(&request, &status);
+    printf("rcv #%d, receive buffer=", myrank);
+    print_char(rcv_buf, rcv_array_size);
+
     sender_name = status.MPI_SOURCE; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
     }
