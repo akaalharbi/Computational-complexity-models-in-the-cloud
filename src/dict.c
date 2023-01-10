@@ -16,10 +16,22 @@
 #include <string.h>
 #include <math.h>
 #include "shared.h"
+#include "util_char_arrays.h"
 
 #include <immintrin.h>
 
 //  how many bits we store as a value in dictionary
+
+
+void print_m256i(__m256i a, char* text){
+  uint32_t A[8] = {0};
+  _mm256_storeu_si256((__m256i*)A, a);
+  printf("%s = ", text);
+  for (int i = 0; i<8; ++i) {
+    printf("%02x, ", A[i]);
+  }
+  puts("");
+}
 
 
 
@@ -118,14 +130,17 @@ int dict_add_element_to(dict* d, u8* state){
   // issues may aris when VAL_SIZE is larger then what is left in the state   |
   //                                                                          |
   // -------------------------------------------------------------------------+
-  
+  static int idx_size = MIN(L_IN_BYTES, N-DEFINED_BYTES-VAL_SIZE_BYTES);
+    
   ++(d->nelements_asked_to_be_inserted);
-
+  printf("nelements wanted to be inserted %lu\n",
+	 d->nelements_asked_to_be_inserted);
+  print_char(state,  N-DEFINED_BYTES);
   /// Use linear probing to add element to the array d->values
   // get bucket number, recall keys[nbuckets*nslots_per_bucket
   u64 idx = 0;
-  memcpy(&idx, state, L_IN_BYTES);
-
+  memcpy(&idx, state, idx_size);
+  printf("initially idx=0x%llx, idx_size=%d\n", idx, idx_size);
 
   /* get the bucket number and scale the index */
   idx = (idx % d->nbuckets) * d->nslots_per_bucket;
@@ -138,16 +153,21 @@ int dict_add_element_to(dict* d, u8* state){
   /* memcpy(&val, &state[L_IN_BYTES], VAL_SIZE_BYTES); */
 
   memcpy(&val,
-	 &state[L_IN_BYTES],
-	 MIN(VAL_SIZE_BYTES, N - L_IN_BYTES - DEFINED_BYTES )); 
-    
+	 &state[idx_size],
+	 VAL_SIZE_BYTES );
+
+  printf("#L=%d, %d bytes copied\n", L_IN_BYTES,	 MIN(VAL_SIZE_BYTES, N - L_IN_BYTES - DEFINED_BYTES ));
+  printf("idx=0x%llx, val=0x%x\n",idx,  val);
   // linear probing 
   for (int i=0; i<NPROBES_MAX; ++i) {
 
+    
     // found an empty slot inside a bucket
      if (d->values[idx] == 0) { // found an empty slot
       d->values[idx] = val;
       ++(d->nelements); /* successfully added an element */
+      printf("idx=0x%llx, val=0x%x, d[idx]=0x%x\n",idx,  val, d->values[idx]);
+      
       return 1;
      }
 
@@ -178,12 +198,20 @@ int dict_has_elm(dict *d, u8 *state)
   // `*state`: element to be looked up  in *d in the form                     |
   //          (L bits) || discard || (VAL_SIZE bits)                          |
   // -------------------------------------------------------------------------+
+  static int idx_size = MIN(L_IN_BYTES, N-DEFINED_BYTES-VAL_SIZE_BYTES);
   u64 idx = 0;
-  memcpy(&idx, state, L_IN_BYTES);
+  memcpy(&idx, state, idx_size);
+  printf("lookup initially idx=0x%llx, idx_size=%d\n", idx, idx_size);
   idx = (idx % d->nbuckets) * d->nslots_per_bucket;
 
   VAL_TYPE val = 0;
+  memcpy(&val,
+	 &state[idx_size],
+	 VAL_SIZE_BYTES );
 
+  printf("#L=%d\n", L_IN_BYTES);
+
+  printf("idx=0x%llx, val=0x%x, d[idx]=0x%x\n",idx,  val, d->values[idx]);
 
 
   int is_key_found = 0;
@@ -199,7 +227,7 @@ int dict_has_elm(dict *d, u8 *state)
   //__m256i zero_vect = _mm256_setzero_si256(); // no need for this with buckets
   REG_TYPE comp_vect_simd;
 
-
+  print_m256i(lookup_key_simd, "values_simd ");
 
   
   // loop at most NPROBES_MAX/SIMD_LEN since we load SIMD_LEN
@@ -211,14 +239,17 @@ int dict_has_elm(dict *d, u8 *state)
 
     // get new fresh keys from one bucket
     dict_keys_simd = SIMD_LOAD_SI((REG_TYPE*)  &(d->values[idx]));
+    print_m256i(dict_keys_simd, "dict_values_simd ");
     // -----------------------------------------------//
     //                   TEST 1                       //
     /*  Does key equal one of the slots?              */
     //------------------------------------------------//
     comp_vect_simd = SIMD_CMP_VALTYPE(lookup_key_simd, dict_keys_simd);
+    print_m256i(comp_vect_simd, "comp_vect_simd");
     is_key_found = (0 == SIMD_TEST(comp_vect_simd, comp_vect_simd));
-
-
+    printf("simd_test=%d\n", SIMD_TEST(comp_vect_simd, comp_vect_simd));
+    printf("is_key_found=%d\n", is_key_found);
+    
     if (is_key_found) {
       return 1; /* we will hash the whole message again */
     }

@@ -32,9 +32,12 @@
 
 int main(int argc, char* argv[]){
 
-  
+
+
+  // pretend we are doing phase i, (just take few hashes)
   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
   u8 M[HASH_INPUT_SIZE] = {0};
+  
 
   CTR_TYPE msg_ctr = 0;
   CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* increment the message by one each time */
@@ -75,14 +78,44 @@ int main(int argc, char* argv[]){
     }
    }
 
-  puts("=========================");
+
+  // we will pretend that we are 2nd server i.e. server #1 
+  
+  puts("\n=====================================\n\n");
+  puts("pretends that we are phase i");
+
+  nmsgs = PROCESS_QUOTA;
   FILE* fp = fopen("data/send/digests/1", "r");
 
-  u8 stream_pt[N-DEFINED_BYTES];
+  int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
+                    + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
+
+  u8* hashes = (u8*) malloc(one_pair_size*nmsgs);
+  // msg||dgst
   for (int i = 0; i<nmsgs; i++){
-    fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp);
-    print_char(stream_pt, N-DEFINED_BYTES);
+    fread(&hashes[one_pair_size*i + sizeof(CTR_TYPE)],
+	  sizeof(u8),
+	  N-DEFINED_BYTES, fp);
     
   }
 
+  dict* d = dict_new(NSLOTS_MY_NODE);
+  dict_add_element_to(d, &hashes[ sizeof(CTR_TYPE)]);
+
+  puts("\n\n");
+  int found = 0;
+
+  for (int i = 0; i<3; ++i) {
+    found = dict_has_elm(d, &hashes[i*one_pair_size + sizeof(CTR_TYPE)]);
+    printf("%dith was found=%d\n",i, found);
+    print_char(&hashes[i*one_pair_size + sizeof(CTR_TYPE)],
+	       N-DEFINED_BYTES);
+    puts("++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+
+
+  }
+
+  free(hashes);
+  dict_free(d);
+  free(d);
 }
