@@ -289,7 +289,7 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   // ctr  := (this is a shortcut that allows us not to send the whole message)
   //---------------------------------------------------------------------------+
   WORD_TYPE Mstate[NWORDS_STATE] = {HASH_INIT_STATE};
-  int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
+  size_t one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
                     + sizeof(CTR_TYPE); /* |dgst| + |ctr| - |known bits|*/
 
   CTR_TYPE msg_ctr = 0;
@@ -304,19 +304,18 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 			     *PROCESS_QUOTA
 			     *NSERVERS);
 
-  /* Init attaching buffers for the buffered send */
-  /* int buf_attached_size = one_pair_size*PROCESS_QUOTA + MPI_BSEND_OVERHEAD; */
-  /* u8* buf_attached = (u8*) malloc(buf_attached_size); */
-  /* MPI_Buffer_attach(buf_attached, buf_attached_size);    */
 
   /* Decide where to place the kth digest in server i buffer */
-  size_t offset = 0;
+  // How many bytes are reserverd for each server in snd_buf
+  size_t nbytes_per_server = one_pair_size * PROCESS_QUOTA;
+  size_t offset = 0; /* where inside the buffer should we go */
   const u64 mask_test = (1LL<<DIFFICULTY) - 1;
 
   /* pos i: How many messages we've generated to be sent to server i? */
   u64 servers_ctr[NSERVERS] = {0};
+  int snd_ctr = 0; /* how many messages have been sent */
   /* set number of generated messages before sending to 0 */
-  memset(servers_ctr, 0, sizeof(u32)*NSERVERS); 
+  /* memset(servers_ctr, 0, sizeof(u32)*NSERVERS);  */
 
   //-------------------------------------------------------------------------+
   //------- Part 2 : Generate hashes and send them  -------
@@ -325,9 +324,9 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   printf("send #%d: done init mpi, now going to generate hashes \n", myrank);
   
   // find_hash_distinguished_init(); 
-  int snd_ctr = 0;
 
-  int i = 0;
+
+
   while(1) { /* when do we break? never! */
   /* while(i<1) { /\* when do we break? never! *\/ */
 
@@ -339,14 +338,16 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
     // @bug probably here 
     /* 1st term: go to server booked memory, 2nd: location of 1st free place*/
-    offset = server_number*PROCESS_QUOTA*one_pair_size
-           + servers_ctr[server_number]*one_pair_size;
+
+    offset = server_number * nbytes_per_server
+           + servers_ctr[server_number] * one_pair_size;
     // recall que one_pair_size =  |dgst| + |ctr| - |known bits|
 
     /* printf("ctr=0x%llx, server_number=%d\n", msg_ctr, server_number); */
 
     // record a pair (msg, dgst), msg is just the counter in our case
-    /* record the counter  */ 
+    /* record the counter  */
+    
     memcpy(&snd_buf[ offset ],
 	   M,
 	   sizeof(CTR_TYPE) );
@@ -360,32 +361,47 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
     
 
-    
+    if (server_number == 2){
+      
 
-    /* this server has one more digest */
-    ++servers_ctr[server_number];
+      printf("server=%d, server_ctr=%llu,\n",server_number,
+	     servers_ctr[server_number]);
+      print_char(&snd_buf[offset], one_pair_size);
 
-    
+
+      /* this server has one more digest */
+      ++servers_ctr[server_number];
+      for (int i=0; i<NSERVERS; ++i) {
+	printf("%d_ctr=%llu, offset=%lu, nbytes/server=%lu, one_pair %lu\n",
+	       i, servers_ctr[i], offset, nbytes_per_server, one_pair_size);
+      } puts("");
+
+    }    
     if (servers_ctr[server_number] == PROCESS_QUOTA){
-      ++snd_ctr;
+
       
       /* printf("rank %d: sending to %d, snd_ctr=%d, it took %fsec\n", */
       /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
       /* time_start = wtime(); */
       /* we have enough messages to send to server (server_number) */
-      MPI_Send(&snd_buf[offset],
+      MPI_Send(&snd_buf[server_number*nbytes_per_server],
 		PROCESS_QUOTA*one_pair_size,
 		MPI_UNSIGNED_CHAR,
 		server_number,
 		TAG_SND_DGST,
 		MPI_COMM_WORLD);
-      ++i;
 
-      char txt[50];
-      snprintf(txt, sizeof(txt), "sender#%d,  server=%d, snd_buf=",
-	       myrank, server_number );
-      print_byte_txt(txt, &snd_buf[offset], one_pair_size*PROCESS_QUOTA);
+      ++snd_ctr;
+      if (server_number == 2) {
 
+
+	char txt[50];
+	snprintf(txt, sizeof(txt), "sender#%d,  server=%d, snd_buf=",
+		 myrank, server_number );
+	print_byte_txt(txt,
+		       &snd_buf[server_number*nbytes_per_server],
+		       one_pair_size*PROCESS_QUOTA);
+      }
       /* printf("rank %d: sending done to %d, snd_ctr=%d, it took %fsec\n", */
       /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
       /* time_start = wtime(); */
@@ -393,13 +409,10 @@ void sender(int myrank, MPI_Comm mpi_communicator)
       /* It is enough to reset the counter. The memroy will be rewritten */  
       servers_ctr[server_number] = 0;
     }
-  } /* todo why do I stop? it is not specified!pp */
+  } 
 
-  /* MPI_Buffer_detach(buf_attached, &buf_attached_size); */
 
   free(snd_buf);
-  /* free(buf_attached); */
-
   return; // au revoir.
 
 } // MPI_Finalize
@@ -494,6 +507,8 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   //---------------------------------------------------------------------------+
   /* printf("recv#%d is listening\n", myrank); */
   // listen the first time
+  int from=-1;
+  
   MPI_Recv(rcv_buf,
 	   rcv_array_size,
 	   MPI_UNSIGNED_CHAR,
@@ -509,10 +524,13 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   // @todo restore the while loop
   /* while (NNEEDED_CND  > nfound_cnd) {  */ // @todo fix this line
   // strange behavior nneeded_cnd = 0
+    /* from = status.MPI_SOURCE; */
+    /* char txt[50]; */
+    /* snprintf(txt, sizeof(txt), "rcv #%d, receive buffer=", myrank); */
+    /* print_byte_txt(txt,rcv_buf, rcv_array_size); */
 
-  /* char txt[50]; */
-  /* snprintf(txt, sizeof(txt), "rcv #%d, receive buffer=", myrank); */
-  /* print_byte_txt(txt,rcv_buf, rcv_array_size); */
+
+
 
 
   while (4  > nfound_cnd) {    
@@ -539,6 +557,15 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
       old_nfound_candidates = nfound_cnd;
     }
     MPI_Wait(&request, &status);
+
+
+      /* from = status.MPI_SOURCE; */
+      /* char txt[50]; */
+      /* snprintf(txt, sizeof(txt), "rcv #%d, from #%d, receive buffer=", */
+      /* 	       from, */
+      /* 	       myrank); */
+      /* print_byte_txt(txt,rcv_buf, rcv_array_size); */
+
 
 
 
