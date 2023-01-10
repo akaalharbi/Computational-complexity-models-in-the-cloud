@@ -49,7 +49,7 @@
 // Let N := n / 8
 #define N 7 /* bytes i.e n := 8*N bits */
 // will be replaced by the NHASHES below 
-#define L 25 /* store 2^L elements in the dictionary  */
+#define L 30 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
@@ -122,7 +122,7 @@
 #define ARCHIVE_SERVER NSERVERS
 // WHAT IS BUFF_SIZE? It doesn't seem to be used!
 //#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
-#define PROCESS_QUOTA 100LL // i.e. send 10 digests to each server @by_hand
+#define PROCESS_QUOTA 1000LL // i.e. send 10 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
 
