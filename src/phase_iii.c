@@ -23,61 +23,9 @@
 #include "memory.h"
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
 #include "util_files.h"
-
+#include "common.h"
 // ------------------- Auxililary functions phase iii --------------------------
 //+ todo complete these functions
-
-static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
-				    WORD_TYPE Mstate[NWORDS_STATE], /* out*/
-				    CTR_TYPE* ctr, /* in, out */
-				    const size_t dist_test /* in */)
-{
-  // ==========================================================================+
-  // Summary: Generates hashes till a distinguished point is found. Mutates M  |
-  //          and resests Mstate in the process. Suitable for phase ii use only|
-  // --------------------------------------------------------------------------+
-  // We start with message M, computed hash(M) if it is not a distinguished    |
-  // point then we change M slightly. Increment the first 64 bits of M by 1    |
-  // --------------------------------------------------------------------------+
-  // INPUTS:                                                                   |
-  // - M[16] : initial value of the random message, we hash this in the first  |
-  //           in first trial, then change it to M xor ctr                     |
-  // - Mstate: This should be the initial state of sha256.                     |
-  // - dist_test: (2^nzeros - 1), e.g. a point is distinguished if it has 3    |
-  //              at the end, then the test is 2^3 - 1 = 7                     |
-  // --------------------------------------------------------------------------+
-  // WARNING: this function can't deal with more than 32zeros as dist_test     |
-  // NOTE: we are only working on the first word                               |
-  // --------------------------------------------------------------------------+
-  // TODO: use hash_multiple instead                                           |
-  // --------------------------------------------------------------------------+
-
-  /* no need to construct init state with each call of the function */ 
-  const static WORD_TYPE init_state[NWORDS_STATE] = {HASH_INIT_STATE};
-  
-
-
-  /* increments the first sizeof(CTR_TYPE)*8 bits of M by 1 */
-  CTR_TYPE* ctr_pt = (CTR_TYPE*) M;
-  
-  while (1) { /* loop till a dist pt found */
-    ctr_pt[0] = ++(*ctr);
-   
-    memcpy(Mstate, init_state, 32);
-    /* todo  use hash multiple */
-    /* figure out the number of words from config.h */
-    hash_single(Mstate,  M);
-    
-    /* is its digest is a distinguished pt? */
-    /* see 1st assumption in config.h  */
-    if ( (((WORD_TYPE*) Mstate)[0] & dist_test) == 0){
-
-      return; /* we got our distinguished digest */
-    }
-
-      
-  }
-}
 
 
 
@@ -87,46 +35,6 @@ int cmp_dgst(void const* dgst1, void const* dgst2){
   return memcmp(dgst1, dgst2, N); /* comparison order: low bytes first */
 }
 
-/* return index of key if it is found, -1 otherwise*/
-int64_t linear_search(u8 *key, u8 *array, size_t array_len, size_t key_len)
-{
-  for (size_t i=0; i<array_len; ++i) {
-    printf("i=%lu\n", i);
-    print_byte_txt("found:", &array[i*key_len], key_len);
-    print_byte_txt("key  :", key, key_len);
-    
-    if ( 0 == memcmp(key, &array[i*key_len], key_len) ){
-      return i;
-    }
-      
-  }
-  
-  return -1; /* not found */
-}
-
-
-void* linear_search_ptr(u8 *key, u8 *array, size_t array_len, size_t key_len)
-{
-  for (size_t i=0; i<array_len; ++i) {
-    if ( 0 == memcmp(key, &array[i*key_len], key_len) ){
-      return &array[i*key_len];
-    }
-    
-  }
-  
-  return NULL; /* not found */
-}
-
-
-
-
-
-void print_byte_array(u8* array, size_t nbytes)
-{
-  for (size_t i=0; i<nbytes; ++i) 
-    printf("0x%02x, ",  array[i]);
-  puts("");
-}
 // ----------------------------------------------------------------------------
 
 

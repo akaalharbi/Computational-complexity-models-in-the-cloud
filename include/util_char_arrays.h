@@ -6,6 +6,19 @@
 #include <sys/random.h>
 #include <stdint.h>
 
+int64_t linear_search(uint8_t *key,
+		      uint8_t *array,
+		      size_t array_len,
+                      size_t key_len);
+
+void *linear_search_ptr(uint8_t *key,
+			uint8_t *array,
+			size_t array_len,
+                        size_t key_len);
+
+
+void print_byte_array(uint8_t* array, size_t nbytes);
+
 int cmp_arrays(char* array1, char* array2, size_t len);
 void print_char(unsigned char *l, size_t len);
 void print_byte_txt(char* txt, unsigned char* a, size_t len);

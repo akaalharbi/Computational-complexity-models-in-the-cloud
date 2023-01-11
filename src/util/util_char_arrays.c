@@ -4,6 +4,49 @@
 #include "util_char_arrays.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
+
+/* return index of key if it is found, -1 otherwise*/
+int64_t linear_search(uint8_t *key, uint8_t *array, size_t array_len, size_t key_len)
+{
+  for (size_t i=0; i<array_len; ++i) {
+    printf("i=%lu\n", i);
+    print_byte_txt("found:", &array[i*key_len], key_len);
+    print_byte_txt("key  :", key, key_len);
+    
+    if ( 0 == memcmp(key, &array[i*key_len], key_len) ){
+      return i;
+    }
+      
+  }
+  
+  return -1; /* not found */
+}
+
+
+void* linear_search_ptr(uint8_t *key, uint8_t *array, size_t array_len, size_t key_len)
+{
+  for (size_t i=0; i<array_len; ++i) {
+    if ( 0 == memcmp(key, &array[i*key_len], key_len) ){
+      return &array[i*key_len];
+    }
+    
+  }
+  
+  return NULL; /* not found */
+}
+
+
+
+
+
+void print_byte_array(uint8_t* array, size_t nbytes)
+{
+  for (size_t i=0; i<nbytes; ++i) 
+    printf("0x%02x, ",  array[i]);
+  puts("");
+}
+
 
 
 int cmp_arrays(char* array1, char* array2, size_t len){
