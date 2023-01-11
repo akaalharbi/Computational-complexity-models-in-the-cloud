@@ -30,7 +30,19 @@
 
 // -----------------------------------------------------------------------------
 
-
+void print_attack_information(){
+  printf("L=%d, L_IN_BYTES=%d, N=%d, NHASHES=%llu, DIFFICULTY=%d, |idx| = %dbytes, NSEERVERS=%d, NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d\n  ",
+	 L,
+	 L_IN_BYTES,
+	 N,
+	 NHASHES,
+	 DIFFICULTY,
+	 MIN(L_IN_BYTES, N-DEFINED_BYTES-VAL_SIZE_BYTES),
+	 NSERVERS,
+	 NSLOTS_MY_NODE,
+	 NPROBES_MAX );
+  
+}
 
 static inline u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
 {
@@ -124,6 +136,8 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr,
 }
 
 
+
+
 void phase_i_store(CTR_TYPE msg_ctr,
 		   size_t nhashes_stored,
 		   WORD_TYPE state[NWORDS_STATE]){
@@ -178,7 +192,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
   /* record the whole state after each each interval has passed */
   static const size_t interval = INTERVAL; 
-  
+
   /// timing variables
   double start = 0;
   double end = 0;
@@ -246,6 +260,8 @@ void phase_i_store(CTR_TYPE msg_ctr,
     msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
     /* print_char(M, 64); */
 
+    
+    
     if ( (state[0] & ones) == 0){ /* it is a distinguished point */
 
       /* Decide which server is responsible for storing this digest */
@@ -272,7 +288,6 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
       // + save states after required amount of intervals
       if (nhashes_stored % interval == 0) {
-
 
 	end = wtime(); /*  for progress report*/
 	/* FILE* states_file = fopen(states_file_name, "a"); */
@@ -325,6 +340,5 @@ int main(){
   // If we have not done the computations before:
   // start from the beginning
   phase_i_store(msg_ctr, nhashes_stored, state);
-
-  
+  print_attack_information();
 }

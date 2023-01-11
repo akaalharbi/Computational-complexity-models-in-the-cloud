@@ -27,6 +27,61 @@
 // ------------------- Auxililary functions phase iii --------------------------
 //+ todo complete these functions
 
+static void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
+				    WORD_TYPE Mstate[NWORDS_STATE], /* out*/
+				    CTR_TYPE* ctr, /* in, out */
+				    const size_t dist_test /* in */)
+{
+  // ==========================================================================+
+  // Summary: Generates hashes till a distinguished point is found. Mutates M  |
+  //          and resests Mstate in the process. Suitable for phase ii use only|
+  // --------------------------------------------------------------------------+
+  // We start with message M, computed hash(M) if it is not a distinguished    |
+  // point then we change M slightly. Increment the first 64 bits of M by 1    |
+  // --------------------------------------------------------------------------+
+  // INPUTS:                                                                   |
+  // - M[16] : initial value of the random message, we hash this in the first  |
+  //           in first trial, then change it to M xor ctr                     |
+  // - Mstate: This should be the initial state of sha256.                     |
+  // - dist_test: (2^nzeros - 1), e.g. a point is distinguished if it has 3    |
+  //              at the end, then the test is 2^3 - 1 = 7                     |
+  // --------------------------------------------------------------------------+
+  // WARNING: this function can't deal with more than 32zeros as dist_test     |
+  // NOTE: we are only working on the first word                               |
+  // --------------------------------------------------------------------------+
+  // TODO: use hash_multiple instead                                           |
+  // --------------------------------------------------------------------------+
+
+  /* no need to construct init state with each call of the function */ 
+  const static WORD_TYPE init_state[NWORDS_STATE] = {HASH_INIT_STATE};
+  
+
+
+  /* increments the first sizeof(CTR_TYPE)*8 bits of M by 1 */
+  CTR_TYPE* ctr_pt = (CTR_TYPE*) M;
+  
+  while (1) { /* loop till a dist pt found */
+    ctr_pt[0] = ++(*ctr);
+   
+    memcpy(Mstate, init_state, 32);
+    /* todo  use hash multiple */
+    /* figure out the number of words from config.h */
+    hash_single(Mstate,  M);
+    
+    /* is its digest is a distinguished pt? */
+    /* see 1st assumption in config.h  */
+    if ( (((WORD_TYPE*) Mstate)[0] & dist_test) == 0){
+
+      return; /* we got our distinguished digest */
+    }
+
+      
+  }
+}
+
+
+
+
 /* 1 if  dgst1 > dgst2, -1 if dgst1<dgist2, 0 if dgst1==dgst2 */
 int cmp_dgst(void const* dgst1, void const* dgst2){
   return memcmp(dgst1, dgst2, N); /* comparison order: low bytes first */
@@ -84,7 +139,29 @@ void print_byte_array(u8* array, size_t nbytes)
 //+ hashes in the sorted list above
 
 
+void load_text_file_as_u64(u64* dest, FILE* fp, size_t nlines){
+  // load FILE fp data into dest, assuming fp is a text file
+  // where each line as a number
+  
+  static const int max_len = 50; // max lenght of a line inside a file
+  char tmp[max_len];
+  char* endptr; // for strtoull
+  size_t idx = 0;
+  
+  
+  while (!feof(fp)) {
+    memset(tmp, 0, max_len);
+    fgets(tmp, max_len, fp);
 
+    dest[idx] = strtoull(tmp, &endptr, 10);
+    ++idx;
+    
+    if (idx >= nlines)
+      return;
+  }
+
+  
+}
 
 
 int main(int argc, char* argv[]) /* single machine */
@@ -121,7 +198,7 @@ int main(int argc, char* argv[]) /* single machine */
   fclose(fp);
 
 
-
+  /* Hash all the candidate messages. */
   /* one thread is enough, we'll parellize it if it's a bottle neck */
   WORD_TYPE state[NWORDS_STATE];
   for (size_t i=0; i<nmsgs; ++i) {
@@ -129,12 +206,12 @@ int main(int argc, char* argv[]) /* single machine */
     memcpy(state, state_init, NWORDS_STATE*WORD_SIZE);
     hash_single(state, &msgs[i*HASH_INPUT_SIZE]);
 
-     /* get dgst in dgst */
+    /* get dgst in dgst */
     memcpy(&dgsts[i*N], state, N);
   }
 
 
-  // ----------------------------- PART 3 ------------------------------------
+  // ----------------------------- PART 2 ------------------------------------
   // sort msg_dgst according to the digests
   memcpy(dgsts_orderd, dgsts, nmsgs*N);
   qsort( dgsts_orderd, nmsgs, N, cmp_dgst);
@@ -149,15 +226,35 @@ int main(int argc, char* argv[]) /* single machine */
     print_byte_txt("", &dgsts_orderd[i*N], N);  
   }
 
-  // ----------------------------- PART 2 ------------------------------------
-  // hash the long message with each hashing probe 
+  // ----------------------------- PART 3 ------------------------------------
+  // Load middle states and counters
+  
   fp = fopen("data/states", "r");
+
   size_t nmiddle_states  = get_file_size(fp)/(NWORDS_STATE*WORD_SIZE);
 
+  printf("nmiddle_states=%lu, INTERVAL=%llu\n", nmiddle_states, INTERVAL);
+  /* assert( nmiddle_states == INTERVAL); */
+
+  WORD_TYPE* middle_states = (WORD_TYPE*) malloc(sizeof(WORD_TYPE)
+						 *NWORDS_STATE
+						 *WORD_SIZE
+						 *INTERVAL);
+
+  CTR_TYPE* counters = (CTR_TYPE*) malloc(sizeof(CTR_TYPE)*INTERVAL);
+
+  /* Load all states: we've 1024 states, we don't getting all of them in RAM */
+  fread(middle_states, INTERVAL*NWORDS_STATE, WORD_SIZE, fp);
+  fclose(fp);
+
+  /* load counters: they are written as a text file  */
+  fp = fopen("data/counters", "r");
+  load_text_file_as_u64(counters, fp, nmiddle_states);
+  fclose(fp);
   
   /* How many state does a thread handle */
-  /* size_t thread_load = nmiddle_states/omp_get_max_threads(); */
-  size_t thread_load = nmiddle_states/1;
+  size_t thread_load = nmiddle_states/omp_get_max_threads();
+  /* size_t thread_load = nmiddle_states/1; */
 
   printf("----------------------------------------------------------\n"
 	 "We have %lu middle states, load/thread %lu, nthreads=%d\n"
@@ -165,66 +262,81 @@ int main(int argc, char* argv[]) /* single machine */
 	 nmiddle_states, thread_load, omp_get_max_threads());
   
 
-
-
-
-
-  /* #pragma omp parallel */
+  double start_time = wtime();
+  #pragma omp parallel
   {
     void* ptr; // result of binary search
-    /* int found = -1; */
+    
     int thread_num = omp_get_thread_num();
     size_t start = thread_load*thread_num;
     size_t end = thread_load*(1+thread_num);
+    u64 ctr_priv = -1;
+    
+    WORD_TYPE state_priv[NWORDS_STATE];
+    WORD_TYPE test = (1LL<<DIFFICULTY) - 1;
+    u8 msg_priv[HASH_INPUT_SIZE] = {0};
+    double start_time_priv;
 
 
     if (thread_num == omp_get_max_threads() - 1)
       end = nmiddle_states; /* last thread gets chunk + nmsg % nthreads */
-    //+ todo how to incorporate counter?
+
     printf("thd%d, [start=%lu, end=%lu)\n", thread_num, start, end);
     
-    WORD_TYPE state_priv[NWORDS_STATE] = {HASH_INIT_STATE};
-    u8 msg_priv[HASH_INPUT_SIZE] = {0};
     
     for (size_t i = start; i<end; ++i) {
-      memcpy(state_priv, state_init, NWORDS_STATE*WORD_SIZE);
-
-      // use counter to increment msg_priv
-      hash_single(state_priv, msg_priv);
-      //ptr = bsearch(state_priv, dgsts_orderd, N, nmsgs, cmp_dgst);
-      ptr = linear_search_ptr((u8*) state_priv, dgsts_orderd, nmsgs, N);
+      start_time_priv = wtime();
       
-      /* printf("cool thread%d, i=%lu\n", omp_get_thread_num(), i); */
+      ctr_priv = counters[i];
 
-      if (ptr != NULL) {/* the binary search was successful! */
-
-        /* remeber digest if the firs N bytes of state  */
-	#pragma omp critical
-	{
-        printf("found a collision at %lu\n", i);
-	printf("hash long message at %lu:\n", i);
-
-	size_t msg_idx = linear_search((u8*) state_priv, dgsts, nmsgs, N);
-	u8* ptr_msg_collide = &msgs[msg_idx];
-	
-
-	
-	print_byte_array((u8*) state_priv, N);
-	
-	printf("while the the following message:\n");
-	print_byte_array(ptr_msg_collide, HASH_INPUT_SIZE);
-	puts("produce the following hash:");
-	print_byte_array(&dgsts[msg_idx], N);
-
-	}// end critical region
-
-      } // end if condition
+      // get the middle state 
+      memcpy(state_priv,
+	     &middle_states[i*NWORDS_STATE*WORD_SIZE],
+	     NWORDS_STATE*WORD_SIZE);
       
+      // between each middle states there are INTERVAL distinguished points
+      // we only hash distinguished points because the h(random message) is
+      // also a distinguished point.
+      for (size_t j=0; j<INTERVAL; ++j) {
+	find_hash_distinguished(msg_priv, state_priv, &ctr_priv, test);
 
+	//ptr = bsearch(state_priv, dgsts_orderd, N, nmsgs, cmp_dgst);
+	ptr = linear_search_ptr((u8*) state_priv, dgsts_orderd, nmsgs, N);
+
+	if (ptr != NULL) {/* the binary search was successful! */
+
+	  /* remeber digest if the firs N bytes of state  */
+          #pragma omp critical
+	  {
+	    printf("found a collision at %lu\n", i);
+	    printf("hash long message at %lu:\n", i);
+
+	    size_t msg_idx = linear_search((u8*) state_priv, dgsts, nmsgs, N);
+	    u8* ptr_msg_collide = &msgs[msg_idx];
+	
+
+	
+	    print_byte_array((u8*) state_priv, N);
+	
+	    printf("while the the following message:\n");
+	    print_byte_array(ptr_msg_collide, HASH_INPUT_SIZE);
+	    puts("produce the following hash:");
+	    print_byte_array(&dgsts[msg_idx], N);
+
+	    
+	  }// end critical region
+	  
+	} // end if condition
+
+
+      }
+      printf("thd%d done the task %lu in %0.2fsec)\n",
+	     omp_get_thread_num(), i, wtime() - start_time_priv);
     } // end for loop, thread's main work
-
-
+    
   } // end parallel region
+
+  printf("it took %0.2f\n", wtime() - start_time );
 
 
   free(msgs);

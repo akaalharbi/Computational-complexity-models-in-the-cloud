@@ -49,14 +49,14 @@
 // Let N := n / 8
 #define N 7 /* bytes i.e n := 8*N bits */
 // will be replaced by the NHASHES below 
-#define L 30 /* store 2^L elements in the dictionary  */
+#define L 28 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 4
+#define DIFFICULTY 0
 
 /* we are not going to hold more than 32 bits in a dict entry */
 #define MAX_VAL_SIZE 32 /* in bits */
@@ -65,7 +65,7 @@
 /* how big is our counter */
 #define CTR_TYPE u64
 /* record the whole state after each each interval has passed */
-#define INTERVAL (NHASHES>>10)
+#define INTERVAL MAX((NHASHES>>10), 2) 
 
 
 // sanity check
@@ -245,49 +245,20 @@
 // define intrinsics based on the the available max register size
 // @todo start here 
 #if N <= L_IN_BYTES
-  #pragma message ("Please decrease MAX_VAL_SIZE_BYTES")
+  #pragma message ("N is smaller than L!")
   #error "The code is not flexible to store every bit as index!"
-
-// we store everything as index except one byte
-//+ @todo when changing MAX_VAL_SIZE_BYTES adopt the conditions below
-#elif (N  < L_IN_BYTES + 1) && (N >= L_IN_BYTES) 
-  #define VAL_SIZE_BYTES 1 /* byte */
-  #define VAL_TYPE u8  /* unsigned char */
-
-  #if __AVX512F__
-  #error "we have an issues with comparing u8 words using avx512 in one instruction"
-  #endif 
-   // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE  SIMD_SET1_EPI8
-  #define SIMD_CMP_VALTYPE SIMD_CMP_EPI8
-
-#elif (N < L_IN_BYTES + 2) && (N >= L_IN_BYTES + 1) 
-  #define VAL_SIZE_BYTES 2 /N* byte */
-  #define VAL_TYPE u16 /* unsigned char */
-  // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE SIMD_SET1_EPI16
-  #define SIMD_CMP_VALTYPE SIMD_CMP_EPI16
+#endif 
 
 
-// Typical condition when in terms of MAX_VAL_SIZE_BYTES
-// #elif (N  < L_IN_BYTES + MAX_VAL_SIZE_BYTES_BYTES) && (N >= L_IN_BYTES + (MAX_VAL_SIZE_BYTES_BYTES/2) )
-
-#elif (N  < L_IN_BYTES + 4) && (N >= L_IN_BYTES + 2 )
-  #define VAL_SIZE_BYTES 4 /* byte */
-  #define VAL_TYPE u32 /* unsigned char */
-  // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
-  #define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
 
 
-#else /* The MAX_VAL_SIZE_BYTES */
-  #define VAL_SIZE_BYTES 4 /* byte */
-  #define VAL_TYPE u32 /* unsigned char */
-  // SIMD instructions has to be adapted according to the size
-  #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
-  #define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
+#define VAL_SIZE_BYTES 4 /* byte */
+#define VAL_TYPE u32 /* unsigned char */
+// SIMD instructions has to be adapted according to the size
+#define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
+#define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
 
-#endif // define VAL_SIZE_BYTES
+
 
 
 /* [distinguished point bits || nserver || y || idx || val || z ] */
