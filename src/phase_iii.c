@@ -33,15 +33,37 @@ int cmp_dgst(void const* dgst1, void const* dgst2){
 }
 
 /* return index of key if it is found, -1 otherwise*/
-size_t linear_search(u8 *key, u8 *array, size_t array_len, size_t key_len)
+int64_t linear_search(u8 *key, u8 *array, size_t array_len, size_t key_len)
 {
-  for (size_t i=0; i<array_len; i += key_len) {
-    if ( 0 == memcmp(key, &array[i], key_len) )
+  for (size_t i=0; i<array_len; ++i) {
+    printf("i=%lu\n", i);
+    print_byte_txt("found:", &array[i*key_len], key_len);
+    print_byte_txt("key  :", key, key_len);
+    
+    if ( 0 == memcmp(key, &array[i*key_len], key_len) ){
       return i;
+    }
+      
   }
   
   return -1; /* not found */
 }
+
+
+void* linear_search_ptr(u8 *key, u8 *array, size_t array_len, size_t key_len)
+{
+  for (size_t i=0; i<array_len; ++i) {
+    if ( 0 == memcmp(key, &array[i*key_len], key_len) ){
+      return &array[i*key_len];
+    }
+    
+  }
+  
+  return NULL; /* not found */
+}
+
+
+
 
 
 void print_byte_array(u8* array, size_t nbytes)
@@ -79,19 +101,24 @@ int main(int argc, char* argv[]) /* single machine */
 
   /* load messages candidates, hash them, sort them */
   FILE* fp = fopen("data/receive/messages/archive", "r");
-  size_t nmsgs = get_file_size(fp)/HASH_INPUT_SIZE;
+
+    
+  size_t nmsgs = (get_file_size(fp)) / HASH_INPUT_SIZE;
   const WORD_TYPE state_init[NWORDS_STATE] = {HASH_INIT_STATE};
-  printf("we have %lu candidates\n", nmsgs);
+  printf("============================\n"
+	 "We have %lu candidates, \n"
+	 "============================\n", nmsgs);
   
   /* We have three arrays: */
   u8* msgs  = (u8*) malloc( sizeof(u8)*nmsgs*HASH_INPUT_SIZE );
   u8* dgsts = (u8*) malloc(sizeof(u8)*nmsgs*(N) );
 
+  
   u8* dgsts_orderd = (u8*) malloc(sizeof(u8)*nmsgs*(N) );
+
   
   fread(msgs, nmsgs, HASH_INPUT_SIZE, fp);
   fclose(fp);
-
 
 
 
@@ -111,64 +138,99 @@ int main(int argc, char* argv[]) /* single machine */
   // sort msg_dgst according to the digests
   memcpy(dgsts_orderd, dgsts, nmsgs*N);
   qsort( dgsts_orderd, nmsgs, N, cmp_dgst);
-  
+
+  puts("digests unordered:");
+  for (int i=0; i<nmsgs; ++i) {
+    print_byte_txt("", &dgsts[i*N], N);    
+  }
+
+  puts("digests ordered:");
+  for (int i=0; i<nmsgs; ++i) {
+    print_byte_txt("", &dgsts_orderd[i*N], N);  
+  }
+
   // ----------------------------- PART 2 ------------------------------------
   // hash the long message with each hashing probe 
   fp = fopen("data/states", "r");
   size_t nmiddle_states  = get_file_size(fp)/(NWORDS_STATE*WORD_SIZE);
+
+  
   /* How many state does a thread handle */
-  size_t thread_load = nmiddle_states/omp_get_max_threads();
+  /* size_t thread_load = nmiddle_states/omp_get_max_threads(); */
+  size_t thread_load = nmiddle_states/1;
+
+  printf("----------------------------------------------------------\n"
+	 "We have %lu middle states, load/thread %lu, nthreads=%d\n"
+	 "-----------------------------------------------------------\n",
+	 nmiddle_states, thread_load, omp_get_max_threads());
   
 
-  #pragma omp parallel
+
+
+
+
+  /* #pragma omp parallel */
   {
     void* ptr; // result of binary search
+    /* int found = -1; */
     int thread_num = omp_get_thread_num();
     size_t start = thread_load*thread_num;
     size_t end = thread_load*(1+thread_num);
+
+
     if (thread_num == omp_get_max_threads() - 1)
-      end = nmiddle_states -1; /* last thread gets chunk + nmsg % nthreads */
+      end = nmiddle_states; /* last thread gets chunk + nmsg % nthreads */
     //+ todo how to incorporate counter?
+    printf("thd%d, [start=%lu, end=%lu)\n", thread_num, start, end);
     
     WORD_TYPE state_priv[NWORDS_STATE] = {HASH_INIT_STATE};
     u8 msg_priv[HASH_INPUT_SIZE] = {0};
     
     for (size_t i = start; i<end; ++i) {
       memcpy(state_priv, state_init, NWORDS_STATE*WORD_SIZE);
+
       // use counter to increment msg_priv
       hash_single(state_priv, msg_priv);
-      ptr = bsearch(state_priv, dgsts_orderd, N, nmsgs, cmp_dgst);
+      //ptr = bsearch(state_priv, dgsts_orderd, N, nmsgs, cmp_dgst);
+      ptr = linear_search_ptr((u8*) state_priv, dgsts_orderd, nmsgs, N);
+      
+      /* printf("cool thread%d, i=%lu\n", omp_get_thread_num(), i); */
 
-      if (ptr) {
+      if (ptr != NULL) {/* the binary search was successful! */
+
         /* remeber digest if the firs N bytes of state  */
 	#pragma omp critical
 	{
-	
+        printf("found a collision at %lu\n", i);
+	printf("hash long message at %lu:\n", i);
+
 	size_t msg_idx = linear_search((u8*) state_priv, dgsts, nmsgs, N);
 	u8* ptr_msg_collide = &msgs[msg_idx];
 	
 
 	
-        printf("found a collision at %lu\n", i);
-	printf("hash long message at %lu:\n", i);
 	print_byte_array((u8*) state_priv, N);
 	
 	printf("while the the following message:\n");
 	print_byte_array(ptr_msg_collide, HASH_INPUT_SIZE);
 	puts("produce the following hash:");
 	print_byte_array(&dgsts[msg_idx], N);
-	
+
 	}// end critical region
+
       } // end if condition
       
-    
+
     } // end for loop, thread's main work
 
+
   } // end parallel region
-  free(fp);
+
+
   free(msgs);
   free(dgsts);
   free(dgsts_orderd);
+
 } // quit the function
 
 

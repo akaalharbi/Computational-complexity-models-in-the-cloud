@@ -95,10 +95,10 @@ static inline int lookup_multi_save(dict *d,
     
     if (tmp){ /* positive probe, i.e. we found a candidate msg||dgst  */
       // reconstruct the message:
-      /* I feel we should pass this as an argument */
 
-      /* printf("found a candidate at counter="); */
-      /* print_char(&stream[i*one_pair_size], sizeof(CTR_TYPE)); */
+
+      printf("found a candidate at counter=");
+      print_char(&stream[i*one_pair_size], sizeof(CTR_TYPE));
 
       /* reconstructing the message: get the template */
       memcpy(M, init_message, HASH_INPUT_SIZE);
@@ -385,10 +385,10 @@ void sender(int myrank, MPI_Comm mpi_communicator)
       /* time_start = wtime(); */
       /* we have enough messages to send to server (server_number) */
 
-      printf("===============================================\n"
-             "sender #%d -> recv #%d before sending %0.2fsec\n"
-	     "===============================================\n\n",
-	     myrank, server_number, wtime() -  time_end );
+      /* printf("===============================================\n" */
+      /*        "sender #%d -> recv #%d before sending %0.2fsec\n" */
+      /* 	     "===============================================\n\n", */
+      /* 	     myrank, server_number, wtime() -  time_end ); */
 
       MPI_Send(&snd_buf[server_number*nbytes_per_server],
 		PROCESS_QUOTA*one_pair_size,
@@ -399,10 +399,10 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
       ++snd_ctr;
 
-      printf("-----------------------------------------------\n"
-             "sender #%d -> recv #%d sending done %0.2fsec\n"
-	     "-----------------------------------------------\n\n",
-	     myrank, server_number, wtime() -  time_end );
+      /* printf("-----------------------------------------------\n" */
+      /*        "sender #%d -> recv #%d sending done %0.2fsec\n" */
+      /* 	     "-----------------------------------------------\n\n", */
+      /* 	     myrank, server_number, wtime() -  time_end ); */
 
       /* 	snprintf(txt, sizeof(txt), "sender#%d,  server=%d, snd_buf=", */
       /* 		 myrank, server_number ); */
@@ -415,6 +415,7 @@ void sender(int myrank, MPI_Comm mpi_communicator)
       // todo do we need here buffer detach? 
       /* It is enough to reset the counter. The memroy will be rewritten */  
       servers_ctr[server_number] = 0;
+      time_end = wtime();
     }
   } 
 
@@ -567,7 +568,9 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 				    fp); /* file to record cadidates */
 
     if (nfound_cnd - old_nfound_candidates > 0) {
-      printf("receiver #%d found %lu candidates\n", myrank, nfound_cnd);
+      printf("+++++++++++++++++++++++++++++++++\n"
+	     "receiver #%d has %lu candidates\n"
+	     "+++++++++++++++++++++++++++++++++\n\n", myrank, nfound_cnd);
       old_nfound_candidates = nfound_cnd;
     }
     MPI_Wait(&request, &status);
@@ -595,7 +598,9 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   free(rcv_buf);
   free(indices);
   fclose(fp);
+
   printf("recv #%d done a good job\n", myrank);
+  exit(EXIT_SUCCESS);
 }
 
 
@@ -714,29 +719,29 @@ int main(int argc, char* argv[])
 
 // ------------------- Auxililary functions phase iii --------------------------
 
-/* 1 if  dgst1 > dgst2, -1 if dgst1<dgist2, 0 if dgst1==dgst2 */
-int cmp_dgst(void const* dgst1, void const* dgst2){
-  return memcmp(dgst1, dgst2, N); /* comparison order: low bytes first */
-}
+/* /\* 1 if  dgst1 > dgst2, -1 if dgst1<dgist2, 0 if dgst1==dgst2 *\/ */
+/* int cmp_dgst(void const* dgst1, void const* dgst2){ */
+/*   return memcmp(dgst1, dgst2, N); /\* comparison order: low bytes first *\/ */
+/* } */
 
-/* return index of key if it is found, -1 otherwise*/
-size_t linear_search(u8 *key, u8 *array, size_t array_len, size_t key_len)
-{
-  for (size_t i=0; i<array_len; i += key_len) {
-    if ( 0 == memcmp(key, &array[i], key_len) )
-      return i;
-  }
+/* /\* return index of key if it is found, -1 otherwise*\/ */
+/* int64_t linear_search(u8 *key, u8 *array, size_t array_len, size_t key_len) */
+/* { */
+/*   for (size_t i=0; i<array_len; i += key_len) { */
+/*     if ( 0 == memcmp(key, &array[i], key_len) ) */
+/*       return i; */
+/*   } */
   
-  return -1; /* not found */
-}
+/*   return -1; /\* not found *\/ */
+/* } */
 
 
-void print_byte_array(u8* array, size_t nbytes)
-{
-  for (size_t i=0; i<nbytes; ++i) 
-    printf("0x%02x, ",  array[i]);
-  puts("");
-}
+/* void print_byte_array(u8* array, size_t nbytes) */
+/* { */
+/*   for (size_t i=0; i<nbytes; ++i)  */
+/*     printf("0x%02x, ",  array[i]); */
+/*   puts(""); */
+/* } */
 
 
 

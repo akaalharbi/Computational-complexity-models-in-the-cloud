@@ -102,15 +102,17 @@ int main(int argc, char* argv[]){
   dict* d = dict_new(NSLOTS_MY_NODE);
   dict_add_element_to(d, &hashes[ sizeof(CTR_TYPE)]);
 
+  dict_add_element_to(d, &hashes[7*one_pair_size + sizeof(CTR_TYPE)]);
+
   puts("\n\n");
   int found = 0;
 
-  for (int i = 0; i<3; ++i) {
+  for (int i = 0; i<8; ++i) {
     found = dict_has_elm(d, &hashes[i*one_pair_size + sizeof(CTR_TYPE)]);
     printf("%dith was found=%d\n",i, found);
     print_char(&hashes[i*one_pair_size + sizeof(CTR_TYPE)],
 	       N-DEFINED_BYTES);
-    puts("++++++++++++++++++++++++++++++++++++++++++++++++++++\n");
+    puts("++++++++++++++++++++++++++++++++++++++++++++++++++++");
 
 
   }

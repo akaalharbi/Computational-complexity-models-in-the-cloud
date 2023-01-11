@@ -33,7 +33,7 @@
 #define NWORDS_DIGEST 8
 #define NWORDS_STATE 8
 #define NWORDS_INPUT 16
-#define HASH_INPUT_SIZE NWORDS_INPUT * WORD_SIZE /* in bytes */
+#define HASH_INPUT_SIZE (NWORDS_INPUT * WORD_SIZE) /* in bytes */
 #define FILE_NAME_MAX_LENGTH 256
 
 
@@ -122,7 +122,7 @@
 #define ARCHIVE_SERVER NSERVERS
 // WHAT IS BUFF_SIZE? It doesn't seem to be used!
 //#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
-#define PROCESS_QUOTA 1000LL // i.e. send 10 digests to each server @by_hand
+#define PROCESS_QUOTA 1000000LL // i.e. send 10 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
 
