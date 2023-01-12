@@ -92,6 +92,14 @@ void print_char(unsigned char* l, size_t len){
   puts("");
 }
 
+void print_u16(uint16_t* l, size_t len){
+  printf("0x");
+  for (size_t i = 0; i<len; ++i)
+    printf("%02x", l[i]);
+  puts("");
+}
+
+
 void print_byte_txt(char* txt, unsigned char* a, size_t len){
   printf("%s 0x", txt);
   for (size_t i = 0; i<len; ++i)

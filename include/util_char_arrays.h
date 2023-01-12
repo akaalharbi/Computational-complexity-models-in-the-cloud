@@ -18,7 +18,7 @@ void *linear_search_ptr(uint8_t *key,
 
 
 void print_byte_array(uint8_t* array, size_t nbytes);
-
+void print_u16(uint16_t* l, size_t len);
 int cmp_arrays(char* array1, char* array2, size_t len);
 void print_char(unsigned char *l, size_t len);
 void print_byte_txt(char* txt, unsigned char* a, size_t len);
