@@ -54,12 +54,17 @@
 //---------------------------- UTILITY FUNCTIONS -------------------------------
 
 
+
+
+
+
 static inline int lookup_multi_save(dict *d,
-				    u8 *stream, /* rcv_buf  */ 
+				    u8 *digests_short, /* known bytes are removed  */ 
                                     u8 init_message[HASH_INPUT_SIZE],
                                     size_t npairs, /* #pairs in rcv_buf */
 				    FILE *fp,
-				    int myrank)
+				    int myrank,
+				    int source)
 {
   // -------------------------------------------------------------------------+
   // Given stream={msg1||dgst1,..} from specific rank, probes each dgst, if   |
@@ -80,36 +85,33 @@ static inline int lookup_multi_save(dict *d,
   /* the stream size is multiple of one_pair size */
   static int one_pair_size = sizeof(CTR_TYPE) + (N-DEFINED_BYTES)*sizeof(u8);
   static int msg_size = HASH_INPUT_SIZE;
+
+
   
   /* how many messages give positive ans when their dgst gets probes */
   int npositive_msgs = 0;
   int tmp = 0;
-  static char M[HASH_INPUT_SIZE]; /* construct the full message here */
+  static u8 M[HASH_INPUT_SIZE]; /* construct the full message here */
   
   for (size_t i=0; i<npairs; ++i){
     /* dictionary only read |dgst| bytes by default  */
     /* probing pair #i */
     // this is wrong we are probing the messgae not the digest, lmfao!
-    tmp =  dict_has_elm(d, &stream[i*one_pair_size + sizeof(CTR_TYPE)]);
+    tmp =  dict_has_elm(d,
+			&digests_short[i*one_pair_size + sizeof(CTR_TYPE)]);
     
 
     
     if (tmp){ /* positive probe, i.e. we found a candidate msg||dgst  */
-      // reconstruct the message:
 
-      if (myrank == 1) {
-
-
-      printf("found a candidate at counter=");
-      print_char(&stream[i*one_pair_size], sizeof(CTR_TYPE));
-      printf("with hash=\n");
-      print_char(&stream[i*one_pair_size + sizeof(CTR_TYPE)],
-		 N-DEFINED_BYTES);
-      }
       /* reconstructing the message: get the template */
       memcpy(M, init_message, HASH_INPUT_SIZE);
       /* set the counter part */
-      memcpy(M, stream+i*one_pair_size, sizeof(CTR_TYPE));
+      memcpy(M,
+	     &digests_short[i*one_pair_size],
+	     sizeof(CTR_TYPE));
+
+      assert(is_dist_msg(M));
 
       /* finally write the reconstructed message */
       fwrite(M, sizeof(u8), msg_size, fp);
@@ -148,7 +150,7 @@ void load_file_to_dict(dict *d, FILE *fp)
   /* add as many hashes as possible */ 
   while ( !feof(fp) ){
     // use fread with a larger buffer @todo 
-    fread(stream_pt, sizeof(u8), N-DEFINED_BYTES, fp);
+    fread(stream_pt, sizeof(u8), (N-DEFINED_BYTES), fp);
     /* it adds the hash iff nprobes <= NPROBES_MAX */
     dict_add_element_to(d, stream_pt); 
   }
@@ -198,7 +200,6 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   char txt[50];
   snprintf(txt, sizeof(txt), "sender #%d template=", myrank);
   print_byte_txt(txt, M,HASH_INPUT_SIZE);
-
     
   /* Send the initial input to all receiving servers */
   /* printf("sender #%d is going to send its template\n", myrank); */
@@ -387,6 +388,10 @@ static inline void receiver_process_get_template(int myrank, int nproc, int npro
 
 
 
+
+
+
+
 void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* templates )
 {
   // todo check the loops, currently they are errornous!
@@ -455,7 +460,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 	   &status);
 
   printf("recv #%d got a message from %d\n"
-	 "(We will message you again)", myrank, status.MPI_SOURCE);
+	 "(We will message you again)\n", myrank, status.MPI_SOURCE);
   
   // copy the received message and listen immediately
   memcpy(lookup_buf, rcv_buf, rcv_array_size);
@@ -475,7 +480,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 
 
 
-  while (4  > nfound_cnd) {    
+  while (NNEEDED_CND > nfound_cnd) {    
     /* printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank); */
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */
@@ -490,12 +495,13 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
     /* printf("recv#%d probing sender #%d messages\n", */
     /* 	   myrank, sender_name_scaled); */
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
-				    rcv_buf, /* messages to search in d */
+				    lookup_buf, /* messages to search in d */
 				    &templates[sender_name_scaled
 					       *HASH_INPUT_SIZE],
 				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
 				    fp,
-				    myrank); /* file to record cadidates */
+				    myrank,
+				    status.MPI_SOURCE); /* file to record cadidates */
 
     if (nfound_cnd - old_nfound_candidates > 0) {
       printf("+++++++++++++++++++++++++++++++++++++++++\n"
@@ -514,13 +520,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
       /* 	       from, */
       /* 	       myrank); */
       /* print_byte_txt(txt,rcv_buf, rcv_array_size); */
-
    
-
-
-
-
-
     sender_name_scaled = status.MPI_SOURCE - NSERVERS; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
     }
@@ -532,12 +532,14 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   fclose(fp);
 
   printf("recv #%d done a good job\n", myrank);
-  exit(EXIT_SUCCESS);
+  /* exit(EXIT_SUCCESS); */
 }
 
 
 
-
+void receiver(int myrank, MPI_Comm mpi_communicator){
+  
+}
 
 
 // 

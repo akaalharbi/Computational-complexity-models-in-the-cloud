@@ -167,7 +167,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
   /* WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE}; */
 
   /* treat state as bytes (have you considered union?) */
-  u8* stream_pt = (u8*) state; 
+  u8* state_u8 = (u8*) state; 
 
   /// INIT FILES: server files that will be send later and state
   char file_name[FILE_NAME_MAX_LENGTH]; // more thnan enough to store file name
@@ -224,19 +224,16 @@ void phase_i_store(CTR_TYPE msg_ctr,
     
     
     if ( (state[0] & ones) == 0){ /* it is a distinguished point */
-
       /* Decide which server is responsible for storing this digest */
-      k = to_which_server((u8*) state);
+      k = to_which_server( state_u8 );
 	//( (state[0]>>DIFFICULTY) & ones_nservers) % NSERVERS;
 
       /* Recall that: */
       /* h = (dist_pt) || h1:=b0 ... b_ceil(log2(nservers)) || the rest   */
-      fwrite(stream_pt+DEFINED_BYTES, /* start  from "the rest" see above */
+      fwrite(&state_u8[DEFINED_BYTES], /* start  from "the rest" see above */
 	     sizeof(u8), /* smallest moving unit */
 	     N-DEFINED_BYTES, /* len( (dist_pt)|| h1 ) = DEFINED_BITS */
 	     data_to_servers[k]);
-
-    
 
       ++nhashes_stored;
 
@@ -254,7 +251,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	/* FILE* states_file = fopen(states_file_name, "a"); */
 	
 	/* Record the whole state */
-	fwrite((WORD_TYPE*) stream_pt, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
+	fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
 	
 	/* Record the counter  */
 	fprintf(counters_file, "%llu\n", msg_ctr_pt[0]);

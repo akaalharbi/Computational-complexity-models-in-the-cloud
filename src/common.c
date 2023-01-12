@@ -31,8 +31,8 @@
 void print_attack_information(){
   printf("\nL=%d, L_IN_BYTES=%d, N=%d, NHASHES=%llu,\n"
 	 "DIFFICULTY=%d, |idx| = %dbytes, NSEERVERS=%d,\n"
-	 " NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
-	 "NDEFINED BYTES=%d\n",
+	 "NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
+	 "NDEFINED BYTES=%d, NCND_NEEDED=%llu\n",
 	 L,
 	 L_IN_BYTES,
 	 N,
@@ -43,7 +43,8 @@ void print_attack_information(){
 	 NSLOTS_MY_NODE,
 	 NPROBES_MAX,
 	 VAL_SIZE_BYTES,
-	 DEFINED_BYTES);
+	 DEFINED_BYTES,
+	 NNEEDED_CND);
   
 }
 
@@ -129,4 +130,20 @@ void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
 
       
   }
+}
+
+
+int is_dist_state(u8 state[NWORDS_STATE*WORD_SIZE]){
+  static const WORD_TYPE ones = (1LL<<DIFFICULTY) - 1;
+
+  return ( (state[0] & ones) == 0 );
+}
+
+
+int is_dist_msg(u8 M[HASH_INPUT_SIZE]){
+  WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
+  hash_single(state, M);
+
+  return is_dist_state((u8*)state);
+  
 }

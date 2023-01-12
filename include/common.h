@@ -11,3 +11,6 @@ void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
 			     CTR_TYPE* ctr, /* in, out */
 			     const size_t dist_test /* in */);
 
+int is_dist_state(u8 state[NWORDS_STATE * WORD_SIZE]);
+
+int is_dist_msg(u8 M[HASH_INPUT_SIZE]);

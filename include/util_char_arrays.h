@@ -6,7 +6,7 @@
 #include <sys/random.h>
 #include <stdint.h>
 
-int64_t linear_search(uint8_t *key,
+uint64_t linear_search(uint8_t *key,
 		      uint8_t *array,
 		      size_t array_len,
                       size_t key_len);

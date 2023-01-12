@@ -7,12 +7,15 @@
 #include <string.h>
 
 /* return index of key if it is found, -1 otherwise*/
-int64_t linear_search(uint8_t *key, uint8_t *array, size_t array_len, size_t key_len)
+uint64_t linear_search(uint8_t *key, uint8_t *array, size_t array_len, size_t key_len)
 {
+  // return the index of element if it exits, otherwise 0
+  // don't use this function to test if an element exists in an array!
+  
   for (size_t i=0; i<array_len; ++i) {
-    printf("i=%lu\n", i);
-    print_byte_txt("found:", &array[i*key_len], key_len);
-    print_byte_txt("key  :", key, key_len);
+    /* printf("i=%lu\n", i); */
+    /* print_byte_txt("found:", &array[i*key_len], key_len); */
+    /* print_byte_txt("key  :", key, key_len); */
     
     if ( 0 == memcmp(key, &array[i*key_len], key_len) ){
       return i;
@@ -20,7 +23,7 @@ int64_t linear_search(uint8_t *key, uint8_t *array, size_t array_len, size_t key
       
   }
   
-  return -1; /* not found */
+  return 0; /* not found */
 }
 
 

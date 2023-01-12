@@ -29,197 +29,47 @@
 #include "common.h"
 //#include <sys/random.h> // probably deadweight getrandom(void *buffer, size_t length, 1
 
+/* 1 if  dgst1 > dgst2, -1 if dgst1<dgist2, 0 if dgst1==dgst2 */
+int cmp_dgst(void const* dgst1, void const* dgst2){
+  return memcmp(dgst1, dgst2, N-DEFINED_BYTES); /* comparison order: low bytes first */
+}
+
 
 
 int main(int argc, char* argv[]){
+  u8 rnd_msg[HASH_INPUT_SIZE] = {0x41, 0x4d, 0x20, 0xd9, 0x00, 0x00, 0x00, 0x00, 0x93, 0x2f, 0x3d, 0x43, 0xa5, 0x15, 0x9b, 0x35, 0x50, 0x0b, 0x8d, 0xa4, 0x8a, 0xaf, 0x47, 0xb7, 0x0e, 0x3c, 0x0b, 0x0f, 0x32, 0x7b, 0xad, 0xd2, 0xfc, 0x2c, 0xfa, 0xa2, 0xe3, 0x1f, 0x19, 0x3b, 0x94, 0x75, 0x80, 0xdf, 0x1d, 0x0c, 0xa0, 0x92, 0x39, 0x72, 0xe3, 0xde, 0x29, 0x11, 0x21, 0x6c, 0x09, 0x21, 0x0c, 0xad, 0x39, 0x1f, 0x55, 0x50 };
 
-  /* print_attack_information(); */
-
-  /* // pretend we are doing phase i, (just take few hashes) */
-  /* WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE}; */
-  /* u8 M[HASH_INPUT_SIZE] = {0}; */
-  
-
-  /* CTR_TYPE msg_ctr = 0; */
-  /* CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /\* increment the message by one each time *\/ */
-  /* *msg_ctr_pt = msg_ctr; /\* update the message counter as the given input *\/ */
-  /* // store the hash value in this variable */
-  /* /\* WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE}; *\/ */
-
-  /* /\* treat state as bytes (have you considered union?) *\/ */
-  /* /\* u8* stream_pt = (u8*) state;  *\/ */
-
-
-  /* u32 ones = (1LL<<DIFFICULTY) - 1; */
-
-  /* printf("N=%dbytes, Difficulty=%d, ones=%d\n", N, DIFFICULTY, ones); */
-
-  /* puts("------------------------------\n"); */
-  /* int nmsgs = 0; */
-  /* const static u32 ones_nservers = (1LL<<LOG2_NSERVERS) - 1; */
-  /* int server = 0; */
-  
-  /* for (; nmsgs<20;){ */
-  /*   hash_single(state, M); */
-  /*   msg_ctr_pt[0]++; */
-
-
-
-
-    
-  /*   server =  ( (((WORD_TYPE*)state)[0] >> (DIFFICULTY)) & ones_nservers) */
-  /*     % NSERVERS; */
-    
-  /*   if ( (state[0] & ones) == 0 && (server == 1) ){ /\* it is a distinguished point *\/ */
-  /*     ++nmsgs; */
-  /*     printf("msg_ctr=%llu, nserver=%d\n", msg_ctr_pt[0], server); */
-  /*     puts("YAY"); */
-  /*     print_char((u8*) state, 32); */
-  /*     puts("--------------------------------------------\n"); */
-  /*   } */
-  /*  } */
-
-
-  /* // we will pretend that we are 2nd server i.e. server #1  */
-  
-  /* puts("\n=====================================\n\n"); */
-  /* puts("pretends that we are phase i"); */
-
-  /* nmsgs = PROCESS_QUOTA; */
-  /* FILE* fp = fopen("data/send/digests/1", "r"); */
-
-  /* int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES) */
-  /*                   + sizeof(CTR_TYPE); /\* |dgst| + |ctr| *\/ */
-
-  /* u8* hashes = (u8*) malloc(one_pair_size*nmsgs); */
-  /* // msg||dgst */
-  /* for (int i = 0; i<nmsgs; i++){ */
-  /*   printf("%d\n", i); */
-  /*   fread(&hashes[one_pair_size*i + sizeof(CTR_TYPE)], */
-  /* 	  sizeof(u8), */
-  /* 	  N-DEFINED_BYTES, */
-  /* 	  fp); */
-    
-  /* } */
-
-  /* dict* d = dict_new(NSLOTS_MY_NODE); */
-  /* dict_add_element_to(d, &hashes[ sizeof(CTR_TYPE)]); */
-
-  /* dict_add_element_to(d, &hashes[7*one_pair_size + sizeof(CTR_TYPE)]); */
-
-  /* puts("\n\n"); */
-  /* int found = 0; */
-
-  /* for (int i = 0; i<8; ++i) { */
-  /*   found = dict_has_elm(d, &hashes[i*one_pair_size + sizeof(CTR_TYPE)]); */
-  /*   printf("%dith was found=%d\n",i, found); */
-  /*   print_char(&hashes[i*one_pair_size + sizeof(CTR_TYPE)], */
-  /* 	       N-DEFINED_BYTES); */
-  /*   puts("++++++++++++++++++++++++++++++++++++++++++++++++++++"); */
-
-
-  /* } */
-
-  /* free(hashes); */
-  /* dict_free(d); */
-  /* free(d); */
-
-/// -------------------------------------------------------------------
-
-// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=--=--=--=-=-=-=--=-=-=-=--=
-
-
-  /// ----------------------- INIT ---------------------------///
-  /// 1- INIT numerical and bytes variables:
-  /* phase will rehash the long message again in parallel */
-  /* here we define how many parllel processors in phase iii */
-  //size_t ncores = 14; // deadweight
-
-  int should_NOT_stop = 1;
-  /* size_t nhashes_stored = 0; */
-
-  u32 ones = (1LL<<DIFFICULTY) - 1;
-
-
-
-  /* Actually we have discussed that we can fix the number of nhashes per */
-  /* Eventhough they have different capacities, since we allow server to  */
-  /* discard excessive hasing */
-
-  /* record the whole state after each each interval has passed */
-  static const size_t interval = INTERVAL; 
-
-  /// timing variables
-
-
-  // INIT SHA256
-
-    // -INIT: The number of Hashes each server will get
-  CTR_TYPE msg_ctr = 0;
-  size_t nhashes_stored = 0;
-  WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
+  u64 ctr = 323907923;
 
   u8 M[HASH_INPUT_SIZE] = {0};
-  CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* increment the message by one each time */
-
-  *msg_ctr_pt = msg_ctr; /* update the message counter as the given input */
-  // store the hash value in this variable
-  /* WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE}; */
-
-  /* treat state as bytes (have you considered union?) */
-  u8* stream_pt = (u8*) state; 
-
-  /// INIT FILES: server files that will be send later and state
-
-  /* char states_file_name[FILE_NAME_MAX_LENGTH]; */
+  u64* msg_ctr_pt = (u64*) M;
   
-  printf("interval=%ld, nhashes_stored≈%ld\n", interval, nhashes_stored);
+  WORD_TYPE state_rnd_msg[NWORDS_STATE] = {HASH_INIT_STATE};
+  WORD_TYPE state_long_msg[NWORDS_STATE] = {HASH_INIT_STATE};
 
+  hash_single(state_rnd_msg, rnd_msg);
 
-
-
-
-  /// ----------------- PHASE I: Part 1/2   ------------------------  ///
-  // First phase hash an extremely long message
-  // M0 M1 ... M_{2^l}, Mi entry will evaluated on the fly
-  // Store the hashes in file correspond to some server k
-  printf("Going to generate hashed with DIFFICULTY=%d\n", DIFFICULTY);
-
-  
-  /* if one server gets filled, it will */
- 
-  while (should_NOT_stop) {
-    // hash and extract n bits of the digest
-    hash_single(state, M);
-    msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
-    /* print_char(M, 64); */
-
-    
-    
-    if ( (state[0] & ones) == 0){ /* it is a distinguished point */
-      print_char((u8*) state, N);
-      /* Decide which server is responsible for storing this digest */
-
-      ++nhashes_stored;
+  for (size_t i = 0; i<ctr-10; ++i) {
+    msg_ctr_pt[0]++;
+      hash_single(state_long_msg, M);
 
       
-      // decide should not stop or should stop?
-      /* not the most optimal implementation */
-      should_NOT_stop = (nhashes_stored < NHASHES);
-    
-
-      // + save states after required amount of intervals
-
-    }
-    
   }
 
+    for (size_t i = 0; i<11; ++i) {
+            msg_ctr_pt[0]++;
+      hash_single(state_long_msg, M);
+
+      printf("ctr=%llu\n",  msg_ctr_pt[0]++);
+      print_byte_txt("h(lng_msg)", (u8*) state_long_msg, N);
+  }
+  print_byte_txt("h(rnd_msg)", (u8*) state_rnd_msg, N);
+
+  return 0;
 
 
 
 
-
-  
-  
-
+       
 }
+

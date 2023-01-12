@@ -47,9 +47,9 @@
 // Apologies: only n ≡ 0 mod 8 is allowed. This is not a feature.
 
 // Let N := n / 8
-#define N 5 /* bytes i.e n := 8*N bits */
+#define N 7 /* bytes i.e n := 8*N bits */
 // will be replaced by the NHASHES below 
-#define L 11 /* store 2^L elements in the dictionary  */
+#define L 26 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
@@ -282,7 +282,7 @@
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
 
-#define NNEEDED_CND MAX((1LL << DISCARDED_BITS), 1)  /* @python  */
+#define NNEEDED_CND MAX((1LL << (DISCARDED_BITS+3)), 1)  /* @python  */
 // (2^#disacrded_bits) / NSERVERS, however, it's not a strict requirement.
 //#define NNEEDED_CND_THIS_SERVER MAX(((1LL << DISCARDED_BITS) >> NSERVERS), 1)
   
