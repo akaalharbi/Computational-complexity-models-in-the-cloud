@@ -9,7 +9,7 @@
 
 
 /* https://stackoverflow.com/a/39920811/20495595 */
-#define NEEDS_BIT(N, B)     (((unsigned long)N >> B) > 0)
+#define NEEDS_BIT(N, B)     ((N >> B) > 0)
 #define BITS_TO_REPRESENT(N)		       \
         (NEEDS_BIT(N,  0) + NEEDS_BIT(N,  1) + \
          NEEDS_BIT(N,  2) + NEEDS_BIT(N,  3) + \

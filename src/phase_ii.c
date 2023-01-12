@@ -58,7 +58,8 @@ static inline int lookup_multi_save(dict *d,
 				    u8 *stream, /* rcv_buf  */ 
                                     u8 init_message[HASH_INPUT_SIZE],
                                     size_t npairs, /* #pairs in rcv_buf */
-				    FILE *fp)
+				    FILE *fp,
+				    int myrank)
 {
   // -------------------------------------------------------------------------+
   // Given stream={msg1||dgst1,..} from specific rank, probes each dgst, if   |
@@ -96,10 +97,15 @@ static inline int lookup_multi_save(dict *d,
     if (tmp){ /* positive probe, i.e. we found a candidate msg||dgst  */
       // reconstruct the message:
 
+      if (myrank == 1) {
+
 
       printf("found a candidate at counter=");
       print_char(&stream[i*one_pair_size], sizeof(CTR_TYPE));
-
+      printf("with hash=\n");
+      print_char(&stream[i*one_pair_size + sizeof(CTR_TYPE)],
+		 N-DEFINED_BYTES);
+      }
       /* reconstructing the message: get the template */
       memcpy(M, init_message, HASH_INPUT_SIZE);
       /* set the counter part */
@@ -153,7 +159,7 @@ void load_file_to_dict(dict *d, FILE *fp)
 
 void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 { /* Send M immediately and clear the memory at the end  */
-
+  
   MPI_Request requests[NSERVERS]; /* they will be used only here  */
   MPI_Status statuses[NSERVERS];
   // how about collective communications? I can't find a simple way using them.
@@ -189,9 +195,9 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   getrandom(M, HASH_INPUT_SIZE, 1);
   ctr_pt[0] = 0; /* zeroing the first 64bits of M */
 
-  /* char txt[50]; */
-  /* snprintf(txt, sizeof(txt), "sender #%d got template", myrank); */
-  /* print_byte_txt(txt, M,HASH_INPUT_SIZE); */
+  char txt[50];
+  snprintf(txt, sizeof(txt), "sender #%d template=", myrank);
+  print_byte_txt(txt, M,HASH_INPUT_SIZE);
 
     
   /* Send the initial input to all receiving servers */
@@ -448,7 +454,8 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 	   MPI_COMM_WORLD,
 	   &status);
 
-  printf("recv #%d got message from %d\n", myrank, status.MPI_SOURCE);
+  printf("recv #%d got a message from %d\n"
+	 "(We will message you again)", myrank, status.MPI_SOURCE);
   
   // copy the received message and listen immediately
   memcpy(lookup_buf, rcv_buf, rcv_array_size);
@@ -487,12 +494,15 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 				    &templates[sender_name_scaled
 					       *HASH_INPUT_SIZE],
 				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
-				    fp); /* file to record cadidates */
+				    fp,
+				    myrank); /* file to record cadidates */
 
     if (nfound_cnd - old_nfound_candidates > 0) {
-      printf("+++++++++++++++++++++++++++++++++\n"
-	     "receiver #%d has %lu candidates\n"
-	     "+++++++++++++++++++++++++++++++++\n\n", myrank, nfound_cnd);
+      printf("+++++++++++++++++++++++++++++++++++++++++\n"
+	     "receiver #%d has %lu candidates from #%d\n"
+	     "++++++++++++++++++++++++++++++++++++++++++\n\n",
+	     myrank, nfound_cnd, status.MPI_SOURCE);
+      
       old_nfound_candidates = nfound_cnd;
     }
     MPI_Wait(&request, &status);

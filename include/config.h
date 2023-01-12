@@ -49,14 +49,14 @@
 // Let N := n / 8
 #define N 7 /* bytes i.e n := 8*N bits */
 // will be replaced by the NHASHES below 
-#define L 28 /* store 2^L elements in the dictionary  */
+#define L 20 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 0
+#define DIFFICULTY 4
 
 /* we are not going to hold more than 32 bits in a dict entry */
 #define MAX_VAL_SIZE 32 /* in bits */
@@ -247,10 +247,13 @@
 #if N <= L_IN_BYTES
   #pragma message ("N is smaller than L!")
   #error "The code is not flexible to store every bit as index!"
-#endif 
+#endif
 
 
+// Having large valtype will make index smaller thus the filling rate
+// will drop significantly
 
+#if L_IN_BYTES <= N - DEFINED_BYTES - 4
 
 #define VAL_SIZE_BYTES 4 /* byte */
 #define VAL_TYPE u32 /* unsigned char */
@@ -258,6 +261,14 @@
 #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
 #define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
 
+#else
+#define VAL_SIZE_BYTES 2 /* byte */
+#define VAL_TYPE u16 /* unsigned char */
+// SIMD instructions has to be adapted according to the size
+#define SIMD_SET1_VALTYPE SIMD_SET1_EPI16
+#define SIMD_CMP_VALTYPE SIMD_CMP_EPI16
+
+#endif
 
 
 
@@ -282,7 +293,8 @@
 
 
 
-#endif 
+#endif
+
 
 
 

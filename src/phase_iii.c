@@ -161,8 +161,8 @@ int main(int argc, char* argv[]) /* single machine */
   fclose(fp);
   
   /* How many state does a thread handle */
-  size_t thread_load = nmiddle_states/omp_get_max_threads();
-  /* size_t thread_load = nmiddle_states/1; */
+  /* size_t thread_load = nmiddle_states/omp_get_max_threads(); */
+  size_t thread_load = nmiddle_states/1;
 
   printf("----------------------------------------------------------\n"
 	 "We have %lu middle states, load/thread %lu, nthreads=%d\n"
@@ -171,7 +171,7 @@ int main(int argc, char* argv[]) /* single machine */
   
 
   double start_time = wtime();
-  #pragma omp parallel
+  /* #pragma omp parallel */
   {
     void* ptr; // result of binary search
     
@@ -208,38 +208,41 @@ int main(int argc, char* argv[]) /* single machine */
       for (size_t j=0; j<INTERVAL; ++j) {
 	find_hash_distinguished(msg_priv, state_priv, &ctr_priv, test);
 
+
+	/* print_char((u8*) state_priv, N); */
+	/* puts(""); */
 	//ptr = bsearch(state_priv, dgsts_orderd, N, nmsgs, cmp_dgst);
 	ptr = linear_search_ptr((u8*) state_priv, dgsts_orderd, nmsgs, N);
 
-	if (ptr != NULL) {/* the binary search was successful! */
+	/* if (ptr != NULL) {/\* the binary search was successful! *\/ */
 
-	  /* remeber digest if the firs N bytes of state  */
-          #pragma omp critical
-	  {
-	    printf("found a collision at %lu\n", i);
-	    printf("hash long message at %lu:\n", i);
+	/*   /\* remeber digest if the firs N bytes of state  *\/ */
+        /*   #pragma omp critical */
+	/*   { */
+	/*     printf("found a collision at %lu\n", i); */
+	/*     printf("hash long message at %lu:\n", i); */
 
-	    size_t msg_idx = linear_search((u8*) state_priv, dgsts, nmsgs, N);
-	    u8* ptr_msg_collide = &msgs[msg_idx];
+	/*     size_t msg_idx = linear_search((u8*) state_priv, dgsts, nmsgs, N); */
+	/*     u8* ptr_msg_collide = &msgs[msg_idx]; */
 	
 
 	
-	    print_byte_array((u8*) state_priv, N);
+	/*     print_byte_array((u8*) state_priv, N); */
 	
-	    printf("while the the following message:\n");
-	    print_byte_array(ptr_msg_collide, HASH_INPUT_SIZE);
-	    puts("produce the following hash:");
-	    print_byte_array(&dgsts[msg_idx], N);
+	/*     printf("while the the following message:\n"); */
+	/*     print_byte_array(ptr_msg_collide, HASH_INPUT_SIZE); */
+	/*     puts("produce the following hash:"); */
+	/*     print_byte_array(&dgsts[msg_idx], N); */
 
 	    
-	  }// end critical region
+	/*   }// end critical region */
 	  
-	} // end if condition
+	/* } // end if condition */
 
 
       }
-      printf("thd%d done the task %lu in %0.2fsec)\n",
-	     omp_get_thread_num(), i, wtime() - start_time_priv);
+      /* printf("thd%d done the task %lu in %0.2fsec)\n", */
+      /* 	     omp_get_thread_num(), i, wtime() - start_time_priv); */
     } // end for loop, thread's main work
     
   } // end parallel region
@@ -250,7 +253,8 @@ int main(int argc, char* argv[]) /* single machine */
   free(msgs);
   free(dgsts);
   free(dgsts_orderd);
-
+  free(middle_states);
+  free(counters);
 } // quit the function
 
 

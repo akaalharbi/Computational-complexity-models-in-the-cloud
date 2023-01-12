@@ -14,8 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <omp.h>
-#include <unistd.h> // access functoin
-
+#include <unistd.h> // access functoin 
 //#include "memory.h" // memory monitor 
 //#include <sys/time.h> // moved timing.h 
 //#include <assert.h>
@@ -30,7 +29,10 @@
 
 
 void print_attack_information(){
-  printf("L=%d, L_IN_BYTES=%d, N=%d, NHASHES=%llu, DIFFICULTY=%d, |idx| = %dbytes, NSEERVERS=%d, NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d\n  ",
+  printf("\nL=%d, L_IN_BYTES=%d, N=%d, NHASHES=%llu,\n"
+	 "DIFFICULTY=%d, |idx| = %dbytes, NSEERVERS=%d,\n"
+	 " NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
+	 "NDEFINED BYTES=%d\n",
 	 L,
 	 L_IN_BYTES,
 	 N,
@@ -39,7 +41,9 @@ void print_attack_information(){
 	 MIN(L_IN_BYTES, N-DEFINED_BYTES-VAL_SIZE_BYTES),
 	 NSERVERS,
 	 NSLOTS_MY_NODE,
-	 NPROBES_MAX );
+	 NPROBES_MAX,
+	 VAL_SIZE_BYTES,
+	 DEFINED_BYTES);
   
 }
 
