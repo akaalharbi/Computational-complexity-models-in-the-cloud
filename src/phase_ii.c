@@ -142,26 +142,57 @@ void load_file_to_dict(dict *d, FILE *fp)
   // `*fp` : File contain number of hashes larger than nelements               |
   // ==========================================================================+
 
-
   /* Check that file exists, the file comes from external resources */  
   if (!fp){
     puts("I have been given a file that lives in nowhere");
     return; // raise an error instead
   }
 
+  
+  size_t nchunks = 1000; 
+  size_t ndigests = get_file_size(fp) / (N-DEFINED_BYTES);
+  size_t nmemb = (ndigests/nchunks >=  1) ? ndigests/nchunks : 1;
+  size_t remainder = ndigests % nchunks;
 
-  u8 stream_pt[N-DEFINED_BYTES];
-  /* add as many hashes as possible */ 
-  while ( !feof(fp) ){
-    // use fread with a larger buffer @todo 
-    fread(stream_pt, sizeof(u8), (N-DEFINED_BYTES), fp);
-    /* it adds the hash iff nprobes <= NPROBES_MAX */
-    dict_add_element_to(d, stream_pt); 
+
+  u8* digests = (u8*) malloc( (N-DEFINED_BYTES) * nmemb * sizeof(u8));
+
+
+  if(nmemb != (ndigests/nchunks)){
+    // the file has less than 1000 digests
+    u8 stream_pt[N-DEFINED_BYTES];
+    /* add as many hashes as possible */
+    while ( !feof(fp) ){
+      // use fread with a larger buffer @todo
+      fread(stream_pt, sizeof(u8), (N-DEFINED_BYTES), fp);
+      /* it adds the hash iff nprobes <= NPROBES_MAX */
+      dict_add_element_to(d, stream_pt);
+    }
+  } 
+  
+  for (size_t i = 0; i<nchunks; ++i) {
+    fread(digests, (N-DEFINED_BYTES), nmemb, fp);
+
+    /* add them to dictionary */
+    for (size_t j=0; j<nmemb; ++j) 
+      dict_add_element_to(d,
+			  &digests[j*(N-DEFINED_BYTES)] );
+    
   }
+
+  // read the left digests 
+  fread(digests, (N-DEFINED_BYTES), remainder, fp);
+
+  /* add them to dictionary */
+  for (size_t j=0; j<remainder; ++j) 
+    dict_add_element_to(d,
+			&digests[j*(N-DEFINED_BYTES)] );
+
+
   
   // fclose(fp); // don't close the file 
 }
-// -----------------------------------------------------------------
+
 
 void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 { /* Send M immediately and clear the memory at the end  */
