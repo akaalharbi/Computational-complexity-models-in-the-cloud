@@ -1,5 +1,26 @@
+
+
+
 # Long message attack
 This repository is still a work in progress that should implement long message attack on parallel using multiple computers. The goal is to attack 96-bits (or higher!) of `sha-256` output. 
+
+## How to run:
+`make purge` deletes all old datat
+`make`
+`./phase_i`
+`cp data/send/digests/* data/receive/digests/` copy digests to the receive folder
+
+`mpirun --oversubscribe -np 20` nothing special about 20, any number n > NSERVERS is enough
+
+wait till an error message (this is because one processor exited while others are working )
+
+`cat data/send/messages/* data/receive/messages/archive `
+`./phase_iii`
+
+
+
+
+
 
 ## Attack Overview
 For a better description see (find somone explains lma)[]. The attack can be parametrized by $n, l$ where denote $n=nbits$ to be attacked and $2^l$ is the number of elements stored in `Phase I` (number of blocks in the long message)

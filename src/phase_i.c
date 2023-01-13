@@ -295,7 +295,7 @@ int main(){
   size_t nhashes_stored = 0;
   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
 
-  /* update state and msg_ctr if was some date befoer in the disk */
+  /* update state and msg_ctr  if was some date befoer in the disk */
   was_state_written_on_disk(&msg_ctr, &nhashes_stored, state);
 
   /* continue hashing  */

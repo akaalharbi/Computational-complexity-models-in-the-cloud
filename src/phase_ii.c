@@ -567,7 +567,9 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
   fclose(fp);
 
   printf("recv #%d done a good job\n", myrank);
-  /* exit(EXIT_SUCCESS); */
+
+  
+  exit(EXIT_SUCCESS);
 }
 
 
