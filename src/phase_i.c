@@ -33,30 +33,40 @@
 
 
 
-
-void was_state_written_on_disk(CTR_TYPE* msg_ctr,
-			       size_t* nhashes_stored,
-			       WORD_TYPE state[NWORDS_STATE])
+// @todo rename file, and truncate 
+void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
+			       size_t* nhashes_stored, /* out */
+			       WORD_TYPE state[NWORDS_STATE] /* out */
+			       )
 {
   // ==========================================================================+
   // Summary: If phase_i_store was interrupted during its excution, load saved |
   //          state and counter from file. Set msg_ctr := found_counter, and   |
   //          memcpy(state, found_state, NWORDS_STATE*WORD_SIZE);              |
   // --------------------------------------------------------------------------+
+  // INPUTS:                                                                   |
+  // - *msg_ctr: 
+
+
+  
   int does_file_exits = access("data/states", F_OK);
   if (does_file_exits == -1){
     puts("No states file has been found. Starting from the beginning");
+    // delete counter file if it exists @todo
+    
     return;
   }
 
 
   does_file_exits = access("data/counters", F_OK);
   if (does_file_exits == -1){
+    // delete the states file
     puts("No counters file has been found. Starting from the beginning");
     return;
   }
-    
 
+
+  
   FILE* fp = fopen("data/states", "r");
   size_t nstates = get_file_size(fp)/(NWORDS_STATE*WORD_SIZE);
   printf("Found %lu states saved\n", nstates);
@@ -77,7 +87,8 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr,
 
   fp = fopen("data/counters", "r");
   puts("opened the counter file");
-  static const int max_len = 21; // max lenght of a line inside a file
+  // max lenght of a line inside a file
+  static const int max_len = sizeof(CTR_TYPE)*8;
   
   char tmp[max_len];
   char* endptr; // for strtoull
@@ -111,9 +122,10 @@ void phase_i_store(CTR_TYPE msg_ctr,
   // ==========================================================================+
   // Summary:                                                                  |
   // Hash a long message of zeros. Store the digest, h, in a file k where      |
-  // 0<= k < nservers. It will store N bytes of digest (N defined in config.h) |
+  // 0<= k < NSERVERS. It will store (N-#defined_bytes) bytes of digest.       |
   // To decide which server gets the digest h, compute k := h1 mod  nservers   |
   // where h = (dist_pt) || h1:=b0 ... b_ceil(log2(nservers)) || the rest.     |
+  // dist_pt means the bits are picked as distinguished point test             |
   // --------------------------------------------------------------------------+
   // INPUTS: CAPITAL LETTERS input are defined in config.h                     |
   //                                                                           |
@@ -128,7 +140,6 @@ void phase_i_store(CTR_TYPE msg_ctr,
   //       stored in the file.                                                 |
   // NOTE: endinaness: u32 A[2] = {x, y} then (uint64*) A = { (y<<32) | x) }   |
   // --------------------------------------------------------------------------+
-  // TODO:                                                                     |
   // ==========================================================================+
   
 
@@ -161,12 +172,14 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
   // INIT SHA256 
   u8 M[HASH_INPUT_SIZE] = {0};
-  CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* increment the message by one each time */
-  *msg_ctr_pt = msg_ctr; /* update the message counter as the given input */
-  // store the hash value in this variable
-  /* WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE}; */
+  /* increment the message by one each time */
+  CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M;
+  /* update the message counter as the given input */
+  *msg_ctr_pt = msg_ctr;
 
-  /* treat state as bytes (have you considered union?) */
+
+
+  /* state is given as input,  treat state as bytes  */
   u8* state_u8 = (u8*) state; 
 
   /// INIT FILES: server files that will be send later and state
@@ -178,16 +191,9 @@ void phase_i_store(CTR_TYPE msg_ctr,
   FILE* counters_file;
 
   // TOUCH FILES ON THE DISK
- 
-  // fopen("data/states", "w"); @todo do we need this?
-  /* create a string that will become a file name  */
-  /* snprintf(states_file_name, */
-  /* 	   sizeof(states_file_name), */
-  /* 	   "data/states"); */
-
   states_file = fopen("data/states", "a");
   counters_file = fopen("data/counters", "a");
-  /* fclose(states_file); // we will open this file again in few occasions */
+
   
   for (size_t i=0; i<NSERVERS; ++i) {
     //edit file name according to server i
@@ -198,52 +204,44 @@ void phase_i_store(CTR_TYPE msg_ctr,
     data_to_servers[i] = fopen(file_name, "a"); 
   }
 
-  // Init coutners before the beginning of the attack
-  //interval = nhashes_stored / ncores;
+
   printf("interval=%ld, nhashes_stored≈%ld\n", interval, nhashes_stored);
 
 
-
-
-
   /// ----------------- PHASE I: Part 1/2   ------------------------  ///
-  // First phase hash an extremely long message
+  // First phase hashes an extremely long message
   // M0 M1 ... M_{2^l}, Mi entry will evaluated on the fly
   // Store the hashes in file correspond to some server k
   printf("Going to generate hashed with DIFFICULTY=%d\n", DIFFICULTY);
+
+
   start = wtime(); /* get the time  */
-  
+
   /* if one server gets filled, it will */
- 
   while (should_NOT_stop) {
     // hash and extract n bits of the digest
     hash_single(state, M);
     msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
-    /* print_char(M, 64); */
-
     
     
-    if ( (state[0] & ones) == 0){ /* it is a distinguished point */
+    if ( (state[0] & ones) == 0){ /* is it a distinguished point? */
       /* Decide which server is responsible for storing this digest */
       k = to_which_server( state_u8 );
-	//( (state[0]>>DIFFICULTY) & ones_nservers) % NSERVERS;
+      // = ( (state[0]>>DIFFICULTY) & ones_nservers) % NSERVERS;
 
       /* Recall that: */
       /* h = (dist_pt) || h1:=b0 ... b_ceil(log2(nservers)) || the rest   */
       fwrite(&state_u8[DEFINED_BYTES], /* start  from "the rest" see above */
 	     sizeof(u8), /* smallest moving unit */
-	     N-DEFINED_BYTES, /* len( (dist_pt)|| h1 ) = DEFINED_BITS */
+	     (N-DEFINED_BYTES), /* len( (dist_pt)|| h1 ) = DEFINED_BITS */
 	     data_to_servers[k]);
 
       ++nhashes_stored;
 
-
-      
       // decide should not stop or should stop?
       /* not the most optimal implementation */
       should_NOT_stop = (nhashes_stored < NHASHES);
     
-
       // + save states after required amount of intervals
       if (nhashes_stored % interval == 0) {
 
@@ -252,10 +250,11 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	
 	/* Record the whole state */
 	fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
-	
+
 	/* Record the counter  */
 	fprintf(counters_file, "%llu\n", msg_ctr_pt[0]);
-	// We would like to flush the data disk as soon we have them
+
+        /* We would like to flush the data disk as soon we have them */
 	fflush(states_file);
 	fflush(counters_file);
 	for (int i=0; i<NSERVERS; ++i) 
@@ -267,20 +266,19 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	       100 * ((float) nhashes_stored) /  NHASHES,
 	       interval, end - start, nhashes_stored);
 
-	// elapsed += end - start; 
+
 	start = wtime();
 	
       }
     }
-    
   }
+  
   fclose(states_file);
   fclose(counters_file);
   for (int i=0; i<NSERVERS; ++i)
     fclose(data_to_servers[i]);
 
 
-  // 
   elapsed = wtime() - elapsed;
   printf("done in %fsec\n", elapsed);
 }
@@ -288,15 +286,20 @@ void phase_i_store(CTR_TYPE msg_ctr,
 int main(){
   /// Generate distinguished points to be stored in dictionaries
   /// inside each server.
-   
+
+  print_attack_information(); /* */
+  puts("========================================\n");
+  
   // -INIT: The number of Hashes each server will get
   CTR_TYPE msg_ctr = 0;
   size_t nhashes_stored = 0;
   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
+
+  /* update state and msg_ctr if was some date befoer in the disk */
   was_state_written_on_disk(&msg_ctr, &nhashes_stored, state);
 
-  // If we have not done the computations before:
-  // start from the beginning
+  /* continue hashing  */
   phase_i_store(msg_ctr, nhashes_stored, state);
-  print_attack_information();
+  
+
 }

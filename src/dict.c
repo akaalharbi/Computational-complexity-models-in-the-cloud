@@ -145,7 +145,7 @@ int dict_add_element_to(dict* d, u8* state){
 
   /* get the bucket number and scale the index */
   idx = (idx % d->nbuckets) * d->nslots_per_bucket;
-  u64 idx_old = idx;
+
   
   VAL_TYPE val = 0;
   /* @todo address sanitizer detected stack overflow here  */

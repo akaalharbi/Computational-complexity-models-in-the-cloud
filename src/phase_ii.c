@@ -59,22 +59,22 @@
 
 
 static inline int lookup_multi_save(dict *d,
-				    u8 *digests_short, /* known bytes are removed  */ 
-                                    u8 init_message[HASH_INPUT_SIZE],
+				    u8 *ctrs_dgsts, /* known bytes are removed  */ 
+                                    u8 template[HASH_INPUT_SIZE], /* initial random message */
                                     size_t npairs, /* #pairs in rcv_buf */
-				    FILE *fp,
-				    int myrank,
-				    int source)
+				    FILE *fp, /* store candidates here */
+				    int myrank, /* for debugging */
+				    int source) /* for debugging */
 {
   // -------------------------------------------------------------------------+
-  // Given stream={msg1||dgst1,..} from specific rank, probes each dgst, if   |
+  // Given ctrs_dgsts={ctr1||dgst1,..} from specific rank, probes each dgst, if   |
   // prope(dgst)=/=0 store its related msg in fp, and returns the number of   |
   // stored messages.                                                         |
   // -------------------------------------------------------------------------+
   // INPUT:                                                                   |
   // - dict                                                                   |
   // - stream                                                                 |
-  // - npairs: how many pairs (msg, dgst) in the stream.                      |
+  // - npairs: how many pairs (ctr, dgst) in the stream.                      |
   // -------------------------------------------------------------------------+
   // NOTES:                                                                   |
   // |msg| = sizeof(CTR_TYPE) since we receive the counter                    |
@@ -84,42 +84,46 @@ static inline int lookup_multi_save(dict *d,
   // -------------------------------------------------------------------------+
   /* the stream size is multiple of one_pair size */
   static int one_pair_size = sizeof(CTR_TYPE) + (N-DEFINED_BYTES)*sizeof(u8);
-  static int msg_size = HASH_INPUT_SIZE;
-
+  static int msg_size = HASH_INPUT_SIZE; /* full message not only the counter */
 
   
-  /* how many messages give positive ans when their dgst gets probes */
-  int npositive_msgs = 0;
-  int tmp = 0;
-  static u8 M[HASH_INPUT_SIZE]; /* construct the full message here */
+  /* how many digests give positive answer they get probed  */
+  int npositive_dgsts = 0; 
+  int is_positive = 0; /* what is this?  */
+
+  /* construct the full message here */
+  static u8 M[HASH_INPUT_SIZE]; 
   
   for (size_t i=0; i<npairs; ++i){
     /* dictionary only read |dgst| bytes by default  */
     /* probing pair #i */
-    // this is wrong we are probing the messgae not the digest, lmfao!
-    tmp =  dict_has_elm(d,
-			&digests_short[i*one_pair_size + sizeof(CTR_TYPE)]);
+
+    is_positive =  dict_has_elm(d,
+			&ctrs_dgsts[i*one_pair_size /* Go 2 the ith pair */
+				    + sizeof(CTR_TYPE)] /* skip ctr part */
+				);
     
 
     
-    if (tmp){ /* positive probe, i.e. we found a candidate msg||dgst  */
+    if (is_positive){ /* did we find a candidate msg||dgst? */
 
       /* reconstructing the message: get the template */
-      memcpy(M, init_message, HASH_INPUT_SIZE);
+      memcpy(M, template, HASH_INPUT_SIZE);
+
       /* set the counter part */
       memcpy(M,
-	     &digests_short[i*one_pair_size],
+	     &ctrs_dgsts[i*one_pair_size],
 	     sizeof(CTR_TYPE));
 
-      assert(is_dist_msg(M));
+      /* assert(is_dist_msg(M)); */ // debugging 
 
       /* finally write the reconstructed message */
       fwrite(M, sizeof(u8), msg_size, fp);
       fflush(fp); /* ensures it's written */
-      ++npositive_msgs;
+      ++npositive_dgsts;
     }
   }
-  return npositive_msgs;
+  return npositive_dgsts;
 }
 
 

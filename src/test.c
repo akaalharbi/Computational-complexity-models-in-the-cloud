@@ -56,13 +56,15 @@ int main(int argc, char* argv[]){
       
   }
 
-    for (size_t i = 0; i<11; ++i) {
-            msg_ctr_pt[0]++;
+  for (size_t i = 0; i<11; ++i) {
+      msg_ctr_pt[0]++;
       hash_single(state_long_msg, M);
 
       printf("ctr=%llu\n",  msg_ctr_pt[0]++);
       print_byte_txt("h(lng_msg)", (u8*) state_long_msg, N);
   }
+
+    
   print_byte_txt("h(rnd_msg)", (u8*) state_rnd_msg, N);
 
   return 0;

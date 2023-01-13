@@ -34,6 +34,7 @@
 #define NWORDS_STATE 8
 #define NWORDS_INPUT 16
 #define HASH_INPUT_SIZE (NWORDS_INPUT * WORD_SIZE) /* in bytes */
+#define HASH_STATE_SIZE (NWORDS_STATE * WORD_SIZE) /* in bytes */ 
 #define FILE_NAME_MAX_LENGTH 256
 
 
@@ -47,9 +48,9 @@
 // Apologies: only n ≡ 0 mod 8 is allowed. This is not a feature.
 
 // Let N := n / 8
-#define N 7 /* bytes i.e n := 8*N bits */
+#define N 8 /* bytes i.e n := 8*N bits */
 // will be replaced by the NHASHES below 
-#define L 26 /* store 2^L elements in the dictionary  */
+#define L 32 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
@@ -86,7 +87,7 @@
 
 
 
-#define NSERVERS 2 /* edit manually */
+#define NSERVERS 4 /* edit manually */
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
