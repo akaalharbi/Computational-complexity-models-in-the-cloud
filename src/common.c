@@ -111,10 +111,10 @@ void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
 
 
   /* increments the first sizeof(CTR_TYPE)*8 bits of M by 1 */
-  CTR_TYPE* ctr_pt = (CTR_TYPE*) M;
+
   
   while (1) { /* loop till a dist pt found */
-    ctr_pt[0] = ++(*ctr);
+    ++(*ctr); /* increase counter part in M by 1 */
    
     memcpy(Mstate, init_state, 32);
     /* todo  use hash multiple */

@@ -50,3 +50,14 @@ int get_memory_usage_kb(long* vmrss_kb, long* vmsize_kb)
 
   return (found_vmrss == 1 && found_vmsize == 1) ? 0 : 1;
 }
+
+
+
+void print_memory_usage(char* txt){
+  
+  long vmrss_kb, vmsize_kb;
+  get_memory_usage_kb(&vmrss_kb, &vmsize_kb);
+  printf("%sMemory usage: ram: %ld kb vm: %ld kb\n",
+	 txt, vmrss_kb, vmsize_kb);
+
+}

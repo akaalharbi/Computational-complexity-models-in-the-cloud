@@ -48,16 +48,16 @@
 // Apologies: only n ≡ 0 mod 8 is allowed. This is not a feature.
 
 // Let N := n / 8
-#define N 8 /* bytes i.e n := 8*N bits */
+#define N 6 /* bytes i.e n := 8*N bits */
 // will be replaced by the NHASHES below 
-#define L 32 /* store 2^L elements in the dictionary  */
+#define L 24 /* store 2^L elements in the dictionary  */
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 4
+#define DIFFICULTY 1
 
 /* we are not going to hold more than 32 bits in a dict entry */
 #define MAX_VAL_SIZE 32 /* in bits */
@@ -87,7 +87,7 @@
 
 
 
-#define NSERVERS 4 /* edit manually */
+#define NSERVERS 8 /* edit manually */
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
@@ -97,7 +97,7 @@
 
 
 // How large is the dictionary in a server 
-#define NSLOTS_MY_NODE (NHASHES>>NSERVERS) // @python
+#define NSLOTS_MY_NODE (NHASHES/NSERVERS) // @python
 
 
 
@@ -283,7 +283,7 @@
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
 
-#define NNEEDED_CND MAX((1LL << (DISCARDED_BITS+3)), 1)  /* @python  */
+#define NNEEDED_CND MAX((1LL << (DISCARDED_BITS)), 1)  /* @python  */
 // (2^#disacrded_bits) / NSERVERS, however, it's not a strict requirement.
 //#define NNEEDED_CND_THIS_SERVER MAX(((1LL << DISCARDED_BITS) >> NSERVERS), 1)
   
