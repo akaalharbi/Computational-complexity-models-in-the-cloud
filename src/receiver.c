@@ -23,6 +23,7 @@
 #include "util_files.h"
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
 #include <mpi.h>
+#include <unistd.h>
 #include "common.h"
 #include "sender.h"
 
@@ -161,7 +162,7 @@ void load_file_to_dict(dict *d, FILE *fp)
 
 
 
-static inline void receiver_process_get_template(int myrank, int nproc, int nproc_snd, u8* templates)
+static inline void receiver_process_get_template(int myrank, int nproc, int nsenders, u8* templates)
 {
 
 
@@ -175,12 +176,12 @@ static inline void receiver_process_get_template(int myrank, int nproc, int npro
 
   MPI_Status status;
 
-  for (int i=0; i<nproc_snd; ++i){
+  for (int i=0; i<nsenders; ++i){
     //printf("receiver %d is listening to %d for the template\n", myrank, i + NSERVERS);
     MPI_Recv(&templates[i*HASH_INPUT_SIZE],
 	     HASH_INPUT_SIZE,
 	     MPI_UNSIGNED_CHAR,
-	     i + NSERVERS,
+	     i + NSERVERS, /*  */
 	     TAG_RANDOM_MESSAGE,
 	     MPI_COMM_WORLD,
 	     &status);
@@ -197,7 +198,11 @@ static inline void receiver_process_get_template(int myrank, int nproc, int npro
 
 
 
-void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* templates )
+void receiver_process_task(dict* d,
+			   int myrank,
+			   int nproc,
+			   int nsenders,
+			   u8* templates )
 {
   // todo check the loops, currently they are errornous!
   //---------------------------------------------------------------------------+
@@ -232,8 +237,12 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 
   int* indices = (int*)malloc(sizeof(int)*nproc);
 
+  /* How many candidates were stored? and remove partial candidates */
   size_t nfound_cnd = get_file_size(fp) / HASH_INPUT_SIZE ;
+  // truncate the candidates file, in case a partial candidate was stored
+  truncate(file_name, nfound_cnd*HASH_INPUT_SIZE);
   size_t old_nfound_candidates = nfound_cnd;
+
   /* 1st sender has rank = NSERVER -scaling-> 1st sender name = 0 */
   int sender_name_scaled = 0; 
 
@@ -254,6 +263,7 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 	   TAG_SND_DGST,
 	   MPI_COMM_WORLD,
 	   &status);
+
 
   printf("recv #%d got a message from %d\n"
 	 "(We will message you again)\n", myrank, status.MPI_SOURCE);
@@ -295,10 +305,23 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
 				    &templates[sender_name_scaled
 					       *HASH_INPUT_SIZE],
 				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
-				    fp,
+				    fp, /* file to record cadidates */
 				    myrank,
-				    status.MPI_SOURCE); /* file to record cadidates */
+				    sender_name_scaled + NSERVERS);
 
+
+
+    /* // debugging: check if a sender and a receiver have the same message */
+    /* int from = sender_name_scaled + NSERVERS; */
+    /* if (from == 9 && myrank == 7){ */
+    /*   char txt[50]; */
+    /*   snprintf(txt, sizeof(txt), "rcv #%d, from #%d, receive buffer=", */
+    /* 	       from, */
+    /* 	       myrank); */
+    /*   print_byte_txt(txt, lookup_buf, rcv_array_size); */
+    /* } */
+
+    
     if (nfound_cnd - old_nfound_candidates > 0) {
       printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 	     "receiver #%d has %lu out of %llu candidates from #%d\n"
@@ -310,12 +333,6 @@ void receiver_process_task(dict* d, int myrank, int nproc, int nproc_snd, u8* te
     MPI_Wait(&request, &status);
 
 
-      /* from = status.MPI_SOURCE; */
-      /* char txt[50]; */
-      /* snprintf(txt, sizeof(txt), "rcv #%d, from #%d, receive buffer=", */
-      /* 	       from, */
-      /* 	       myrank); */
-      /* print_byte_txt(txt,rcv_buf, rcv_array_size); */
    
     sender_name_scaled = status.MPI_SOURCE - NSERVERS; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);

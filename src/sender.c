@@ -159,11 +159,6 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
     
     if (servers_ctr[server_number] >= PROCESS_QUOTA){
-      
-      /* printf("rank %d: sending to %d, snd_ctr=%d, it took %fsec\n", */
-      /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
-      /* time_start = wtime(); */
-      /* we have enough messages to send to server (server_number) */
 
       printf("===============================================\n"
              "sender #%d -> recv #%d before sending %0.4fsec\n"
@@ -186,15 +181,19 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 	     "-----------------------------------------------\n\n",
 	     myrank, server_number, wtime() -  time_start );
 
+
+      // debugging: check if sender and receiver have the same digest
+      /* if (server_number == 7 && myrank == 9) { */
       /* 	snprintf(txt, sizeof(txt), "sender#%d,  server=%d, snd_buf=", */
       /* 		 myrank, server_number ); */
       /* 	print_byte_txt(txt, */
       /* 		       &snd_buf[server_number*nbytes_per_server], */
       /* 		       one_pair_size*PROCESS_QUOTA); */
-      /* printf("rank %d: sending done to %d, snd_ctr=%d, it took %fsec\n", */
-      /* 	     myrank, server_number, snd_ctr, wtime() - time_start); */
+      /* } */
+
+
       /* time_start = wtime(); */
-      // todo do we need here buffer detach? 
+
       /* It is enough to reset the counter. The memroy will be rewritten */  
       servers_ctr[server_number] = 0;
       time_start = wtime();

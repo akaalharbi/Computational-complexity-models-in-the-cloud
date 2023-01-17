@@ -32,6 +32,13 @@
 // -----------------------------------------------------------------------------
 
 
+FILE* truncate_file_by_number_of_lines(FILE* fp, size_t nlines){
+  /// Given a text file with k lines > nlines, remove all the extra lines
+  /// and keep only the first nlines
+
+  
+}
+
 
 // @todo rename file, and truncate 
 void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
@@ -48,12 +55,13 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
   // - *msg_ctr: 
 
 
+  FILE* fp;
   
   int does_file_exits = access("data/states", F_OK);
   if (does_file_exits == -1){
     puts("No states file has been found. Starting from the beginning");
-    // delete counter file if it exists @todo
-    
+    fp = fopen("data/counters", "w");
+    fclose(fp); /* remove the counter file */
     return;
   }
 
@@ -62,21 +70,33 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
   if (does_file_exits == -1){
     // delete the states file
     puts("No counters file has been found. Starting from the beginning");
+    fp = fopen("data/states", "w");
+    fclose(fp); /* remove the counter file */
     return;
   }
 
 
   
-  FILE* fp = fopen("data/states", "r");
+  fp = fopen("data/states", "r");
   size_t nstates = get_file_size(fp)/(NWORDS_STATE*WORD_SIZE);
-  printf("Found %lu states saved\n", nstates);
+  printf("Found %lu states saved\n"
+	 "We will truncate the file to multiple states size if necessary\n",
+	  nstates);
+
+
   
+
+  // in case of interruption, a partial state might be recorded
+  // remove the partial state. 
+  truncate("data/states", nstates*NWORDS_STATE*WORD_SIZE);    
+  truncate("data/counters", nstates*sizeof(CTR_TYPE));
+
   if (nstates==0){
-    puts("");
     return;
   }
-    
+
   
+  /* go to the last state */
   fseek(fp,
 	(nstates-1)*NWORDS_STATE*WORD_SIZE,
 	SEEK_SET); 
@@ -85,23 +105,19 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
   puts("done with states reading");
   fclose(fp);
 
+  
   fp = fopen("data/counters", "r");
+  printf("while found %lu counters\n",
+	 get_file_size(fp)/(sizeof(CTR_TYPE)));
+  
+  fseek(fp,
+	(nstates-1)*sizeof(CTR_TYPE),
+	SEEK_SET); 
+
   puts("opened the counter file");
   // max lenght of a line inside a file
-  static const int max_len = sizeof(CTR_TYPE)*8;
-  
-  char tmp[max_len];
-  char* endptr; // for strtoull
-  size_t ctr_old = 0; /* Last read will be always zero, see man fgets */
-  
-  while (!feof(fp)) {
-    *msg_ctr = ctr_old; /* update the message till we get the last ctr */
-    
-    memset(tmp, 0, max_len);
-    fgets(tmp, max_len, fp);
+  fread(msg_ctr, sizeof(CTR_TYPE), 1, fp);
 
-    ctr_old = strtoull(tmp, &endptr, 10);
-  }
   *nhashes_stored = nstates * INTERVAL; /* approximately how many hashes stored*/
 
   printf("Loaded from disk: counter=%llu\n", *msg_ctr);
@@ -252,7 +268,8 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
 
 	/* Record the counter  */
-	fprintf(counters_file, "%llu\n", msg_ctr_pt[0]);
+	fwrite(msg_ctr_pt, sizeof(CTR_TYPE), 1, counters_file);
+
 
         /* We would like to flush the data disk as soon we have them */
 	fflush(states_file);
@@ -261,11 +278,10 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	  fflush(data_to_servers[i]);
 
 	
-	printf("%2.4f%% Generating %lu distinguished points took"
-	       "%0.2fsec, nhashes_stored≈%lu\n",
+	printf("%2.4f%% Generating %lu dist points took"
+	       "%0.2fsec, nhashes_stored≈%lu, msg_ctr=%llu\n",
 	       100 * ((float) nhashes_stored) /  NHASHES,
-	       interval, end - start, nhashes_stored);
-
+	       interval, end - start, nhashes_stored, msg_ctr_pt[0]);
 
 	start = wtime();
 	
@@ -303,3 +319,4 @@ int main(){
   
 
 }
+

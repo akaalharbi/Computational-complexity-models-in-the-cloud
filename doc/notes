@@ -1,3 +1,8 @@
+Tuesday 17 Jan 2023
+ 
+- python script
+- check that if a sender sends to reciever i, then i gets the exact same message
+_________________
 Monday 9 Jan 2023
 - assumption: N-DEFINED_BYTES > 0
 - assumption: log2(nservers) + difficulty <= 32
