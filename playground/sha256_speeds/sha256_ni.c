@@ -5,9 +5,11 @@
 /*   Based on code from Intel, and by Sean Gulley for      */
 /*   the miTLS project.                                    */
 
-/* gcc -DTEST_MAIN -msse4.1 -msha sha256-x86.c -o sha256.exe   */
+/* gcc -DTEST_MAIN -msse4.1 -msha sha256_ni.c -o sha256_ni   */
 
 /* Include the GCC super header */
+#include <string.h>
+#include <stdlib.h>
 #if defined(__GNUC__)
 # include <stdint.h>
 # include <x86intrin.h>
@@ -218,6 +220,19 @@ void sha256_process_x86(uint32_t state[8], const uint8_t data[], uint32_t length
     _mm_storeu_si128((__m128i*) &state[4], STATE1);
 }
 
+
+uint32_t* sha256_single(uint8_t msg[64]){
+  uint32_t state[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+                         0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+
+  sha256_process_x86(state, msg, 64);
+  
+  uint32_t* return_state = malloc(sizeof(uint32_t)*8);
+  memcpy(return_state, state, 8*4);
+
+  return return_state;
+}
+
 #if defined(TEST_MAIN)
 
 #include <stdio.h>
@@ -227,7 +242,7 @@ int main(int argc, char* argv[])
     /* empty message with padding */
     uint8_t message[64];
     memset(message, 0x00, sizeof(message));
-    message[0] = 0x00;
+    message[0] = 0x01;
 
     /* initial state */
     uint32_t state[8] = {
