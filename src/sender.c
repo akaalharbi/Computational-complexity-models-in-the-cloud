@@ -62,13 +62,18 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
 
   /* M = 64bit ctr || 64bit nonce || random value */
+  u8 Ms[16][HASH_INPUT_SIZE]; /* random word */
   u8 M[HASH_INPUT_SIZE]; /* random word */
-
+  
   /* Get a random message only once */
   CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* counter pointer  */
   getrandom(M, HASH_INPUT_SIZE, 1);
   msg_ctr_pt[0] = 0; /* zeroing the first 64bits of M */
 
+  for (int i = 0; i<16; ++i) {
+    memcpy(Ms[i], M, HASH_INPUT_SIZE);
+  }
+  
   char txt[50];
   snprintf(txt, sizeof(txt), "sender #%d template=", myrank);
   print_byte_txt(txt, M,HASH_INPUT_SIZE);
@@ -126,7 +131,7 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   /* while(i<1) { /\* when do we break? never! *\/ */
 
     /* Find a message that produces distinguished point */
-    find_hash_distinguished( M, Mstate, msg_ctr_pt, mask_test);
+    find_hash_distinguished(Ms, M, Mstate, msg_ctr_pt, mask_test);
 
     //+ decide to which server to add to? 
     server_number = to_which_server((u8*) Mstate);

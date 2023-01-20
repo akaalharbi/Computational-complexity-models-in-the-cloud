@@ -25,7 +25,7 @@
 #include "shared.h" // shared variables for duplicate 
 #include "memory.h"
 #include "util_files.h"
-
+#include "c_sha256_oct_avx2.h"
 
 
 void print_attack_information(){
@@ -80,7 +80,7 @@ u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
 
 
 
-void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
+void find_hash_distinguished_old(u8 M[HASH_INPUT_SIZE], /* in, out*/
 				    WORD_TYPE Mstate[NWORDS_STATE], /* out*/
 				    CTR_TYPE* ctr, /* in, out */
 				    const size_t dist_test /* in */)
@@ -132,6 +132,71 @@ void find_hash_distinguished(u8 M[HASH_INPUT_SIZE], /* in, out*/
   }
 }
 
+
+
+void cpy_transposed_state(u32* tr_state, u32* Mstate, int lane){
+  for (int i = 0; i<NWORDS_STATE; ++i) {
+    Mstate[i] = tr_state[lane + i*16];
+  }
+}
+
+
+void find_hash_distinguished(u8 M[16][HASH_INPUT_SIZE], /* in*/
+			     u8 Mdist[HASH_INPUT_SIZE],
+			     WORD_TYPE Mstate[NWORDS_STATE], /* out*/
+			     CTR_TYPE* ctr, /* in, out */
+			     const size_t dist_test /* in */)
+{
+  // ==========================================================================+
+  // Summary: Generates hashes till a distinguished point is found. Mutates M  |
+  //          and resests Mstate in the process. Suitable for phase ii use only|
+  // --------------------------------------------------------------------------+
+  // We start with message M, computed hash(M) if it is not a distinguished    |
+  // point then we change M slightly. Increment the first 64 bits of M by 1    |
+  // --------------------------------------------------------------------------+
+  // INPUTS:                                                                   |
+  // - M[16] : initial value of the random message, we hash this in the first  |
+  //           in first trial, then change it to M xor ctr                     |
+  // - Mstate: This should be the initial state of sha256.                     |
+  // - dist_test: (2^nzeros - 1), e.g. a point is distinguished if it has 3    |
+  //              at the end, then the test is 2^3 - 1 = 7                     |
+  // --------------------------------------------------------------------------+
+  // WARNING: this function can't deal with more than 32zeros as dist_test     |
+  // NOTE: we are only working on the first word                               |
+  // --------------------------------------------------------------------------+
+  // TODO: use hash_multiple instead                                           |
+  // --------------------------------------------------------------------------+
+
+  /* no need to construct init state with each call of the function */ 
+  static u32* state_ptr;
+  
+
+
+  /* increments the first sizeof(CTR_TYPE)*8 bits of M by 1 */
+
+  
+  while (1) { /* loop till a dist pt found */
+
+    for (int i=0; i<8; ++i) {
+      M[i][0] = ++(*ctr); /* increase counter part in M by 1 */
+    }
+
+   
+
+    /* todo  use hash multiple */
+    /* figure out the number of words from config.h */
+    
+    state_ptr = sha256_multiple_8(M);
+
+    for (int i=0; i<8; ++i) {
+      if ((state_ptr[i] & dist_test) == 0) {
+	cpy_transposed_state(state_ptr, Mstate, i);
+	memcpy(Mdist, M[i], HASH_INPUT_SIZE);
+	return;
+      }
+    }
+  }
+}
 
 int is_dist_state(u8 state[NWORDS_STATE*WORD_SIZE]){
   static const WORD_TYPE ones = (1LL<<DIFFICULTY) - 1;
