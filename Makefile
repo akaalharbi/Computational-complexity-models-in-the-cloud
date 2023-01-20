@@ -17,8 +17,11 @@ CC=gcc
 MPI_INCLUDE = -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
 MPI_LINK = -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
 
+
+
 INCLUDE = -Iinclude $(MPI_INCLUDE)
-LDLIBS  =  $(MPI_LINK) -lm
+LDLIBS  =  $(MPI_LINK) -lm -L./lib/sha256_intel_avx/ -lsha256_oct_avx2
+
 LDFLAGS = -fopenmp -pthread -O0 -g -fsanitize=address
 # note: -fanalyzer doesn't report when -flto is enabled
 CFLAGS =  -g -O0 -fopenmp -Wall -march=native -msha  -std=c11 -fopt-info-all -fanalyzer -fsanitize=address 
@@ -48,6 +51,10 @@ OBJECTS := $(FILENAMES:$(SRC)/%.c=$(OBJDIR)/%.o)
 
 
 # Part 3: Compiling and Linking
+
+
+BUILD_LIBS:
+	cd lib/sha256_intel_avx && make clean && make all
 
 # BUILD OBJECT FILES IN OBJECTDIR directory
 $(OBJDIR)/%.o: $(SRC)/%.c
