@@ -229,7 +229,7 @@ int dict_has_elm(dict *d, u8 *state)
   // and the other bits will be stored as index thus the dependency on L.
   REG_TYPE lookup_key_simd = SIMD_SET1_VALTYPE(val); // (val, val, ..., val) 
   //__m256i zero_vect = _mm256_setzero_si256(); // no need for this with buckets
-  REG_TYPE comp_vect_simd;
+  REG_CMP_TYPE comp_vect_simd;
 
 
 
@@ -248,6 +248,8 @@ int dict_has_elm(dict *d, u8 *state)
     //                   TEST 1                       //
     /*  Does key equal one of the slots?              */
     //------------------------------------------------//
+
+    
     comp_vect_simd = SIMD_CMP_VALTYPE(lookup_key_simd, dict_keys_simd);
 
     is_key_found = (0 == SIMD_TEST(comp_vect_simd, comp_vect_simd));

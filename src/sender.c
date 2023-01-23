@@ -131,12 +131,21 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   /* while(i<1) { /\* when do we break? never! *\/ */
 
     /* Find a message that produces distinguished point */
-    find_hash_distinguished(Ms,
-			    M, /* save the message here */
-			    Mstate,
-			    msg_ctr_pt,
-			    mask_test);
+    /* find_hash_distinguished(Ms, */
+    /* 			    M, /\* save the message here *\/ */
+    /* 			    Mstate, */
+    /* 			    msg_ctr_pt, */
+    /* 			    mask_test); */
 
+
+
+    find_hash_distinguished_old(M,
+				Mstate,
+				msg_ctr_pt,
+				mask_test);
+
+
+    
     //+ decide to which server to add to? 
     server_number = to_which_server((u8*) Mstate);
 

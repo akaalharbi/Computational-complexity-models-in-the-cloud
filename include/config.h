@@ -151,15 +151,22 @@
 // -------------------------------------------------------------------------+
 #ifdef __AVX512F__ /* F for Foundation */
 #define REG_TYPE __m512i
+#define REG_CMP_TYPE __mmask32
 #define AVX_SIZE  512
 #define ALIGNMENT 64
 // Number of elements per simd register
 #define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES))
 
 
-#define SIMD_LOAD_SI _mm512_load_si512
-#define SIMD_TEST _mm512_test_epi64_mask
+static inline int is_not_zero(int i1, int i2){
+  /* when moving to avx512 _mm512_cmpeq_epi16_mask returns an int rather
+   than a 512bit vector */
+  return i1 != 0;
+}
 
+#define SIMD_LOAD_SI _mm512_load_si512
+/* #define SIMD_TEST _mm512_test_epi64_mask */
+#define SIMD_TEST is_not_zero
 #define SIMD_SET1_EPI32 _mm512_set1_epi32
 #define SIMD_SET1_EPI16 _mm512_set1_epi16
 
@@ -172,6 +179,7 @@
 
 #elif defined(__AVX2__)
 #define REG_TYPE __m256i
+#define REG_CMP_TYPE __m256i
 #define AVX_SIZE  256
 #define ALIGNMENT 32
 #define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES))
@@ -193,6 +201,7 @@
 
 #elif defined(__SSE4_1__)
 #define REG_TYPE __m128i
+#define REG_TYPE_CMP __m128i
 #define AVX_SIZE  128
 #define ALIGNMENT 16
 #define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES))
