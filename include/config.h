@@ -158,11 +158,6 @@
 #define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES))
 
 
-static inline int is_not_zero(int i1, int i2){
-  /* when moving to avx512 _mm512_cmpeq_epi16_mask returns an int rather
-   than a 512bit vector */
-  return i1 != 0;
-}
 
 #define SIMD_LOAD_SI _mm512_load_si512
 /* #define SIMD_TEST _mm512_test_epi64_mask */
@@ -186,7 +181,7 @@ static inline int is_not_zero(int i1, int i2){
 
 
 #define SIMD_LOAD_SI _mm256_load_si256
-#define SIMD_TEST _mm256_testz_si256
+/* #define SIMD_TEST _mm256_testz_si256 */
 
 
 #define SIMD_SET1_EPI32 _mm256_set1_epi32

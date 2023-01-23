@@ -249,11 +249,13 @@ int dict_has_elm(dict *d, u8 *state)
     /*  Does key equal one of the slots?              */
     //------------------------------------------------//
 
-    
     comp_vect_simd = SIMD_CMP_VALTYPE(lookup_key_simd, dict_keys_simd);
-
+    #ifndef __AVX512F__ /* F for Foundation */
     is_key_found = (0 == SIMD_TEST(comp_vect_simd, comp_vect_simd));
-    
+    #endif
+    #ifdef __AVX512F__ /* F for Foundation */
+    is_key_found = comp_vect_simd;
+    #endif
     if (is_key_found) {
       return 1; /* we will hash the whole message again */
     }
