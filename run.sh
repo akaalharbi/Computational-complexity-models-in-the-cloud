@@ -1,7 +1,4 @@
 make purge
-
-make BUILD_LIBS
-
 make all
 
 ./phase_i

@@ -139,12 +139,12 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   /* while(i<1) { /\* when do we break? never! *\/ */
 
     /* Find a message that produces distinguished point */
-    /* printf("msg_ctr=%llu\n", msg_ctr_pt[0] ); */
+
     find_hash_distinguished(Ms,
 			    M, /* save the message here */
 			    Mstate,
-			    msg_ctr_pt,
 			    mask_test);
+
 
 
 

@@ -25,7 +25,7 @@
 #include "shared.h" // shared variables for duplicate 
 #include "memory.h"
 #include "util_files.h"
-#include "c_sha256_oct_avx2.h"
+#include "c_sha256_avx.h"
 
 
 void print_attack_information(){
@@ -141,10 +141,9 @@ void cpy_transposed_state(u32* Mstate, u32* tr_state,  int lane){
 }
 
 
-void find_hash_distinguished(u8 M[16][HASH_INPUT_SIZE], /* in*/
-			     u8 Mdist[HASH_INPUT_SIZE],
+void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
+			     u8 M[HASH_INPUT_SIZE], /* in, out */
 			     WORD_TYPE Mstate[NWORDS_STATE], /* out*/
-			     CTR_TYPE* ctr, /* in, out */
 			     const size_t dist_test /* in */)
 {
   // ==========================================================================+
@@ -155,8 +154,11 @@ void find_hash_distinguished(u8 M[16][HASH_INPUT_SIZE], /* in*/
   // point then we change M slightly. Increment the first 64 bits of M by 1    |
   // --------------------------------------------------------------------------+
   // INPUTS:                                                                   |
-  // - M[16] : initial value of the random message, we hash this in the first  |
-  //           in first trial, then change it to M xor ctr                     |
+  // - Mavx[lane][HASH_INPUT_SIZE]: place holder for messages to be hashed     |
+  //      using avx. they are copies of M, however counter part  increases by  |
+  //      one for each lane.                                                   |
+  // - M[HASH_INPUT_SIZE] : initial value of the random message, when we found |
+  //   a disitingusihed point in on of Mavx, we coput Mavx[lane] to M          |
   // - Mstate: This should be the initial state of sha256.                     |
   // - dist_test: (2^nzeros - 1), e.g. a point is distinguished if it has 3    |
   //              at the end, then the test is 2^3 - 1 = 7                     |
@@ -169,36 +171,50 @@ void find_hash_distinguished(u8 M[16][HASH_INPUT_SIZE], /* in*/
 
   /* no need to construct init state with each call of the function */ 
   static u32* states_avx_ptr;
-  
 
+  /* copy the counter part of M */
+  CTR_TYPE local_ctr = ((CTR_TYPE*) M)[0]; 
 
-  /* increments the first sizeof(CTR_TYPE)*8 bits of M by 1 */
 
   
   while (1) { /* loop till a dist pt found */
-
-    for (int i=0; i<8; ++i) {
-      ((u64*)M[i])[0] = ++(*ctr); /* increase counter part in M by 1 */
+    
+    for (int i=0; i<(AVX_SIZE/WORD_SIZE_BITS); ++i) {
+      ((CTR_TYPE*)Mavx[i])[0] = local_ctr+(i+1); /* increase counter part in M by 1 */
     }
 
-   
-
-    /* todo  use hash multiple */
-    /* figure out the number of words from config.h */
+    local_ctr += (AVX_SIZE/WORD_SIZE_BITS); /* update counter locally */
     
-    states_avx_ptr = sha256_multiple_8(M);
-    // todo change the 8
-    for (int i=0; i<8; ++i) {
+
+    #ifdef  __AVX512F__
+    /* HASH 16 MESSAGES AT ONCE */
+    states_avx_ptr = sha256_multiple_x16(Mavx);
+    #endif
+
+    #ifndef  __AVX512F__
+    #ifdef    __AVX2__
+    /* HASH 16 MESSAGES AT ONCE */
+    states_avx_ptr = sha256_multiple_oct(Mavx);
+    #endif
+    #endif
+
+    
+    for (int i=0; i< (AVX_SIZE/WORD_SIZE_BITS); ++i) { // 8 for avx2,  16 for avx512
+      
       if ((states_avx_ptr[i] & dist_test) == 0) {
-	cpy_transposed_state( Mstate, states_avx_ptr, i);
-	memcpy(Mdist, M[i], HASH_INPUT_SIZE);
+	/* copy the message that produces distinguish point along with its counter */
+	cpy_transposed_state(Mstate, states_avx_ptr, i);
+	memcpy(M, Mavx[i], HASH_INPUT_SIZE);
 	return;
       }
     }
+    
   }
 }
 
-int is_dist_state(u8 state[NWORDS_STATE*WORD_SIZE]){
+
+
+int is_dist_state(WORD_TYPE state[NWORDS_STATE*WORD_SIZE]){
   static const WORD_TYPE ones = (1LL<<DIFFICULTY) - 1;
 
   return ( (state[0] & ones) == 0 );
@@ -209,6 +225,6 @@ int is_dist_msg(u8 M[HASH_INPUT_SIZE]){
   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
   hash_single(state, M);
 
-  return is_dist_state((u8*)state);
+  return is_dist_state(state);
   
 }

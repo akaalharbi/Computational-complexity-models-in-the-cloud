@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) /* single machine */
     memcpy(state, state_init, NWORDS_STATE*WORD_SIZE);
     hash_single(state, &msgs[i*HASH_INPUT_SIZE]);
 
-    assert(is_dist_state((u8*)state));
+    assert(is_dist_state(state));
 
     /* get dgst in dgst */
     memcpy(&dgsts[i*N], state, N);

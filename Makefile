@@ -20,11 +20,11 @@ MPI_LINK = -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
 
 
 INCLUDE = -Iinclude $(MPI_INCLUDE)
-LDLIBS  =  $(MPI_LINK) -lm -L./lib/sha256_intel_avx/ -lsha256_oct_avx2
+LDLIBS  =  $(MPI_LINK) -lm -L./lib/sha256_intel_avx/ -lsha256_avx
 
 LDFLAGS = -fopenmp -pthread -O0 -g -fsanitize=address
 # note: -fanalyzer doesn't report when -flto is enabled
-CFLAGS =  -g -O0 -fopenmp -Wall -march=native -msha  -std=c11 -fopt-info-all -fanalyzer -fsanitize=address 
+CFLAGS =  -O0  -fopenmp -Wall -march=native -msha  -std=c11  -fopt-info-all -g -fanalyzer -fsanitize=address 
 #CFLAGS += -DVERBOSE_LEVEL=2 
 
 
@@ -53,7 +53,7 @@ OBJECTS := $(FILENAMES:$(SRC)/%.c=$(OBJDIR)/%.o)
 # Part 3: Compiling and Linking
 
 
-BUILD_LIBS:
+lib:
 	cd lib/sha256_intel_avx && make clean && make all
 
 # BUILD OBJECT FILES IN OBJECTDIR directory
@@ -72,7 +72,7 @@ COMMON_OBJECTS = $(filter-out $(TARGET_OBJECTS), $(OBJECTS) )
 
 $(info common objects = $(COMMON_OBJECTS))
 
-all: $(TARGETS)
+all: $(TARGETS) lib
 	mkdir -p obj
 	mkdir -p data
 	mkdir -p data/send

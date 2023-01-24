@@ -89,7 +89,7 @@ static inline int lookup_multi_save(dict *d,
 	     &ctrs_dgsts[i*one_pair_size],
 	     sizeof(CTR_TYPE));
 
-      /* assert(is_dist_msg(M)); */ // debugging 
+      /* assert(is_dist_msg(M)); // debugging  */
 
       /* finally write the reconstructed message */
       fwrite(M, sizeof(u8), msg_size, fp);

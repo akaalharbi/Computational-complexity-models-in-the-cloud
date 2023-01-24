@@ -15,6 +15,10 @@
 // -- a discover avx vector length                                            |
 // -- set types for the vector                                                |
 // ---------------------------------------------------------------------------+
+///  @todo fix naming 
+// annoying convention: sometimes we use size a meaning in bits
+// and sometimes in byt
+
 
 #ifndef LONG_MESSAGE_CONFIG
 #define LONG_MESSAGE_CONFIG
@@ -29,6 +33,7 @@
 
 /* change it only when you change the function */
 #define WORD_SIZE 4 // bytes = 32 bit
+#define WORD_SIZE_BITS (WORD_SIZE*8) // bytes = 32 bit
 #define WORD_TYPE u32
 #define NWORDS_DIGEST 8
 #define NWORDS_STATE 8
@@ -282,12 +287,14 @@
 // 1- y since (distinguished points || nserver ) may not be multiple of 8bits
 // 2- z
 
+// @todo this is not satisfactory!
 #define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES), 0)
 
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
 
-#define NNEEDED_CND MAX((1LL << (DISCARDED_BITS)), 1)  /* @python  */
+#define NNEEDED_CND MAX(( (1LL << (DISCARDED_BITS+2)) ),	\
+			  1)   /* @python  */
 // (2^#disacrded_bits) / NSERVERS, however, it's not a strict requirement.
 //#define NNEEDED_CND_THIS_SERVER MAX(((1LL << DISCARDED_BITS) >> NSERVERS), 1)
   
