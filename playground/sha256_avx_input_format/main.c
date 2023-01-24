@@ -9,7 +9,7 @@
 #include <sys/random.h>
 #include <sys/types.h>
 
-
+#include "sha256_intel_avx/c_sha256_x16_avx512.h"
 #include "sha256_intel_avx/c_sha256_oct_avx2.h"
 #include "sha256_ni/sha256_ni.h"
 
@@ -50,7 +50,7 @@ void print_digest_k(uint32_t* state, int k){
 
 
 void cpy_transposed_state(uint32_t* tr_state, uint32_t* state, int lane){
-  for (int i = 0; i<8; ++i) {
+  for (int i = 0; i<16; ++i) {
     state[i] = tr_state[lane + i*16];
   }
 }
@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
   uint32_t tmp_state[8] = {0};
   uint8_t* buff = (uint8_t*) malloc(64*16);
   uint8_t msgs[16][64] = {0};
-  uint32_t * state = sha256_multiple_8(msgs);
+  uint32_t * state;
   uint8_t msg[64] = {0};
   uint32_t* state_single;
   int equal = 0;
@@ -73,14 +73,28 @@ for (size_t j = 0; j<100; ++j) {
   getrandom(buff, 64*16, 1);
   memcpy(msgs, buff, 64*16);
 
-  sha256_multiple_8(msgs);
-
+  /* sha256_multiple_8(msgs); */
+  state = sha256_multiple_x16(msgs);
 
   // go over the 16 messages, hash them and compare them with the lane
-  for (int lane=0; lane<8; ++lane) {
-    memcpy(msg, &buff[64*lane], 64);
-    state_single = sha256_single(msg);
-    cpy_transposed_state(state, tmp_state, lane);
+  /* for (int lane=0; lane<8; ++lane) { */
+  /*   memcpy(msg, &buff[64*lane], 64); */
+  /*   state_single = sha256_single(msg); */
+  /*   cpy_transposed_state(state, tmp_state, lane); */
+  /*   equal = ( 0 == memcmp(tmp_state, state_single, 32)); */
+
+  /*   if (equal != 1){ */
+  /*     print_bytes(msg, 64); */
+  /*     puts("at the above message the two hashing methods do not agree!"); */
+  /*     ++nhashes_dont_agree; */
+  /*   } */
+  /* } */
+
+  /* // avx512  */
+  for (int lane=0; lane<16; ++lane) {
+    memcpy(msg, &buff[64*lane], 64); // get the random message
+    state_single = sha256_single(msg); // hash it 
+    cpy_transposed_state(state, tmp_state, lane); // extract the ith state from avx hashes 
     equal = ( 0 == memcmp(tmp_state, state_single, 32));
 
     if (equal != 1){
@@ -94,4 +108,11 @@ for (size_t j = 0; j<100; ++j) {
  printf("#hashes where two methods of hashing don't agree = %d\n",
 	nhashes_dont_agree);
 
+
+ puts("Let's print the last hash: 1- using avx512, 2- using sha_ni");
+ print_digest_k(state, 15);
+ print_bytes((uint8_t*) state_single, 32);
+ puts("");
+ 
+ 
 }
