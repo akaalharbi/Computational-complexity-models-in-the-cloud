@@ -181,7 +181,7 @@
 
 
 #define SIMD_LOAD_SI _mm256_load_si256
-/* #define SIMD_TEST _mm256_testz_si256 */
+#define SIMD_TEST _mm256_testz_si256
 
 
 #define SIMD_SET1_EPI32 _mm256_set1_epi32

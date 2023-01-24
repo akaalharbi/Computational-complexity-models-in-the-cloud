@@ -64,6 +64,8 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   /* M = 64bit ctr || 64bit nonce || random value */
   u8 Ms[16][HASH_INPUT_SIZE]; /* random word */
   u8 M[HASH_INPUT_SIZE]; /* random word */
+
+
   
   /* Get a random message only once */
   CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* counter pointer  */
@@ -73,6 +75,12 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   for (int i = 0; i<16; ++i) {
     memcpy(Ms[i], M, HASH_INPUT_SIZE);
   }
+
+  print_byte_txt("M=", M, 64);
+  for (int i = 0; i<16; ++i) {
+      print_byte_txt("Mi=", Ms[i], 64);
+  }
+
   
   char txt[50];
   snprintf(txt, sizeof(txt), "sender #%d template=", myrank);
@@ -131,18 +139,19 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   /* while(i<1) { /\* when do we break? never! *\/ */
 
     /* Find a message that produces distinguished point */
-    /* find_hash_distinguished(Ms, */
-    /* 			    M, /\* save the message here *\/ */
-    /* 			    Mstate, */
-    /* 			    msg_ctr_pt, */
-    /* 			    mask_test); */
+    /* printf("msg_ctr=%llu\n", msg_ctr_pt[0] ); */
+    find_hash_distinguished(Ms,
+			    M, /* save the message here */
+			    Mstate,
+			    msg_ctr_pt,
+			    mask_test);
 
 
 
-    find_hash_distinguished_old(M,
-				Mstate,
-				msg_ctr_pt,
-				mask_test);
+    /* find_hash_distinguished_old(M, */
+    /* 				Mstate, */
+    /* 				msg_ctr_pt, */
+    /* 				mask_test); */
 
 
     

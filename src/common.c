@@ -134,7 +134,7 @@ void find_hash_distinguished_old(u8 M[HASH_INPUT_SIZE], /* in, out*/
 
 
 
-void cpy_transposed_state(u32* tr_state, u32* Mstate, int lane){
+void cpy_transposed_state(u32* Mstate, u32* tr_state,  int lane){
   for (int i = 0; i<NWORDS_STATE; ++i) {
     Mstate[i] = tr_state[lane + i*16];
   }
@@ -168,7 +168,7 @@ void find_hash_distinguished(u8 M[16][HASH_INPUT_SIZE], /* in*/
   // --------------------------------------------------------------------------+
 
   /* no need to construct init state with each call of the function */ 
-  static u32* state_ptr;
+  static u32* states_avx_ptr;
   
 
 
@@ -178,7 +178,7 @@ void find_hash_distinguished(u8 M[16][HASH_INPUT_SIZE], /* in*/
   while (1) { /* loop till a dist pt found */
 
     for (int i=0; i<8; ++i) {
-      M[i][0] = ++(*ctr); /* increase counter part in M by 1 */
+      ((u64*)M[i])[0] = ++(*ctr); /* increase counter part in M by 1 */
     }
 
    
@@ -186,11 +186,11 @@ void find_hash_distinguished(u8 M[16][HASH_INPUT_SIZE], /* in*/
     /* todo  use hash multiple */
     /* figure out the number of words from config.h */
     
-    state_ptr = sha256_multiple_8(M);
-
+    states_avx_ptr = sha256_multiple_8(M);
+    // todo change the 8
     for (int i=0; i<8; ++i) {
-      if ((state_ptr[i] & dist_test) == 0) {
-	cpy_transposed_state(state_ptr, Mstate, i);
+      if ((states_avx_ptr[i] & dist_test) == 0) {
+	cpy_transposed_state( Mstate, states_avx_ptr, i);
 	memcpy(Mdist, M[i], HASH_INPUT_SIZE);
 	return;
       }
