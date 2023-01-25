@@ -45,7 +45,8 @@ size_t time_sha_ni(){
   printf("sha_ni elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes \n",
 	 elapsed, NMSGS/elapsed, log2(NMSGS/elapsed));
 
-  
+
+  free(msgs);
   return ctr;
 
 }
@@ -84,6 +85,8 @@ size_t time_sha_avx2(){
   
   printf("sha_avx2_intel elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes\n",
 	 elapsed, NMSGS/elapsed,  log2(NMSGS/elapsed));
+
+  free(msgs);
   return ctr;
 }
 
@@ -116,6 +119,8 @@ size_t time_sha_avx512(){
   
   printf("sha_avx512_intel elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes\n",
 	 elapsed, NMSGS/elapsed,  log2(NMSGS/elapsed));
+
+  free(msgs);
   return ctr;
 }
 

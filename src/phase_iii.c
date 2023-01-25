@@ -24,6 +24,7 @@
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
 #include "util_files.h"
 #include "common.h"
+#include <dirent.h>
 // ------------------- Auxililary functions phase iii --------------------------
 //+ todo complete these functions
 
@@ -34,6 +35,8 @@
 int cmp_dgst(void const* dgst1, void const* dgst2){
   return memcmp(dgst1, dgst2, N); /* comparison order: low bytes first */
 }
+
+
 
 
 
@@ -98,19 +101,20 @@ int main(int argc, char* argv[]) /* single machine */
 
 
   /* Hash all the candidate messages. */
-  /* one thread is enough, we'll parellize it if it's a bottle neck */
+  /* one thread is enough, it will be parallelized when it's a bottleneck  */
   WORD_TYPE state[NWORDS_STATE];
   for (size_t i=0; i<nmsgs; ++i) {
     /* copy init state, then hash  */
-    memcpy(state, state_init, NWORDS_STATE*WORD_SIZE);
+    memcpy(state, state_init, HASH_STATE_SIZE);
     hash_single(state, &msgs[i*HASH_INPUT_SIZE]);
 
+    /* a sanity check  */
     assert(is_dist_state(state));
 
     /* get dgst in dgst */
     memcpy(&dgsts[i*N], state, N);
   }
-  memcpy(state, state_init, NWORDS_STATE*WORD_SIZE);
+  memcpy(state, state_init, HASH_STATE_SIZE);
 
 
   // ----------------------------- PART 2 ------------------------------------
@@ -119,69 +123,115 @@ int main(int argc, char* argv[]) /* single machine */
   qsort( dgsts_orderd, nmsgs, N, cmp_dgst);
 
 
-  
-  puts("digests unordered:");
+  puts("digests unordered: (first 5)");
   for (int i=0; i<5; ++i) {
     print_byte_txt("", &dgsts[i*N], N);    
   }
 
-  puts("digests ordered:");
+  puts("digests ordered: (first 5)");
   for (int i=0; i<5; ++i) {
     print_byte_txt("", &dgsts_orderd[i*N], N);  
   }
 
+
   // ----------------------------- PART 3 ------------------------------------
-  // Let's do it in the simple way
-
+  // First get all states: 
+  FILE* fstates = fopen("data/states", "r");
+  FILE* fctrs   = fopen("data/counters", "r");
   
-  memcpy(state, state_init, NWORDS_STATE*WORD_SIZE);
+  u64 nmiddle_states = get_file_size(fstates)/HASH_STATE_SIZE;
+  /* between each middle state there are: */
+  size_t nhashes_in_interval = NHASHES / nmiddle_states;
+  printf("There %llu middle states\n", nmiddle_states);
 
-  u8 M[HASH_INPUT_SIZE] = {0};
-  CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* increment the message by one each time */
-  u32 ones = (1LL<<DIFFICULTY) - 1; 
-  u8* ptr = NULL;
+  WORD_TYPE* middle_states = (WORD_TYPE*) malloc(nmiddle_states*HASH_STATE_SIZE);
+  CTR_TYPE* middle_ctr = (CTR_TYPE*) malloc(nmiddle_states*sizeof(CTR_TYPE));
+
+  fread(middle_states, WORD_SIZE, nmiddle_states*NWORDS_STATE, fstates);
+  fread(middle_ctr,   sizeof(CTR_TYPE), nmiddle_states, fctrs);  
+
+  fclose(fstates);
+  fclose(fctrs);
+  
+
+  print_byte_txt("init state      ", (u8*) state_init, HASH_STATE_SIZE);
+  print_byte_txt("1st middle state", (u8*) middle_states, HASH_STATE_SIZE);
+  printf("1st counter = %llu\n", middle_ctr[0]);
+  printf("nhashes in interval = %lu, nhashes=%llu, mod=%llu\n",
+	 nhashes_in_interval, NHASHES, NHASHES % nmiddle_states);
 
 
-  size_t ctr = 0;
-  print_byte_txt("state init=", (u8*)state, NWORDS_STATE*WORD_SIZE);
-  for (size_t i=0; i<NHASHES;) {
-        hash_single(state, M);
-	msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
-	ctr++;
-	if((state[0] & ones) == 0){
-	  i++;
-	  ptr = bsearch(state, dgsts_orderd, nmsgs, N, cmp_dgst);
-	  if (ptr){
-	    printf("Yes at %lu\n", i);
+
+  // ----------------------------- PART 4 ------------------------------------
+
+
+
+
+  #pragma omp parallel for
+  for(size_t ith_state=0; ith_state<(nmiddle_states-1); ++ith_state){
+    u8 M_priv[HASH_INPUT_SIZE] = {0};
+    CTR_TYPE* M_ctr_pt_priv = (CTR_TYPE*) M_priv;
+    CTR_TYPE next_ctr = middle_ctr[ith_state+1];
+    WORD_TYPE state_priv[HASH_STATE_SIZE];
+    u8* srearch_ptr_priv = NULL;
+
+    
+    printf("ith_state=%lu, next counter = %llu\n",
+	   ith_state, next_ctr);
+
+    
+
+    memcpy(state_priv,
+	   &middle_states[ith_state*NWORDS_STATE],
+	   HASH_STATE_SIZE);
+
+    M_priv[0] = middle_ctr[ith_state];
+
+
+    for (; M_ctr_pt_priv[0]<next_ctr; ) {
+      hash_single(state_priv, M_priv);
+      ++M_ctr_pt_priv[0];
+
+
+
+      
+      if(is_dist_state(state_priv)){
+	srearch_ptr_priv = bsearch(state_priv, dgsts_orderd, nmsgs, N, cmp_dgst);
+
+	if (srearch_ptr_priv){
+	  printf("Yes at %llu\n", M_ctr_pt_priv[0]);
 	    
-	    size_t idx = linear_search((u8*)state,
-				       dgsts,
-				       nmsgs,
-				       N);
-	    printf("at index=%lu, random msg=\n", idx);
-	    print_byte_array(&msgs[idx*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
-	    printf("long message ctr=%llu\n", ((u64*)M)[0]);
-	    print_byte_txt("hash long=", (u8*)state, N);
+	  size_t idx = linear_search((u8*)state_priv,
+				     dgsts,
+				     nmsgs,
+				     N);
 
-	    WORD_TYPE state_rnd[NWORDS_STATE] = {HASH_INIT_STATE};
-	    hash_single(state_rnd, &msgs[idx*HASH_INPUT_SIZE]);
-	    print_byte_txt("hash rnd =", (u8*)state_rnd, N);
+          printf("at index=%lu, random msg=\n", idx);
+	  print_byte_array(&msgs[idx*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
+	  printf("long message ctr=%llu\n", ((u64*)M_priv)[0]);
+	  print_byte_txt("hash long=", (u8*)state_priv, N);
 
-	    puts("----------------------------");
-	  }
-	  	 
+	  WORD_TYPE state_rnd[NWORDS_STATE] = {HASH_INIT_STATE};
+	  hash_single(state_rnd, &msgs[idx*HASH_INPUT_SIZE]);
+	  print_byte_txt("hash rnd =", (u8*)state_rnd, N);
+
+	  puts("----------------------------");
 	}
+	  	 
+      }
+      
+    }
+    
   }
-
-
   
 
-  
+
   free(msgs);
   free(dgsts);
   free(dgsts_orderd);
-
-
+  free(middle_states);
+  free(middle_ctr);
+  
 } // quit the function
 
 

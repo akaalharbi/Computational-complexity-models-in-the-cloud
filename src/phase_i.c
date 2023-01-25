@@ -32,12 +32,6 @@
 // -----------------------------------------------------------------------------
 
 
-FILE* truncate_file_by_number_of_lines(FILE* fp, size_t nlines){
-  /// Given a text file with k lines > nlines, remove all the extra lines
-  /// and keep only the first nlines
-
-  
-}
 
 
 // @todo rename file, and truncate 
@@ -233,6 +227,17 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
   start = wtime(); /* get the time  */
 
+
+  /* Record the initial message and the initial ctr */
+  /* Record the whole state */
+  fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
+  /* Record the counter  */
+  fwrite(msg_ctr_pt, sizeof(CTR_TYPE), 1, counters_file);
+  /* We would like to flush the data disk as soon we have them */
+  fflush(states_file);
+  fflush(counters_file);
+
+  
   /* if one server gets filled, it will */
   while (should_NOT_stop) {
     // hash and extract n bits of the digest
@@ -288,6 +293,16 @@ void phase_i_store(CTR_TYPE msg_ctr,
       }
     }
   }
+
+  /* Record the last  message and the last ctr */
+  /* Record the whole state */
+  fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
+  /* Record the counter  */
+  fwrite(msg_ctr_pt, sizeof(CTR_TYPE), 1, counters_file);
+  /* We would like to flush the data disk as soon we have them */
+  fflush(states_file);
+  fflush(counters_file);
+
   
   fclose(states_file);
   fclose(counters_file);
