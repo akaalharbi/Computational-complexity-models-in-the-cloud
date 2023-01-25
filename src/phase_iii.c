@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) /* single machine */
   // ----------------------------- PART 1 ------------------------------------
 
   /* load messages candidates, hash them, sort them */
-  FILE* fp = fopen("data/receive/messages/archive", "r");
+  FILE* fp = fopen("data/messages/archive", "r");
   size_t nmsgs = (get_file_size(fp)) / HASH_INPUT_SIZE;
   
 

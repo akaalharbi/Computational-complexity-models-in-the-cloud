@@ -30,9 +30,10 @@
 
 void print_attack_information(){
   printf("\nL=%d, L_IN_BYTES=%d, N=%d, NHASHES=%llu,\n"
-	 "DIFFICULTY=%d, |idx| = %dbytes, NSEERVERS=%d,\n"
-	 "NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
-	 "NDEFINED BYTES=%d, NCND_NEEDED=%llu\n",
+         "DIFFICULTY=%d, |idx| = %dbytes, NSEERVERS=%d,\n"
+         "NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
+         "NDEFINED BYTES=%d, NCND_NEEDED=%llu,\n"
+	 "AVX_SIZE=%dbits\n",
 	 L,
 	 L_IN_BYTES,
 	 N,
@@ -44,7 +45,10 @@ void print_attack_information(){
 	 NPROBES_MAX,
 	 VAL_SIZE_BYTES,
 	 DEFINED_BYTES,
-	 NNEEDED_CND);
+	 NNEEDED_CND,
+	 AVX_SIZE);
+
+  
   
 }
 

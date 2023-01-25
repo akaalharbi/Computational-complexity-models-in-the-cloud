@@ -75,12 +75,10 @@ $(info common objects = $(COMMON_OBJECTS))
 all: $(TARGETS) lib
 	mkdir -p obj
 	mkdir -p data
-	mkdir -p data/send
-	mkdir -p data/send/digests
-	mkdir -p data/send/messages
-	mkdir -p data/receive
-	mkdir -p data/receive/digests
-	mkdir -p data/receive/messages
+	mkdir -p data/digests
+	mkdir -p data/messages
+	mkdir -p data/digests
+	mkdir -p data/messages
 	mkdir -p data/stats
 
 

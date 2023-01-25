@@ -213,7 +213,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
   
   for (size_t i=0; i<NSERVERS; ++i) {
     //edit file name according to server i
-    snprintf(file_name, sizeof(file_name), "data/send/digests/%lu", i);
+    snprintf(file_name, sizeof(file_name), "data/digests/%lu", i);
     printf("file_name=%s\n", file_name);
 
     /* append to it if it exists, todo */

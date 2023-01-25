@@ -218,8 +218,8 @@ void receiver_process_task(dict* d,
   /* create file: data/messages/myrank that will hold messages whose hashes */
   /* gives a postivie response when probing the dictionary */
   
-  char file_name[FILE_NAME_MAX_LENGTH]; /* "data/send/messages/%d" */
-  snprintf(file_name, sizeof(file_name), "data/send/messages/%d", myrank );
+  char file_name[FILE_NAME_MAX_LENGTH]; /* "data/messages/%d" */
+  snprintf(file_name, sizeof(file_name), "data/messages/%d", myrank );
   FILE* fp = fopen(file_name, "a");
   int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
                     + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
@@ -371,7 +371,7 @@ void receiver(int myrank, MPI_Comm mpi_communicator, int nsenders)
   dict* d = dict_new(NSLOTS_MY_NODE); /* This is done by python script */
   double time_start = wtime();
   char file_name[FILE_NAME_MAX_LENGTH];
-  snprintf(file_name, sizeof(file_name), "data/receive/digests/%d", myrank);
+  snprintf(file_name, sizeof(file_name), "data/digests/%d", myrank);
   FILE* fp = fopen(file_name, "r");
   load_file_to_dict(d, fp);
 
