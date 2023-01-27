@@ -39,8 +39,12 @@ int cmp_dgst(void const* dgst1, void const* dgst2){
 int main(int argc, char* argv[]){
 
   print_attack_information();
-    
 
+  printf("Estimated memory per dictionary=%lu Bytes ≈ 2^%0.2f Bytes\n",
+	 dict_memory(NSLOTS_MY_NODE),
+	 log2(dict_memory(NSLOTS_MY_NODE)));
+
+  printf("sizeof(dict)=%lu bytes\n", sizeof(dict));
 
   return 0;
 
