@@ -167,8 +167,9 @@ int main(int argc, char* argv[]) /* single machine */
 
 
 
-  /* #pragma omp parallel for */
+  #pragma omp parallel for
   for(size_t ith_state=0; ith_state<(nmiddle_states-1); ++ith_state){
+    double start = wtime();
     u8 M_priv[HASH_INPUT_SIZE] = {0};
     CTR_TYPE* M_ctr_pt_priv = (CTR_TYPE*) M_priv;
     CTR_TYPE next_ctr = middle_ctr[ith_state+1];
@@ -176,8 +177,6 @@ int main(int argc, char* argv[]) /* single machine */
     u8* srearch_ptr_priv = NULL;
 
     
-    printf("ith_state=%lu, next counter = %llu\n",
-	   ith_state, next_ctr);
 
     
 
@@ -185,8 +184,9 @@ int main(int argc, char* argv[]) /* single machine */
 	   &middle_states[ith_state*NWORDS_STATE],
 	   HASH_STATE_SIZE);
 
-    M_priv[0] = middle_ctr[ith_state];
+    M_ctr_pt_priv[0] = middle_ctr[ith_state];
 
+    printf("ctr=%llu, ", ((u64*) M_priv)[0]);
 
     for (; M_ctr_pt_priv[0]<next_ctr; ) {
       hash_single(state_priv, M_priv);
@@ -221,6 +221,10 @@ int main(int argc, char* argv[]) /* single machine */
       }
       
     }
+
+        printf("ith_state=%lu, next counter=%llu, done in %0.2fsec, thrd%d\n",
+	       ith_state, next_ctr, wtime() - start, omp_get_thread_num());
+
     
   }
   

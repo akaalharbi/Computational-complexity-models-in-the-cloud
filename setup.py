@@ -29,24 +29,28 @@ available_mem = get_free_memory()
 def parse_config(N=None, L=None, NSERVERS=None, DIFFICULTY=None):
     import re
 
-
+    print(N, L, NSERVERS, DIFFICULTY)
 
     with open("include/config.h", "r") as f:
         lines = f.readlines()
 
-
+    print(len(lines))
     for i in range(len(lines)):
-        if lines[i][2:] == "L " and L:
-            lines[i] = f"L {L}"
+        if lines[i][:10] == "#define L " and L:
+            lines[i] = f"#define L {L}\n"
+            print("L done")
 
-        if lines[i][2:] == "N " and N:
-            lines[i] = f"N {N}"
+        if lines[i][:10] == "#define N " and N:
+            lines[i] = f"#define N {N}\n"
+            print("N done")
 
-        if lines[i][9:] == "NSERVERS " and NSERVERS:
-            lines[i] = f"NSERVERS {L}"
+        if lines[i][:17] == "#define NSERVERS " and NSERVERS:
+            lines[i] = f"#define NSERVERS {L}\n"
+            print("nservers done")
 
-        if lines[i][11:] == "DIFFICULTY " and DIFFICULTY:
-            lines[i] = f"DIFFICULTY {L}"
+        if lines[i][:19] == "#define DIFFICULTY " and DIFFICULTY:
+            lines[i] = f"#define DIFFICULTY {L}\n"
+            print("difficulty done")
 
     with open("include/config.h", "w") as f:
         f.writelines(lines)
@@ -77,6 +81,6 @@ args = parser.parse_args()
 
 
 
-
+print(args)
 
 parse_config(args.N, args.L, args.NSERVERS, args.DIFFICULTY)
