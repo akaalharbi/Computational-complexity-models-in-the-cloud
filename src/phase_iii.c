@@ -167,7 +167,7 @@ int main(int argc, char* argv[]) /* single machine */
 
 
 
-  #pragma omp parallel for
+  /* #pragma omp parallel for */
   for(size_t ith_state=0; ith_state<(nmiddle_states-1); ++ith_state){
     u8 M_priv[HASH_INPUT_SIZE] = {0};
     CTR_TYPE* M_ctr_pt_priv = (CTR_TYPE*) M_priv;

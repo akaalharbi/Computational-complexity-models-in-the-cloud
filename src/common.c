@@ -32,8 +32,9 @@ void print_attack_information(){
   printf("\nL=%d, L_IN_BYTES=%d, N=%d, NHASHES=%llu,\n"
          "DIFFICULTY=%d, |idx| = %dbytes, NSEERVERS=%d,\n"
          "NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
-         "NDEFINED BYTES=%d, NCND_NEEDED=%llu,\n"
-	 "AVX_SIZE=%dbits\n",
+         "NDEFINED BYTES=%d, NCND_NEEDED=%llu≈2^%0.4f,\n"
+	 "NDISCARDED_BITS=%d\n"
+	 "AVX_SIZE=%dbits, mask_ones=%d\n",
 	 L,
 	 L_IN_BYTES,
 	 N,
@@ -46,7 +47,10 @@ void print_attack_information(){
 	 VAL_SIZE_BYTES,
 	 DEFINED_BYTES,
 	 NNEEDED_CND,
-	 AVX_SIZE);
+	 log2(NNEEDED_CND),
+	 DISCARDED_BITS,
+	 AVX_SIZE,
+	 (1<<DIFFICULTY) - 1);
 
   
   
@@ -54,7 +58,7 @@ void print_attack_information(){
 
 
 
-u32 to_which_server(u8 MState[NWORDS_DIGEST*WORD_SIZE])
+u32 to_which_server(u8 MState[HASH_STATE_SIZE])
 {
   // ==========================================================================+
   // Summary: Given a state. Decide to which server we send it to.             |
