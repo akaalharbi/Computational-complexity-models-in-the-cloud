@@ -54,10 +54,10 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 8
+#define N 10
 
  /* store 2^L elements in the dictionary  */
-#define L 33
+#define L 41
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
@@ -94,7 +94,7 @@
 
 
 /* edit manually */
-#define NSERVERS 4
+#define NSERVERS 16
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */

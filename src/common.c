@@ -34,7 +34,8 @@ void print_attack_information(){
          "NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
          "NDEFINED BYTES=%d, NCND_NEEDED=%llu≈2^%0.4f,\n"
 	 "NDISCARDED_BITS=%d\n"
-	 "AVX_SIZE=%dbits, mask_ones=%d\n",
+	 "AVX_SIZE=%dbits, mask_ones=%d\n"
+	 "size",
 	 L,
 	 L_IN_BYTES,
 	 N,

@@ -95,8 +95,6 @@ dict* dict_new(size_t nelements){
 inline void dict_free(dict* d){
   free(d->values);
 }
-
-
 size_t dict_memory(size_t nelements){
   /// return memory estimation of the dictionary size
   int nslots_per_bucket = SIMD_LEN; // we store 32 bits per value

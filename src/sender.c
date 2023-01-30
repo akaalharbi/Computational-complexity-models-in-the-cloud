@@ -43,6 +43,7 @@ void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 	      TAG_RANDOM_MESSAGE,
 	      MPI_COMM_WORLD, &requests[i]);
   }
+  
   MPI_Waitall(NSERVERS, requests, statuses);
 } /* clear stack variables */
 
@@ -62,34 +63,32 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
 
   /* M = 64bit ctr || 64bit nonce || random value */
-  u8 Ms[16][HASH_INPUT_SIZE]; /* random word */
-  u8 M[HASH_INPUT_SIZE]; /* random word */
 
+  u8 M[HASH_INPUT_SIZE]; /* random message base */
+  // 16 messages for avx, each message differs from the other in the counter part
+  u8 Mavx[16][HASH_INPUT_SIZE];  /* except counter, they are all the same */
 
   
   /* Get a random message only once */
-  CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* counter pointer  */
+  CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* counter pointer */
   getrandom(M, HASH_INPUT_SIZE, 1);
   msg_ctr_pt[0] = 0; /* zeroing the first 64bits of M */
 
+  // copy the the random message to all avx messages
   for (int i = 0; i<16; ++i) {
-    memcpy(Ms[i], M, HASH_INPUT_SIZE);
+    memcpy(Mavx[i], M, HASH_INPUT_SIZE);
   }
 
-  print_byte_txt("M=", M, 64);
-  for (int i = 0; i<16; ++i) {
-      print_byte_txt("Mi=", Ms[i], 64);
-  }
 
-  
+  // print the template. this is not necessary.
   char txt[50];
   snprintf(txt, sizeof(txt), "sender #%d template=", myrank);
   print_byte_txt(txt, M,HASH_INPUT_SIZE);
-
+  puts("\n");
+  
   // ----------------------------- PART 1 --------------------------------- //
   // 1-  Sen the initial input to all receiving servers 
-  send_random_message_template(M); /* send template to all servers */
-
+  send_random_message_template(M);
 
 
   // ------------------------------ PART 2 ----------------------------------- +
@@ -116,8 +115,9 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   size_t nbytes_per_server = one_pair_size * PROCESS_QUOTA;
   size_t offset = 0; /* which index within a  server buffer should we pick */
 
-  // use the mask to decide 
-  const u64 mask_test = (1LL<<DIFFICULTY) - 1; /* mask_test & diges =?= 0 */
+  // use the mask to decide if the digest is distinguished or not.
+  /* it's distinguished if (mask_test & diges) == 0 */
+  const u64 mask_test = (1LL<<DIFFICULTY) - 1; 
 
   /* pos i: How many messages we've generated to be sent to server i? */
   u64 servers_ctr[NSERVERS] = {0};
@@ -134,27 +134,14 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   // find_hash_distinguished_init(); 
 
 
-
   while(1) { /* when do we break? never! */
-  /* while(i<1) { /\* when do we break? never! *\/ */
-
     /* Find a message that produces distinguished point */
-
-    find_hash_distinguished(Ms,
-			    M, /* save the message here */
-			    Mstate,
+    find_hash_distinguished(Mavx,
+			    M, /* save the message that generates dist here */
+			    Mstate, /* save the distinguished state here */
 			    mask_test);
 
 
-
-
-    /* find_hash_distinguished_old(M, */
-    /* 				Mstate, */
-    /* 				msg_ctr_pt, */
-    /* 				mask_test); */
-
-
-    
     //+ decide to which server to add to? 
     server_number = to_which_server((u8*) Mstate);
 
@@ -180,13 +167,8 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
     servers_ctr[server_number] += 1;
     
-
-    /* if (server_number == 2){ */
-      
-
     
     if (servers_ctr[server_number] >= PROCESS_QUOTA){
-
       printf("===============================================\n"
              "sender #%d -> recv #%d before sending %0.4fsec\n"
 	     "===============================================\n\n",
@@ -200,7 +182,6 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 		TAG_SND_DGST,
 		MPI_COMM_WORLD);
 
-      
       ++snd_ctr;
 
       printf("-----------------------------------------------\n"
@@ -208,20 +189,6 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 	     "-----------------------------------------------\n\n",
 	     myrank, server_number, wtime() -  time_start );
 
-
-      // debugging: check if sender and receiver have the same digest
-      /* if (server_number == 7 && myrank == 9) { */
-      /* 	snprintf(txt, sizeof(txt), "sender#%d,  server=%d, snd_buf=", */
-      /* 		 myrank, server_number ); */
-      /* 	print_byte_txt(txt, */
-      /* 		       &snd_buf[server_number*nbytes_per_server], */
-      /* 		       one_pair_size*PROCESS_QUOTA); */
-      /* } */
-
-
-      /* time_start = wtime(); */
-
-      /* It is enough to reset the counter. The memroy will be rewritten */  
       servers_ctr[server_number] = 0;
       time_start = wtime();
     }

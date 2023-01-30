@@ -32,6 +32,8 @@
 
 //---------------------------- UTILITY FUNCTIONS -------------------------------
 // local function
+
+
 static inline int lookup_multi_save(dict *d,
 				    u8 *ctrs_dgsts, /* known bytes are removed  */ 
                                     u8 template[HASH_INPUT_SIZE], /* initial random message */
@@ -41,14 +43,19 @@ static inline int lookup_multi_save(dict *d,
 				    int source) /* for debugging */
 {
   // -------------------------------------------------------------------------+
-  // Given ctrs_dgsts={ctr1||dgst1,..} from specific rank, probes each dgst, if   |
+  // Given ctrs_dgsts={ctr1||dgst1,..} from specific rank, probes each dgst,if|
   // prope(dgst)=/=0 store its related msg in fp, and returns the number of   |
   // stored messages.                                                         |
   // -------------------------------------------------------------------------+
   // INPUT:                                                                   |
   // - dict                                                                   |
-  // - stream                                                                 |
+  // - templaet: random message with zero counter                             |
+  // - *ctrs_dgsts: array of pairs (ctr, digest ) packed as ctr||digest       |
   // - npairs: how many pairs (ctr, dgst) in the stream.                      |
+  // - fp: where to store candidate messages, i.e. messages whose digest      |
+  //       returns positive answser when it gets probed in the dictionary     |
+  // - myrank: myrank as an MPI, process (we don't use it!)                   |
+  // - source: who sent the message                                           |
   // -------------------------------------------------------------------------+
   // NOTES:                                                                   |
   // |msg| = sizeof(CTR_TYPE) since we receive the counter                    |
@@ -58,12 +65,13 @@ static inline int lookup_multi_save(dict *d,
   // -------------------------------------------------------------------------+
   /* the stream size is multiple of one_pair size */
   static int one_pair_size = sizeof(CTR_TYPE) + (N-DEFINED_BYTES)*sizeof(u8);
-  static int msg_size = HASH_INPUT_SIZE; /* full message not only the counter */
+
 
   
   /* how many digests give positive answer they get probed  */
-  int npositive_dgsts = 0; 
-  int is_positive = 0; /* what is this?  */
+  int npositive_dgsts = 0;
+  /* did dict say it has the digest? (it doesn't have to be correct)*/
+  int is_positive = 0; 
 
   /* construct the full message here */
   static u8 M[HASH_INPUT_SIZE]; 
@@ -72,15 +80,13 @@ static inline int lookup_multi_save(dict *d,
     /* dictionary only read |dgst| bytes by default  */
     /* probing pair #i */
 
-    is_positive =  dict_has_elm(d,
+    /* pair := ctr||dgst, probe d for dgst  */
+    is_positive =  dict_has_elm(d, /* it probes the digest */
 			&ctrs_dgsts[i*one_pair_size /* Go 2 the ith pair */
-				    + sizeof(CTR_TYPE)] /* skip ctr part */
-				);
+				    + sizeof(CTR_TYPE)] /* skip ctr part */);
     
-
     
     if (is_positive){ /* did we find a candidate msg||dgst? */
-
       /* reconstructing the message: get the template */
       memcpy(M, template, HASH_INPUT_SIZE);
 
@@ -88,11 +94,11 @@ static inline int lookup_multi_save(dict *d,
       memcpy(M,
 	     &ctrs_dgsts[i*one_pair_size],
 	     sizeof(CTR_TYPE));
-
+      
       /* assert(is_dist_msg(M)); // debugging  */
 
       /* finally write the reconstructed message */
-      fwrite(M, sizeof(u8), msg_size, fp);
+      fwrite(M, sizeof(u8), HASH_INPUT_SIZE, fp);
       fflush(fp); /* ensures it's written */
       ++npositive_dgsts;
     }
@@ -101,16 +107,15 @@ static inline int lookup_multi_save(dict *d,
 }
 
 
-// -----------------------------------------------------------------------------
 
 
 // -----------------------------------------------------------------------------
 // local function
-void load_file_to_dict(dict *d, FILE *fp)
+static void load_file_to_dict(dict *d, FILE *fp)
 {
   // ==========================================================================+
   // Summary: Load hashes from the file *fp, and try to store them in dict *d  |
-  // Note: dict d has the right to reject inserting element.                   |
+  // Note: dict* d has the right to reject inserting element.                   |
   // --------------------------------------------------------------------------+
   // INPUTS:                                                                   |
   // `*d`: Dictionary that will keep elements from *fp.                        |
@@ -124,13 +129,12 @@ void load_file_to_dict(dict *d, FILE *fp)
   }
 
   
-  size_t nchunks = 1000000; 
+  size_t nchunks = 10000; 
   size_t ndigests = get_file_size(fp) / (N-DEFINED_BYTES);
   size_t nmemb = (ndigests/nchunks >=  1) ? ndigests/nchunks : 1;
 
-
+  /* read digests from file to this buffer  */
   u8* digests = (u8*) malloc( (N-DEFINED_BYTES) * nmemb * sizeof(u8));
-
 
 
   /*  load one chunk each time */
@@ -144,8 +148,9 @@ void load_file_to_dict(dict *d, FILE *fp)
   }
 
   /* ndigests = nchunks*nmemb + remainder  */
-  // read the remainder digests 
+  // read the remainder digests, since ndigests may not mutlipe of nchunks
   u8 stream_pt[N-DEFINED_BYTES];
+
   /* add as many hashes as possible */
   while ( !feof(fp) ){
     // use fread with a larger buffer @todo
@@ -159,13 +164,8 @@ void load_file_to_dict(dict *d, FILE *fp)
 }
 
 
-
-
-
 static inline void receiver_process_get_template(int myrank, int nproc, int nsenders, u8* templates)
 {
-
-
 
   //---------------------------------------------------------------------------+
   // --- : receive the initial inputs from all generating processors 
@@ -186,13 +186,8 @@ static inline void receiver_process_get_template(int myrank, int nproc, int nsen
 	     MPI_COMM_WORLD,
 	     &status);
 
-    //print_char(&templates[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
-    
-    /* print_char(&initial_inputs[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE); */
   }
 }
-
-
 
 
 
@@ -211,16 +206,18 @@ void receiver_process_task(dict* d,
   // candidates. Send candidates to archive process.                           |
   //---------------------------------------------------------------------------+
   // nproc_snd: number of sender processes
-  // nproc : number of all processes 
+  // nproc : number of all processes
+
+  //---------------------------------------------------------------------------+
   // ------- Part 1 : Init receiving buffers of digests and counters      -----|
   //---------------------------------------------------------------------------+
-
   /* create file: data/messages/myrank that will hold messages whose hashes */
   /* gives a postivie response when probing the dictionary */
   
   char file_name[FILE_NAME_MAX_LENGTH]; /* "data/messages/%d" */
   snprintf(file_name, sizeof(file_name), "data/messages/%d", myrank );
   FILE* fp = fopen(file_name, "a");
+
   int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
                     + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
   
@@ -247,8 +244,6 @@ void receiver_process_task(dict* d,
   int sender_name_scaled = 0; 
 
 
-
-
   //---------------------------------------------------------------------------+
   // --- Part 3: Receive digests and probe them
   //---------------------------------------------------------------------------+
@@ -265,25 +260,14 @@ void receiver_process_task(dict* d,
 	   &status);
 
 
-  printf("recv #%d got a message from %d\n"
-	 "(We will message you again)\n", myrank, status.MPI_SOURCE);
+  printf("recv #%d got its 1st message from %d\n",
+	 myrank,
+	 status.MPI_SOURCE);
   
   // copy the received message and listen immediately
   memcpy(lookup_buf, rcv_buf, rcv_array_size);
   /* 1st sender has rank = NSERVER -scaling-> 1st sender name = 0 */
   sender_name_scaled = status.MPI_SOURCE - NSERVERS; // who sent the message?
-
-
-  // @todo restore the while loop
-  /* while (NNEEDED_CND  > nfound_cnd) {  */ // @todo fix this line
-  // strange behavior nneeded_cnd = 0
-    /* from = status.MPI_SOURCE; */
-    /* char txt[50]; */
-    /* snprintf(txt, sizeof(txt), "rcv #%d, receive buffer=", myrank); */
-    /* print_byte_txt(txt,rcv_buf, rcv_array_size); */
-
-
-
 
 
   while (NNEEDED_CND > nfound_cnd) {    
@@ -297,7 +281,7 @@ void receiver_process_task(dict* d,
 	      MPI_COMM_WORLD,
 	      &request);
     
-    //+ probe these messages and update the founded candidates
+    // probe these messages and update the founded candidates
     /* printf("recv#%d probing sender #%d messages\n", */
     /* 	   myrank, sender_name_scaled); */
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
@@ -310,18 +294,6 @@ void receiver_process_task(dict* d,
 				    sender_name_scaled + NSERVERS);
 
 
-
-    /* // debugging: check if a sender and a receiver have the same message */
-    /* int from = sender_name_scaled + NSERVERS; */
-    /* if (from == 9 && myrank == 7){ */
-    /*   char txt[50]; */
-    /*   snprintf(txt, sizeof(txt), "rcv #%d, from #%d, receive buffer=", */
-    /* 	       from, */
-    /* 	       myrank); */
-    /*   print_byte_txt(txt, lookup_buf, rcv_array_size); */
-    /* } */
-
-    
     if (nfound_cnd - old_nfound_candidates > 0) {
       printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 	     "receiver #%d has %lu out of %llu candidates from #%d\n"
@@ -338,7 +310,6 @@ void receiver_process_task(dict* d,
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
     }
 
-
   // good job
   free(rcv_buf);
   free(indices);
@@ -346,21 +317,19 @@ void receiver_process_task(dict* d,
 
   printf("recv #%d done a good job\n", myrank);
 
-  
   exit(EXIT_SUCCESS);
 }
 
 
-
-
 void receiver(int myrank, MPI_Comm mpi_communicator, int nsenders)
 {
-  //-------------------------------------------------------------------------+
-  // I'm a receiving process: receive hashes, probe them, and send candidates 
-  // Process Numbers: [0,  NSERVERS - 1]
-  //-------------------------------------------------------------------------+
+  //--------------------------------------------------------------------------+
+  // I'm a receiving process: receive hashes, probe them, and send candidates |
+  // Process Numbers: [0,  NSERVERS - 1]                                      |
+  //--------------------------------------------------------------------------+
 
-  int nproc; MPI_Comm_size(mpi_communicator, &nproc);  
+  int nproc;
+  MPI_Comm_size(mpi_communicator, &nproc);  
   u8* templates = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nsenders);
 
   // PART 1: LOAD dictionary
@@ -368,7 +337,7 @@ void receiver(int myrank, MPI_Comm mpi_communicator, int nsenders)
   snprintf(txt, sizeof(txt), "recv#%d before dict load", myrank);
   print_memory_usage(txt);
 
-  dict* d = dict_new(NSLOTS_MY_NODE); /* This is done by python script */
+  dict* d = dict_new(NSLOTS_MY_NODE);
   double time_start = wtime();
   char file_name[FILE_NAME_MAX_LENGTH];
   snprintf(file_name, sizeof(file_name), "data/digests/%d", myrank);
