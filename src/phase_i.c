@@ -283,10 +283,12 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	  fflush(data_to_servers[i]);
 
 	
-	printf("%2.4f%% Generating %lu dist points took"
-	       "%0.2fsec, nhashes_stored≈%lu, msg_ctr=%llu\n",
+	printf("%2.4f%% ETA %0.4fsec, "
+	       "#hashes≈%lu, msg_ctr=%llu\n",
 	       100 * ((float) nhashes_stored) /  NHASHES,
-	       interval, end - start, nhashes_stored, msg_ctr_pt[0]);
+	       (end-start) * (NHASHES-nhashes_stored)/((float) interval),
+	       nhashes_stored,
+	       msg_ctr_pt[0]);
 
 	start = wtime();
 	

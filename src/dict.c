@@ -35,7 +35,6 @@ void print_m256i(__m256i a, char* text){
 
 
 
-
 /* //-----------------------------------------------------// */
 /* //                  data structure                     // */
 /* //-----------------------------------------------------// */
@@ -77,12 +76,15 @@ dict* dict_new(size_t nelements){
 
   // the extra d->nslots_per_bucket seems to supress the address sanitizer
   // error, however, i am not sure why since all accesses are < nslots.
-  d->values = (VAL_TYPE*) aligned_alloc(ALIGNMENT,
+  /* d->values = (VAL_TYPE*) aligned_alloc(ALIGNMENT, */
+  /* 				      (nslots+d->nslots_per_bucket)*(sizeof(VAL_TYPE))); */
+  d->values = (VAL_TYPE*) aligned_alloc(GPAGE_SIZE,
 				      (nslots+d->nslots_per_bucket)*(sizeof(VAL_TYPE)));
+  madvise(d->values,
+	  (nslots+d->nslots_per_bucket)*(sizeof(VAL_TYPE)),
+	  GPAGE_SIZE);
+  
   /* d->values = (VAL_TYPE*) malloc((nslots)*(sizeof(VAL_TYPE))); */
-
-
-
 
   // Ensure keys are zeroed
   #pragma omp simd
@@ -96,13 +98,13 @@ inline void dict_free(dict* d){
   free(d->values);
 }
 size_t dict_memory(size_t nelements){
-  /// return memory estimation of the dictionary size
+  /// return memory estimation of the dictionary size in BYTES
   int nslots_per_bucket = SIMD_LEN; // we store 32 bits per value
   size_t nslots = nelements;
   nslots = nslots + (-nslots % nslots_per_bucket);
   size_t estimate = nslots*(sizeof(VAL_TYPE)) + sizeof(dict);
   
-  return estimate/1000.0;
+  return estimate;
 }
 
 
@@ -156,6 +158,8 @@ int dict_add_element_to(dict* d, u8* state){
 	 &state[idx_size],
 	 VAL_SIZE_BYTES );
 
+  /* 0 means empty, we have to ignore zero values  */
+  if (val == 0) return 0;
   
   // linear probing 
   for (int i=0;
@@ -211,10 +215,9 @@ int dict_has_elm(dict *d, u8 *state)
 	 &state[idx_size],
 	 VAL_SIZE_BYTES );
 
-
-
-
-
+  /* 0 means empty, we have to ignore zero values  */
+  if (val == 0) return 0;
+  
 
   int is_key_found = 0;
   // it's enough to check if the first element is empty

@@ -1,3 +1,5 @@
+# Configure the arguments of the attack in config.h
+
 import argparse
 
 
@@ -12,16 +14,25 @@ def get_free_memory():
 
 
 def get_ram_size():
-    """ Return ram size in kB """
+    """Return ram size in kB."""
     import re
     with open("/proc/meminfo") as f:
         meminfo = f.read()
         matched = re.search(r"MemTotal:\s+(\d+)", meminfo)
 
-    return int(matched.groups()[0])
+    return 1000*int(matched.groups()[0])
 
 
-available_mem = get_free_memory()
+def compute_dict_size():
+    """Compute how many slots in the dictionary this device should get."""
+    from math import log2
+    ram_size = get_ram_size()
+    leave_free_memory = (10**9) * 7  # 6 GB
+
+    nslots = (ram_size - leave_free_memory)/4
+    print(f"This server will hold {nslots}=2^{log2(nslots)} elements")
+
+    return int(nslots)
 
 
 def parse_config(N=None, L=None, NSERVERS=None, DIFFICULTY=None):
@@ -49,39 +60,38 @@ def parse_config(N=None, L=None, NSERVERS=None, DIFFICULTY=None):
             lines[i] = f"#define DIFFICULTY {DIFFICULTY}\n"
             print("difficulty done")
 
+        if lines[i][:23] == "#define NSLOTS_MY_NODE ":
+            lines[i] = f"#define NSLOTS_MY_NODE {compute_dict_size()}LL\n"
+            print("Update nslots_my_node")
+
     with open("include/config.h", "w") as f:
         f.writelines(lines)
 
 
-# parsing
-parser = argparse.ArgumentParser()
-parser.add_argument("-N",
-                    type=int,
-                    help="Number of bytes to be attacked")
-
-parser.add_argument("-L",
-                    type=int,
-                    help="Number of distingusihed hashes to search among them")
 
 
-parser.add_argument("-s", "--NSERVERS",
-                    type=int,
-                    help="How many server? (i.e. receivers)")
+if __name__ == "__main__":
+    # parsing
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-N",
+                        type=int,
+                        help="Number of bytes to be attacked")
 
-parser.add_argument("-d", "--DIFFICULTY",
-                    type=int,
-                    help="How many bits are zero")
+    parser.add_argument("-L",
+                        type=int,
+                        help="Number of distingusihed hashes to search among them")
 
+    parser.add_argument("-s", "--NSERVERS",
+                        type=int,
+                        help="How many server? (i.e. receivers)")
 
-args = parser.parse_args()
+    parser.add_argument("-d", "--DIFFICULTY",
+                        type=int,
+                        help="How many bits are zero")
 
+    args = parser.parse_args()
 
-
-
-
-print(args)
-
-parse_config(N=args.N,
-             L=args.L,
-             NSERVERS=args.NSERVERS,
-             DIFFICULTY=args.DIFFICULTY)
+    parse_config(N=args.N,
+                 L=args.L,
+                 NSERVERS=args.NSERVERS,
+                 DIFFICULTY=args.DIFFICULTY)

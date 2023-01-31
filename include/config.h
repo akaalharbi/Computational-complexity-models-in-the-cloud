@@ -27,6 +27,18 @@
 #include "numbers_shorthands.h"
 #include "confg_math_func.h"
 
+
+/*  huge pages */
+#include <sys/mman.h> 
+/* 2 MiB page  */
+#define HPAGE_SIZE (1 << 21)
+
+/* 1 GiB page  */
+#define GPAGE_SIZE (1 << 30)
+
+
+
+
 // ---------------------------------------------------------------------------+
 //                   1- Hash function generic setup                           |
 // ---------------------------------------------------------------------------+
@@ -54,10 +66,10 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 10
+#define N 9
 
  /* store 2^L elements in the dictionary  */
-#define L 41
+#define L 31
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
@@ -94,7 +106,7 @@
 
 
 /* edit manually */
-#define NSERVERS 16
+#define NSERVERS 1
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
@@ -103,8 +115,11 @@
 
 
 
-// How large is the dictionary in a server 
-#define NSLOTS_MY_NODE (NHASHES/NSERVERS) // @python
+// How large is the dictionary in a server
+/* #define NSLOTS_MY_NODE 8462608000LL */
+
+// 7*4 GiB 
+#define NSLOTS_MY_NODE (7516192768LL)
 
 
 

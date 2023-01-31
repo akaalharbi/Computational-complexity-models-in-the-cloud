@@ -106,9 +106,13 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
   int server_number = -1;
   // { (server0 paris) | (server1 pairs) | ... | (serverK pairs) }
-  u8* snd_buf = (u8*) malloc(one_pair_size
-			     *PROCESS_QUOTA
-			     *NSERVERS);
+  u8* snd_buf = (u8*) aligned_alloc(HPAGE_SIZE, one_pair_size
+				               *PROCESS_QUOTA
+				               *NSERVERS);
+  madvise(snd_buf,
+	  one_pair_size*PROCESS_QUOTA*NSERVERS,
+	  HPAGE_SIZE); /* 2MiB */
+
 
   /* Decide where to place the kth digest in server i buffer */
   // How many bytes are reserverd for each server in snd_buf
@@ -181,6 +185,18 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 		server_number,
 		TAG_SND_DGST,
 		MPI_COMM_WORLD);
+
+      /* if (snd_ctr > 0) { */
+      /* 	printf("to %d\n", server_number); */
+      /* 	print_char(&snd_buf[server_number*nbytes_per_server], PROCESS_QUOTA*one_pair_size); */
+      /* 	print_attack_information(); */
+      /* } */
+
+      /* else { */
+      /* 	printf("i am %d to %d\n", myrank, server_number); */
+      /* 	print_char(&snd_buf[server_number*nbytes_per_server], PROCESS_QUOTA*one_pair_size); */
+      /* } */
+
 
       ++snd_ctr;
 

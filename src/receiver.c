@@ -223,6 +223,7 @@ void receiver_process_task(dict* d,
   
   //+ receive message in this buffer
   u8* rcv_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
+  
   //+ copy rcv_buf to lookup_buf then listen to other sender using rcv_buf
   u8* lookup_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
 
@@ -266,6 +267,9 @@ void receiver_process_task(dict* d,
   
   // copy the received message and listen immediately
   memcpy(lookup_buf, rcv_buf, rcv_array_size);
+  /* print_char(lookup_buf, rcv_array_size); */
+  /* puts("-=-=-=-=-=-=-=-=-=-=-=-=-="); */
+  
   /* 1st sender has rank = NSERVER -scaling-> 1st sender name = 0 */
   sender_name_scaled = status.MPI_SOURCE - NSERVERS; // who sent the message?
 
@@ -280,7 +284,8 @@ void receiver_process_task(dict* d,
 	      TAG_SND_DGST, 
 	      MPI_COMM_WORLD,
 	      &request);
-    
+
+
     // probe these messages and update the founded candidates
     /* printf("recv#%d probing sender #%d messages\n", */
     /* 	   myrank, sender_name_scaled); */
@@ -308,6 +313,11 @@ void receiver_process_task(dict* d,
    
     sender_name_scaled = status.MPI_SOURCE - NSERVERS; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
+
+    /* printf("from %d:\n", status.MPI_SOURCE); */
+    /* print_char(lookup_buf, rcv_array_size); */
+    /* print_attack_information(); */
+
     }
 
   // good job

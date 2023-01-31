@@ -44,6 +44,20 @@ int main(int argc, char* argv[]){
 	 dict_memory(NSLOTS_MY_NODE),
 	 log2(dict_memory(NSLOTS_MY_NODE)));
 
+
+  if (argc > 1){
+    float l = atof(argv[1]);
+    u64 given_nslots = exp2(l);
+    printf("%llu\n", given_nslots);
+    
+    printf("For l=%0.3f\n"
+	   "Estimated memory per dictionary =%lu Bytes ≈ 2^%0.2f Bytes\n",
+	   l,
+	   dict_memory(given_nslots),
+	   log2(dict_memory(given_nslots)));
+
+    
+  }
   printf("sizeof(dict)=%lu bytes\n", sizeof(dict));
 
   return 0;
