@@ -29,7 +29,7 @@
 
 
 /*  huge pages */
-#include <sys/mman.h> 
+#include <sys/mman.h>
 /* 2 MiB page  */
 #define HPAGE_SIZE (1 << 21)
 
@@ -119,7 +119,7 @@
 /* #define NSLOTS_MY_NODE 8462608000LL */
 
 // 7*4 GiB 
-#define NSLOTS_MY_NODE (7516192768LL)
+#define NSLOTS_MY_NODE (7516192768LL >> 1)
 
 
 

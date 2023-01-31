@@ -25,7 +25,7 @@
 #include <mpi.h>
 #include "common.h"
 #include "sender.h"
-
+#include <sys/mman.h> 
 
 void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 { /* Send M immediately and clear the memory at the end  */
@@ -104,15 +104,23 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   size_t one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
                        + sizeof(CTR_TYPE); /* |dgst| + |ctr| - |known bits|*/
 
+  size_t snd_buf_size = one_pair_size * PROCESS_QUOTA * NSERVERS;
+  
   int server_number = -1;
   // { (server0 paris) | (server1 pairs) | ... | (serverK pairs) }
-  u8* snd_buf = (u8*) aligned_alloc(HPAGE_SIZE, one_pair_size
-				               *PROCESS_QUOTA
-				               *NSERVERS);
-  madvise(snd_buf,
-	  one_pair_size*PROCESS_QUOTA*NSERVERS,
-	  HPAGE_SIZE); /* 2MiB */
 
+  /* size_t snd_buf_size_aligned */
+  /* u8* snd_buf = (u8*) aligned_alloc(HPAGE_SIZE, one_pair_size */
+  /* 				               *PROCESS_QUOTA */
+  /* /\* 				               *NSERVERS); *\/ */
+  /* madvise(snd_buf, */
+  /* 	  one_pair_size*PROCESS_QUOTA*NSERVERS, */
+  /* 	 MADV_HUGEPAGE); /\* 2MiB *\/ */
+
+  /* u8* snd_buf = (u8*) malloc(snd_buf_size); */
+  snd_buf_size = snd_buf_size + (-snd_buf_size % HPAGE_SIZE);
+  u8* snd_buf = (u8*) aligned_alloc(HPAGE_SIZE, snd_buf_size);
+  madvise(snd_buf, HPAGE_SIZE, MADV_HUGEPAGE);
 
   /* Decide where to place the kth digest in server i buffer */
   // How many bytes are reserverd for each server in snd_buf

@@ -17,7 +17,7 @@
 #include <math.h>
 #include "shared.h"
 #include "util_char_arrays.h"
-
+#include <sys/mman.h> 
 #include <immintrin.h>
 
 //  how many bits we store as a value in dictionary
@@ -68,6 +68,10 @@ dict* dict_new(size_t nelements){
   d->nslots_per_bucket = nslots_per_bucket;
   d->nslots = (d->nbuckets)*(d->nslots_per_bucket);
 
+  /* for huge pages : required memory for nslots is a mutlipe GPAGE_SIZE  */
+  d->nslots = ((d->nslots*sizeof(VAL_TYPE)) / GPAGE_SIZE ) * GPAGE_SIZE;
+  d->nslots = d->nslots / sizeof(VAL_TYPE);
+    
   d->nelements = 0; /* how many elements currently in the dictionary */
   d->nelements_asked_to_be_inserted = 0;
 
@@ -79,10 +83,13 @@ dict* dict_new(size_t nelements){
   /* d->values = (VAL_TYPE*) aligned_alloc(ALIGNMENT, */
   /* 				      (nslots+d->nslots_per_bucket)*(sizeof(VAL_TYPE))); */
   d->values = (VAL_TYPE*) aligned_alloc(GPAGE_SIZE,
-				      (nslots+d->nslots_per_bucket)*(sizeof(VAL_TYPE)));
+					(d->nslots)*(sizeof(VAL_TYPE))
+					+ GPAGE_SIZE);
+             /* address sanitizer complains wihtout the above addition */
+
   madvise(d->values,
-	  (nslots+d->nslots_per_bucket)*(sizeof(VAL_TYPE)),
-	  GPAGE_SIZE);
+	  GPAGE_SIZE,
+	  MADV_HUGEPAGE);
   
   /* d->values = (VAL_TYPE*) malloc((nslots)*(sizeof(VAL_TYPE))); */
 
@@ -168,14 +175,15 @@ int dict_add_element_to(dict* d, u8* state){
 
     
     // found an empty slot inside a bucket
-     if (d->values[idx] == 0) { // found an empty slot
+    /* printf("idx=%llu, d->nslots=%lu\n", idx, d->nslots); */
+    if (d->values[idx] == 0) { // found an empty slot
       d->values[idx] = val;
       ++(d->nelements); /* successfully added an element */
       return 1;
-     }
+    }
 
 
-     ++idx;
+    ++idx;
     // reduce mod n->slots //
     if (idx >= d->nslots ) /* we forgot the equal sign here */
       idx = 0;
