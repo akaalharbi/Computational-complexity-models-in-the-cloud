@@ -161,7 +161,6 @@ void phase_i_store(CTR_TYPE msg_ctr,
   /* here we define how many parllel processors in phase iii */
   //size_t ncores = 14; // deadweight
   size_t k =  0; // server index
-  int should_NOT_stop = 1;
   /* size_t nhashes_stored = 0; */
 
   u32 ones = (1LL<<DIFFICULTY) - 1;
@@ -252,9 +251,9 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
       /* Recall that: */
       /* h = (dist_pt) || h1:=b0 ... b_ceil(log2(nservers)) || the rest   */
-      fwrite(&state_u8[DEFINED_BYTES], /* start  from "the rest" see above */
-	     sizeof(u8), /* smallest moving unit */
-	     (N-DEFINED_BYTES), /* len( (dist_pt)|| h1 ) = DEFINED_BITS */
+      fwrite(state_u8, /* start the beginning */
+	     sizeof(u8), 
+	     N, /* record the whole digest, even with defined bytes */
 	     data_to_servers[k]);
 
       ++nhashes_stored;

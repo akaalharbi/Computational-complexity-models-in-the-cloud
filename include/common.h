@@ -3,8 +3,8 @@
 
 void print_attack_information();
 
-u32 to_which_server(u8 MState[NWORDS_DIGEST * WORD_SIZE]);
-u32 to_which_server(u8 MState[NWORDS_DIGEST * WORD_SIZE]);
+
+u32 to_which_server(u8 MState[HASH_STATE_SIZE]);
 
 
 void find_hash_distinguished_old(u8 M[HASH_INPUT_SIZE], /* in, out*/
@@ -20,6 +20,6 @@ void find_hash_distinguished(u8 M[16][HASH_INPUT_SIZE], /* in*/
 			     const size_t dist_test /* in */);
 
 
-int is_dist_state(WORD_TYPE state[NWORDS_STATE * WORD_SIZE]);
+int is_dist_state(WORD_TYPE state[NWORDS_STATE * WORD_SIZE]); /* or [HASH_STATE_SIZE]*/
 
 int is_dist_msg(u8 M[HASH_INPUT_SIZE]);
