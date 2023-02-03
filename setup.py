@@ -1,3 +1,4 @@
+
 # Configure the arguments of the attack in config.h
 
 import argparse
@@ -9,6 +10,7 @@ def get_free_memory():
     with open("/proc/meminfo") as f:
         meminfo = f.read()
         matched = re.search(r"MemFree:\s+(\d+)", meminfo)
+    print(int(matched.groups()[0]))
 
     return int(matched.groups()[0])
 

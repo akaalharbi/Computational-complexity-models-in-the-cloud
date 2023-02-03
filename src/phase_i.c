@@ -72,7 +72,7 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
 
   
   fp = fopen("data/states", "r");
-  size_t nstates = get_file_size(fp)/(NWORDS_STATE*WORD_SIZE);
+  size_t nstates = get_file_size(fp)/HASH_STATE_SIZE;
   printf("Found %lu states saved\n"
 	 "We will truncate the file to multiple states size if necessary\n",
 	  nstates);
@@ -82,7 +82,7 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
 
   // in case of interruption, a partial state might be recorded
   // remove the partial state. 
-  truncate("data/states", nstates*NWORDS_STATE*WORD_SIZE);    
+  truncate("data/states", nstates*HASH_STATE_SIZE);    
   truncate("data/counters", nstates*sizeof(CTR_TYPE));
 
   if (nstates==0){
@@ -92,7 +92,7 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
   
   /* go to the last state */
   fseek(fp,
-	(nstates-1)*NWORDS_STATE*WORD_SIZE,
+	(nstates-1)*HASH_STATE_SIZE,
 	SEEK_SET); 
   
   fread(state, WORD_SIZE, NWORDS_STATE, fp);
@@ -239,7 +239,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
   
   /* if one server gets filled, it will */
-  while (should_NOT_stop) {
+  while (nhashes_stored < NHASHES) {
     // hash and extract n bits of the digest
     hash_single(state, M);
     msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
@@ -261,7 +261,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
       // decide should not stop or should stop?
       /* not the most optimal implementation */
-      should_NOT_stop = (nhashes_stored < NHASHES);
+      /* should_NOT_stop = (nhashes_stored < NHASHES); */
     
       // + save states after required amount of intervals
       if (nhashes_stored % interval == 0) {
@@ -283,10 +283,11 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	  fflush(data_to_servers[i]);
 
 	
-	printf("%2.4f%% ETA %0.4fsec, "
-	       "#hashes≈%lu, msg_ctr=%llu\n",
+	printf("%2.4f%%, ETA %0.4fsec, write %0.2f MB/S, "
+	       "#hashes≈%lu,  msg_ctr=%llu\n",
 	       100 * ((float) nhashes_stored) /  NHASHES,
 	       (end-start) * (NHASHES-nhashes_stored)/((float) interval),
+	       interval * N / ((end - start) * 1000000.0),
 	       nhashes_stored,
 	       msg_ctr_pt[0]);
 
@@ -321,8 +322,8 @@ int main(){
   /// inside each server.
 
   print_attack_information(); /* */
-  puts("========================================\n");
-  
+  puts("\n========================================\n");
+  printf("Going to store %0.2f kB\n", NHASHES*N / 1000.0);
   // -INIT: The number of Hashes each server will get
   CTR_TYPE msg_ctr = 0;
   size_t nhashes_stored = 0;
@@ -336,4 +337,3 @@ int main(){
   
 
 }
-

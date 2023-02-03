@@ -66,17 +66,17 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 9
+#define N 8
 
  /* store 2^L elements in the dictionary  */
-#define L 31
+#define L 32
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 0
+#define DIFFICULTY 4
 
 /* we are not going to hold more than 32 bits in a dict entry */
 #define MAX_VAL_SIZE 32 /* in bits */
@@ -119,7 +119,7 @@
 /* #define NSLOTS_MY_NODE 8462608000LL */
 
 // 7*4 GiB 
-#define NSLOTS_MY_NODE (7516192768LL >> 1)
+#define NSLOTS_MY_NODE 6389362000LL
 
 
 
