@@ -66,10 +66,10 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 9
+#define N 7
 
  /* store 2^L elements in the dictionary  */
-#define L 31
+#define L 24
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
@@ -118,8 +118,11 @@
 // How large is the dictionary in a server
 /* #define NSLOTS_MY_NODE 8462608000LL */
 
-// 7*4 GiB 
-#define NSLOTS_MY_NODE (7516192768LL >> 1)
+// 7*4 GiB
+#define TOTAL_RAM 33850432000LL
+#define NRECEIVERS_PER_NODE 2
+#define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
+
 
 
 
@@ -313,6 +316,10 @@
 
 #define NNEEDED_CND MAX(( (1LL << (DISCARDED_BITS+2)) ),\
 			  1)   /* @python  */
+
+/* #define NNEEDED_CND 5000 */
+		
+
 // (2^#disacrded_bits) / NSERVERS, however, it's not a strict requirement.
 //#define NNEEDED_CND_THIS_SERVER MAX(((1LL << DISCARDED_BITS) >> NSERVERS), 1)
   

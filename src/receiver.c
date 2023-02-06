@@ -130,33 +130,34 @@ static void load_file_to_dict(dict *d, FILE *fp)
 
   
   size_t nchunks = 10000; 
-  size_t ndigests = get_file_size(fp) / (N-DEFINED_BYTES);
+  size_t ndigests = get_file_size(fp) / N;
   size_t nmemb = (ndigests/nchunks >=  1) ? ndigests/nchunks : 1;
 
   /* read digests from file to this buffer  */
-  u8* digests = (u8*) malloc( (N-DEFINED_BYTES) * nmemb * sizeof(u8));
+  u8* digests = (u8*) malloc( N * nmemb * sizeof(u8));
 
 
   /*  load one chunk each time */
   for (size_t i = 0; i<nchunks; ++i) {
-    fread(digests, (N-DEFINED_BYTES), nmemb, fp);
+    fread(digests, N, nmemb, fp);
 
     /* add them to dictionary */
     for (size_t j=0; j<nmemb; ++j) 
       dict_add_element_to(d,
-			  &digests[j*(N-DEFINED_BYTES)] );
+			  &digests[j*N /* need to skip defined bytes */
+				   + DEFINED_BYTES] );
   }
 
   /* ndigests = nchunks*nmemb + remainder  */
   // read the remainder digests, since ndigests may not mutlipe of nchunks
-  u8 stream_pt[N-DEFINED_BYTES];
+  u8 stream_pt[N];
 
   /* add as many hashes as possible */
   while ( !feof(fp) ){
     // use fread with a larger buffer @todo
-    fread(stream_pt, sizeof(u8), (N-DEFINED_BYTES), fp);
+    fread(stream_pt, sizeof(u8), N, fp);
     /* it adds the hash iff nprobes <= NPROBES_MAX */
-    dict_add_element_to(d, stream_pt);
+    dict_add_element_to(d, &stream_pt[DEFINED_BYTES]);
   }
 
   free(digests);

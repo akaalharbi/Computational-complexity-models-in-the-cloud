@@ -283,10 +283,11 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	  fflush(data_to_servers[i]);
 
 	
-	printf("%2.4f%% ETA %0.4fsec, "
-	       "#hashes≈%lu, msg_ctr=%llu\n",
+	printf("%2.4f%%, ETA %0.4fsec, write %0.2f MB/S, "
+	       "#hashes≈%lu,  msg_ctr=%llu\n",
 	       100 * ((float) nhashes_stored) /  NHASHES,
 	       (end-start) * (NHASHES-nhashes_stored)/((float) interval),
+	       interval * N / ((end - start) * 1000000.0),
 	       nhashes_stored,
 	       msg_ctr_pt[0]);
 
@@ -321,8 +322,8 @@ int main(){
   /// inside each server.
 
   print_attack_information(); /* */
-  puts("========================================\n");
-  
+  puts("\n========================================\n");
+  printf("Going to store %0.2f kB\n", NHASHES*N / 1000.0);
   // -INIT: The number of Hashes each server will get
   CTR_TYPE msg_ctr = 0;
   size_t nhashes_stored = 0;

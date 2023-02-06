@@ -37,7 +37,7 @@ def compute_dict_size():
 
 def parse_config(N=None, L=None, NSERVERS=None, DIFFICULTY=None):
     """Edit N, L, NSERVERS, and DIFFICULTY."""
-    print(N, L, NSERVERS, DIFFICULTY)
+    print(f"N={N}, L={L}, NSERVERS={NSERVERS}, DIFFICUTLY={DIFFICULTY}")
 
     with open("include/config.h", "r") as f:
         lines = f.readlines()
@@ -60,9 +60,10 @@ def parse_config(N=None, L=None, NSERVERS=None, DIFFICULTY=None):
             lines[i] = f"#define DIFFICULTY {DIFFICULTY}\n"
             print("difficulty done")
 
-        if lines[i][:23] == "#define NSLOTS_MY_NODE ":
-            lines[i] = f"#define NSLOTS_MY_NODE {compute_dict_size()}LL\n"
-            print("Update nslots_my_node")
+        if lines[i][:17] == "#define TOTAL_RAM":
+            memory_left = 7*10**9
+            lines[i] = f"#define TOTAL_RAM {get_ram_size() - memory_left}LL\n"
+            print(f"Updated RAM will used = {get_ram_size() - memory_left}kb")
 
     with open("include/config.h", "w") as f:
         f.writelines(lines)
