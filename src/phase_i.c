@@ -72,7 +72,7 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
 
   
   fp = fopen("data/states", "r");
-  size_t nstates = get_file_size(fp)/(NWORDS_STATE*WORD_SIZE);
+  size_t nstates = get_file_size(fp)/HASH_STATE_SIZE;
   printf("Found %lu states saved\n"
 	 "We will truncate the file to multiple states size if necessary\n",
 	  nstates);
@@ -82,7 +82,7 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
 
   // in case of interruption, a partial state might be recorded
   // remove the partial state. 
-  truncate("data/states", nstates*NWORDS_STATE*WORD_SIZE);    
+  truncate("data/states", nstates*HASH_STATE_SIZE);    
   truncate("data/counters", nstates*sizeof(CTR_TYPE));
 
   if (nstates==0){
@@ -92,7 +92,7 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
   
   /* go to the last state */
   fseek(fp,
-	(nstates-1)*NWORDS_STATE*WORD_SIZE,
+	(nstates-1)*HASH_STATE_SIZE,
 	SEEK_SET); 
   
   fread(state, WORD_SIZE, NWORDS_STATE, fp);
@@ -161,7 +161,6 @@ void phase_i_store(CTR_TYPE msg_ctr,
   /* here we define how many parllel processors in phase iii */
   //size_t ncores = 14; // deadweight
   size_t k =  0; // server index
-  int should_NOT_stop = 1;
   /* size_t nhashes_stored = 0; */
 
   u32 ones = (1LL<<DIFFICULTY) - 1;
@@ -239,7 +238,7 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
   
   /* if one server gets filled, it will */
-  while (should_NOT_stop) {
+  while (nhashes_stored < NHASHES) {
     // hash and extract n bits of the digest
     hash_single(state, M);
     msg_ctr_pt[0]++; /* Increment 64bit of M by 1 */
@@ -252,16 +251,16 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
       /* Recall that: */
       /* h = (dist_pt) || h1:=b0 ... b_ceil(log2(nservers)) || the rest   */
-      fwrite(&state_u8[DEFINED_BYTES], /* start  from "the rest" see above */
-	     sizeof(u8), /* smallest moving unit */
-	     (N-DEFINED_BYTES), /* len( (dist_pt)|| h1 ) = DEFINED_BITS */
+      fwrite(state_u8, /* start the beginning */
+	     sizeof(u8), 
+	     N, /* record the whole digest, even with defined bytes */
 	     data_to_servers[k]);
 
       ++nhashes_stored;
 
       // decide should not stop or should stop?
       /* not the most optimal implementation */
-      should_NOT_stop = (nhashes_stored < NHASHES);
+      /* should_NOT_stop = (nhashes_stored < NHASHES); */
     
       // + save states after required amount of intervals
       if (nhashes_stored % interval == 0) {
@@ -337,4 +336,3 @@ int main(){
   
 
 }
-

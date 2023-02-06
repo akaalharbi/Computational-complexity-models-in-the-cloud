@@ -69,7 +69,11 @@
 #define N 7
 
  /* store 2^L elements in the dictionary  */
+
 #define L 24
+
+
+
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
@@ -106,7 +110,7 @@
 
 
 /* edit manually */
-#define NSERVERS 1
+#define NSERVERS 2
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
@@ -118,10 +122,15 @@
 // How large is the dictionary in a server
 /* #define NSLOTS_MY_NODE 8462608000LL */
 
+
 // 7*4 GiB
 #define TOTAL_RAM 33850432000LL
 #define NRECEIVERS_PER_NODE 2
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
+
+
+
+
 
 
 
