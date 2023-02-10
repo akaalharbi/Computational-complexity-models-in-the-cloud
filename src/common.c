@@ -35,7 +35,7 @@ void print_attack_information(){
          "NDEFINED BYTES=%d, NCND_NEEDED=%llu≈2^%0.4f,\n"
 	 "NDISCARDED_BITS=%d\n"
 	 "AVX_SIZE=%dbits, mask_ones=%d\n"
-	 "size",
+	 "NPROBES LOOK UP = %d\n",
 	 L,
 	 L_IN_BYTES,
 	 N,
@@ -51,9 +51,10 @@ void print_attack_information(){
 	 log2(NNEEDED_CND),
 	 DISCARDED_BITS,
 	 AVX_SIZE,
-	 (1<<DIFFICULTY) - 1);
+	 (1<<DIFFICULTY) - 1,
+	 (int) (NPROBES_MAX/SIMD_LEN));
 
-  
+  puts("-------------------------------\n");
   
 }
 

@@ -66,11 +66,11 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 7
+#define N 11
 
  /* store 2^L elements in the dictionary  */
 
-#define L 24
+#define L 30
 
 
 
@@ -126,12 +126,8 @@
 // 7*4 GiB
 #define TOTAL_RAM 33850432000LL
 #define NRECEIVERS_PER_NODE 2
-#define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
-
-
-
-
-
+#define NSLOTS_MY_NODE ((1LL<<L)>>1)
+/* #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE)) */
 
 
 

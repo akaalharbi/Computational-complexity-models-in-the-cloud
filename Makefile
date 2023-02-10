@@ -7,7 +7,7 @@
 
 
 # Part 1: Basic Flags in the compile and linking
-CC=scorep gcc
+CC = gcc
 
 # Doesn't work
 # MPI_INCLUDE := $(shell mpicc -showme:compile | grep -e . )
@@ -64,7 +64,7 @@ $(OBJDIR)/%.o: $(SRC)/%.c
 
 
 
-TARGETS = test phase_i phase_ii phase_iii
+TARGETS = benchmark phase_i phase_ii phase_iii
 
 # REMOVE TARGETS FROM $(OBJECTS)
 TARGET_OBJECTS = $(addprefix $(OBJDIR)/,  $(addsuffix .o, $(TARGETS)) )
@@ -88,7 +88,7 @@ all: $(TARGETS) lib
 # 1- remove all $(TARGETS) members from dependencies
 # 2- add X.o as a dependency
 
-test: $(OBJDIR)/test.o $(COMMON_OBJECTS)
+benchmark: $(OBJDIR)/benchmark.o $(COMMON_OBJECTS)
 	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 

@@ -20,7 +20,8 @@ obj/*
 phase_i
 phase_ii
 phase_iii
-
+test
+benchmark
 
 # Linker output
 *.ilk
