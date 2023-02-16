@@ -32,6 +32,27 @@
 // -----------------------------------------------------------------------------
 
 
+static void truncate_digests(){
+  /// Truncate all files in data/digests to a multiple of N bytes
+  char file_name[FILE_NAME_MAX_LENGTH];
+  size_t file_size; 
+  size_t ndigests;
+  FILE* fp;
+
+  for (size_t i = 0; i<NSERVERS; ++i){
+    snprintf(file_name, FILE_NAME_MAX_LENGTH, "data/digests/%lu", i);
+    fp = fopen(file_name, "r");
+    file_size = get_file_size(fp);
+    ndigests = file_size/N;
+    printf("file %s had %lu bytes\n", file_name, file_size);
+    
+    truncate(file_name, N*ndigests);
+    file_size = get_file_size(fp);
+    printf("file %s has %lu bytes\n", file_name, file_size);
+
+    fclose(fp);
+  }
+}
 
 
 // @todo rename file, and truncate 
@@ -114,6 +135,9 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
 
   *nhashes_stored = nstates * INTERVAL; /* approximately how many hashes stored*/
 
+  // Ensure that digests are multiple of N
+  truncate_digests();
+  
   printf("Loaded from disk: counter=%llu\n", *msg_ctr);
 }
 
@@ -282,11 +306,12 @@ void phase_i_store(CTR_TYPE msg_ctr,
 	  fflush(data_to_servers[i]);
 
 	
-	printf("%2.4f%%, ETA %0.4fsec, write %0.2f MB/S, "
+	printf("%2.4f%%, ETA %0.4fsec, write %0.2f MB/S, 2^%0.3f hashes/sec "
 	       "#hashes≈%lu,  msg_ctr=%llu\n",
 	       100 * ((float) nhashes_stored) /  NHASHES,
 	       (end-start) * (NHASHES-nhashes_stored)/((float) interval),
 	       interval * N / ((end - start) * 1000000.0),
+	       log2(interval / (end-start)),
 	       nhashes_stored,
 	       msg_ctr_pt[0]);
 

@@ -25,8 +25,31 @@
 #include "util_files.h"
 #include "common.h"
 #include <dirent.h>
+#include <unistd.h>
 // ------------------- Auxililary functions phase iii --------------------------
 //+ todo complete these functions
+
+static void truncate_messages(){
+  /// Truncate all files in data/messages to a multiple of HASH_INPUT_SIZE bytes
+  char file_name[FILE_NAME_MAX_LENGTH];
+  size_t file_size; 
+  size_t nmsgs;
+  FILE* fp;
+
+  for (size_t i = 0; i<NSERVERS; ++i){
+    snprintf(file_name, FILE_NAME_MAX_LENGTH, "data/messages/%lu", i);
+    fp = fopen(file_name, "r");
+    file_size = get_file_size(fp);
+    nmsgs = file_size/HASH_INPUT_SIZE;
+    printf("file %s had %lu bytes\n", file_name, file_size);
+    
+    truncate(file_name, HASH_INPUT_SIZE*nmsgs);
+    file_size = get_file_size(fp);
+    printf("file %s has %lu bytes\n", file_name, file_size);
+
+    fclose(fp);
+  }
+}
 
 
 
@@ -77,7 +100,9 @@ int main(int argc, char* argv[]) /* single machine */
   
   
   // ----------------------------- PART 1 ------------------------------------
-
+  /* Truncate messages to multiple of HASH_INPUT_SIZE */
+  truncate_messages();
+  
   /* load messages candidates, hash them, sort them */
   FILE* fp = fopen("data/messages/archive", "r");
   size_t nmsgs = (get_file_size(fp)) / HASH_INPUT_SIZE;
