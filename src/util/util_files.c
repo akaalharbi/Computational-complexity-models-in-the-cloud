@@ -16,7 +16,7 @@ size_t get_file_size(FILE *fp)
 
 
 
-void merge(FILE* fp_in, FILE* fp_out)
+void merge_file(FILE* fp_in, FILE* fp_out)
 {
   // Write the content of fp_in to fp_out.
 

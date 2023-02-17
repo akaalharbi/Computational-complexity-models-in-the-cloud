@@ -66,11 +66,11 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 11
+#define N 7
 
  /* store 2^L elements in the dictionary  */
 
-#define L 30
+#define L 32
 
 
 
@@ -110,7 +110,7 @@
 
 
 /* edit manually */
-#define NSERVERS 2
+#define NSERVERS 1
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
@@ -124,10 +124,9 @@
 
 
 // 7*4 GiB
-#define TOTAL_RAM 33850432000LL
-#define NRECEIVERS_PER_NODE 2
-#define NSLOTS_MY_NODE ((1LL<<L)>>1)
-/* #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE)) */
+#define TOTAL_RAM 20850444000LL
+#define NRECEIVERS_PER_NODE 1
+#define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
 
 
@@ -319,7 +318,7 @@
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
 
-#define NNEEDED_CND MAX(( (1LL << (DISCARDED_BITS+2)) ),\
+#define NNEEDED_CND MAX(( (1LL << (DISCARDED_BITS+3)) ),\
 			  1)   /* @python  */
 
 /* #define NNEEDED_CND 5000 */

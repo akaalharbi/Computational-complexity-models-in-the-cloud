@@ -29,13 +29,17 @@
 // ------------------- Auxililary functions phase iii --------------------------
 //+ todo complete these functions
 
-static void truncate_messages(){
+static void merge_truncate_messages(){
   /// Truncate all files in data/messages to a multiple of HASH_INPUT_SIZE bytes
+  /// Then merge them into archive file.
+
+  
   char file_name[FILE_NAME_MAX_LENGTH];
   size_t file_size; 
   size_t nmsgs;
   FILE* fp;
-
+  FILE* fp_archive = fopen("data/messages/archive", "w");
+  
   for (size_t i = 0; i<NSERVERS; ++i){
     snprintf(file_name, FILE_NAME_MAX_LENGTH, "data/messages/%lu", i);
     fp = fopen(file_name, "r");
@@ -47,6 +51,8 @@ static void truncate_messages(){
     file_size = get_file_size(fp);
     printf("file %s has %lu bytes\n", file_name, file_size);
 
+    /* add the content to archive */
+    merge_file(fp, fp_archive);
     fclose(fp);
   }
 }
@@ -101,7 +107,8 @@ int main(int argc, char* argv[]) /* single machine */
   
   // ----------------------------- PART 1 ------------------------------------
   /* Truncate messages to multiple of HASH_INPUT_SIZE */
-  truncate_messages();
+  /* Also, add all their content to archive  */
+  merge_truncate_messages();
   
   /* load messages candidates, hash them, sort them */
   FILE* fp = fopen("data/messages/archive", "r");
