@@ -66,7 +66,9 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 7
+#define N 8
+/* record the whole state after each each interval has passed */
+#define INTERVAL (1LL<<30)
 
  /* store 2^L elements in the dictionary  */
 
@@ -88,8 +90,6 @@
 
 /* how big is our counter */
 #define CTR_TYPE u64
-/* record the whole state after each each interval has passed */
-#define INTERVAL MAX((NHASHES>>10), 2) 
 
 
 // sanity check

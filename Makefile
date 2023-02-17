@@ -7,7 +7,7 @@
 
 
 # Part 1: Basic Flags in the compile and linking
-CC = scorep gcc
+CC = gcc
 
 # Doesn't work
 # MPI_INCLUDE := $(shell mpicc -showme:compile | grep -e . )
@@ -24,7 +24,7 @@ LDLIBS  =  $(MPI_LINK) -lm -L./lib/sha256_intel_avx/ -lsha256_avx
 
 LDFLAGS = -fopenmp -pthread -O3 -flto  #-fsanitize=address
 # note: -fanalyzer doesn't report when -flto is enabled
-CFLAGS =  -O3 -flto  -fopenmp -Wall -march=native -msha -fopt-info-all -g -fanalyzer #-fsanitize=address 
+CFLAGS =  -O3 -flto -fopenmp -Wall -march=native -msha -fopt-info-all -g -fanalyzer #-fsanitize=address 
 #CFLAGS += -DVERBOSE_LEVEL=2 
 
 
