@@ -70,7 +70,7 @@
 
  /* store 2^L elements in the dictionary  */
 
-#define L 32
+#define L 30
 
 
 

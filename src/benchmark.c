@@ -105,13 +105,11 @@ size_t time_sha_avx512(){
   #pragma omp parallel
   {
   size_t nmsgs = 1600000LL;
-  msg_avx* msgs = malloc(sizeof(msg_avx)*(nmsgs/16));  
-
+  msg_avx msg;
+  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
   // fill the messages
 
-  for (size_t i = 0; i<(nmsgs/16); ++i) {
-    getrandom(msgs[i].M , 16*HASH_INPUT_SIZE, 1);
-  }
+
 
   
   size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
@@ -123,7 +121,7 @@ size_t time_sha_avx512(){
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/16); ++i) {
-    state_ptr = sha256_multiple_oct(msgs[i].M);
+    state_ptr = sha256_multiple_x16(msg.M);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
@@ -141,6 +139,124 @@ size_t time_sha_avx512(){
 }
 
 
+size_t time_sha_avx512_single_thread(){
+  // place holder for the 16 messages
+
+
+
+  size_t nmsgs = 1600000LL;
+  msg_avx msg;
+  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
+  // fill the messages
+
+
+
+  
+  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
+  double elapsed = 0;
+  double start = wtime(); /* timing */
+
+
+  uint32_t state[8];
+  uint32_t* state_ptr = state;
+  
+  for (size_t i = 0; i<(nmsgs/16); ++i) {
+    state_ptr = sha256_multiple_x16(msg.M);
+    ctr += ((state[3] & 0xFF) == 0) ;
+  }
+
+  elapsed = wtime() - start;
+  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
+  
+  printf("single sha_avx512_16way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
+	 elapsed, (nmsgs)/elapsed,
+	 log2((nmsgs)/elapsed),
+	 hashed_MB/elapsed);
+
+
+  return 0;
+}
+
+
+size_t time_sha_avx256(){
+  // place holder for the 16 messages
+
+  #pragma omp parallel
+  {
+  size_t nmsgs = 8000000LL;
+  msg_avx msg;
+  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
+  // fill the messages
+
+
+
+  
+  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
+  double elapsed = 0;
+  double start = wtime(); /* timing */
+
+
+  uint32_t state[8];
+  uint32_t* state_ptr = state;
+  
+  for (size_t i = 0; i<(nmsgs/8); ++i) {
+    state_ptr = sha256_multiple_x16(msg.M);
+    ctr += ((state[3] & 0xFF) == 0) ;
+  }
+
+  elapsed = wtime() - start;
+  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
+  
+  printf("thd%d sha_8way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
+	 omp_get_thread_num(),
+	 elapsed, (nmsgs)/elapsed,
+	 log2((nmsgs)/elapsed),
+	 hashed_MB/elapsed);
+
+  }
+  return 0;
+}
+
+
+size_t time_sha_avx256_single(){
+  // place holder for the 16 messages
+
+
+
+  size_t nmsgs = 8000000LL;
+  msg_avx msg;
+  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
+  // fill the messages
+
+
+
+  
+  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
+  double elapsed = 0;
+  double start = wtime(); /* timing */
+
+
+  uint32_t state[8];
+  uint32_t* state_ptr = state;
+  
+  for (size_t i = 0; i<(nmsgs/8); ++i) {
+    state_ptr = sha256_multiple_x16(msg.M);
+    ctr += ((state[3] & 0xFF) == 0) ;
+  }
+
+  elapsed = wtime() - start;
+  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
+  
+  printf("single sha_8way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
+	 elapsed, (nmsgs)/elapsed,
+	 log2((nmsgs)/elapsed),
+	 hashed_MB/elapsed);
+
+
+  return 0;
+}
+
+
 
 int main(int argc, char *argv[])
 {
@@ -153,6 +269,13 @@ int main(int argc, char *argv[])
 
 
   time_sha_avx512();
+  puts("==============================================\n");
+  time_sha_avx512_single_thread();
+  puts("==============================================\n");
+  time_sha_avx256();
+  puts("==============================================\n");
+  time_sha_avx256_single();
+  puts("==============================================\n");
   
   printf("sizeof(dict)=%lu bytes\n", sizeof(dict));
 
