@@ -7,7 +7,7 @@
 
 
 # Part 1: Basic Flags in the compile and linking
-CC = scorep gcc
+CC = gcc
 
 # Doesn't work
 # MPI_INCLUDE := $(shell mpicc -showme:compile | grep -e . )

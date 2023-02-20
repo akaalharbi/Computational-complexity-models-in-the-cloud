@@ -139,6 +139,73 @@ size_t time_sha_avx512(){
 }
 
 
+
+size_t time_sha_one_avx512_other_sha_ni(){
+  // place holder for the 16 messages
+
+  #pragma omp parallel
+  {
+  if (omp_get_thread_num() == 0) {
+  size_t nmsgs = 16000000LL;
+  msg_avx msg;
+  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
+  // fill the messages
+
+
+
+  
+  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
+  double elapsed = 0;
+  double start = wtime(); /* timing */
+
+
+  uint32_t state[8];
+  uint32_t* state_ptr = state;
+  
+  for (size_t i = 0; i<(nmsgs/16); ++i) {
+    state_ptr = sha256_multiple_x16(msg.M);
+    ctr += ((state[3] & 0xFF) == 0) ;
+  }
+
+  elapsed = wtime() - start;
+  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
+  
+  printf("thd%d sha_avx512_16way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
+	 omp_get_thread_num(),
+	 elapsed, (nmsgs)/elapsed,
+	 log2((nmsgs)/elapsed),
+	 hashed_MB/elapsed);
+
+  } else {
+    size_t nmsgs = 1600000LL;
+    u8 M[64] = {0};
+    getrandom(M, 64, 1);
+    uint32_t state[8] = {HASH_INIT_STATE};
+    double elapsed = 0;
+    size_t dummy = 0;
+    double start = wtime(); /* timing */
+    for (size_t i = 0; i<nmsgs; ++i) {
+      hash_single(state, M);
+    }
+
+    elapsed = wtime() - start;
+    double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
+
+    printf("thd%d sha_ni elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
+	   omp_get_thread_num(),
+	   elapsed, (nmsgs)/elapsed,
+	   log2((nmsgs)/elapsed),
+	   hashed_MB/elapsed);
+    printf("%lu\n", dummy);
+    
+    
+  }
+
+  }
+  return 0;
+}
+
+
 size_t time_sha_avx512_single_thread(){
   // place holder for the 16 messages
 
@@ -268,14 +335,16 @@ int main(int argc, char *argv[])
 	 log2(dict_memory(NSLOTS_MY_NODE)));
 
 
-  time_sha_avx512();
-  puts("==============================================\n");
+  /* time_sha_avx512(); */
+  /* puts("==============================================\n"); */
   time_sha_avx512_single_thread();
-  puts("==============================================\n");
-  time_sha_avx256();
-  puts("==============================================\n");
-  time_sha_avx256_single();
-  puts("==============================================\n");
+  /* puts("==============================================\n"); */
+  /* time_sha_one_avx512_other_sha_ni(); */
+  /* puts("==============================================\n"); */
+  /* time_sha_avx256(); */
+  /* puts("==============================================\n"); */
+  /* time_sha_avx256_single(); */
+  /* puts("==============================================\n"); */
   
   printf("sizeof(dict)=%lu bytes\n", sizeof(dict));
 
