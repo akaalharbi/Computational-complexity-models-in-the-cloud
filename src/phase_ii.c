@@ -79,18 +79,39 @@ int main(int argc, char* argv[])
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nproc);
 
+
+  /* Variables for the inter-communicator */
+  /* color 0 group -> color 1 group i.e. */
+  /* senders group send to receivers group :) */
+  MPI_Comm local_comm, inter_comm;
+
+  /* color: 1 for recievers, 0 for senders */
+  int color = (myrank < NSERVERS);
+
+  /* Create a local communicator: */
+  /* (senders has a local comm), (receivers has a local comme) */
+  MPI_Comm_split(MPI_COMM_WORLD, color, myrank, &local_comm);
+  
   /* How many procs that are going t send */
   int nsenders = nproc - NSERVERS;
-  /* int nreceivers = NSERVERS; */
+
   printf("There are %d senders\n", nsenders);
 
 
   // Who am I? a sender,  or a receiver?
   if (myrank >= NSERVERS){
-    sender(myrank, MPI_COMM_WORLD); /* never ends :) */
+    /* Creat inter-comm from sender point of view:  */
+    /* local leader: local rank 0, remote leader: global rank NSERVES, tag=0  */
+    MPI_Intercomm_create(local_comm, 0, MPI_COMM_WORLD, NSERVERS, 0, &inter_comm);
+
+    sender(myrank, inter_comm); /* never ends :) */
   }
   else if (myrank < NSERVERS){ /* receiver, repeat infinitely  */
-    receiver(myrank, MPI_COMM_WORLD, nsenders);
+    /* Creat inter-comm from sender point of view:  */
+    /* local leader: local rank 0(global rank NSERVERS), remote leader: global rank 0, tag=0  */
+    MPI_Intercomm_create(local_comm, 0, MPI_COMM_WORLD, 0, 0, &inter_comm);
+
+    receiver(myrank, inter_comm, nsenders);
   }
 
 

@@ -66,13 +66,13 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 8
+#define N 12
 /* record the whole state after each each interval has passed */
 #define INTERVAL (1LL<<30)
 
  /* store 2^L elements in the dictionary  */
 
-#define L 30
+#define L 43
 
 
 
