@@ -22,6 +22,7 @@ phase_ii
 phase_iii
 test
 benchmark
+verify_data
 
 # Linker output
 *.ilk

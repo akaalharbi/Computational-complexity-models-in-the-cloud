@@ -27,7 +27,7 @@
 #include "sender.h"
 #include <sys/mman.h> 
 
-void send_random_message_template(u8 M[HASH_INPUT_SIZE])
+static void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 { /* Send M immediately and clear the memory at the end  */
   
   MPI_Request requests[NSERVERS]; /* they will be used only here  */
@@ -48,6 +48,14 @@ void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 } /* clear stack variables */
 
 
+static void regenerate_long_message_digests(){
+  /// The long message has been sent in a reduced form to save space on the hard disk
+  /// Each process will take a unique part of the file data/states and compute enough
+  /// hashes.
+  1+1;
+}
+
+
 
 void sender(int myrank, MPI_Comm mpi_communicator)
 {
@@ -64,10 +72,43 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
   /* M = 64bit ctr || 64bit nonce || random value */
 
+  // @todo edit this part
   u8 M[HASH_INPUT_SIZE]; /* random message base */
+
   // 16 messages for avx, each message differs from the other in the counter part
   u8 Mavx[16][HASH_INPUT_SIZE];  /* except counter, they are all the same */
 
+  // Save the distinguished stata here.
+  WORD_TYPE Mstate[NWORDS_STATE] = {HASH_INIT_STATE};
+  size_t one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
+                       + sizeof(CTR_TYPE); /* |dgst| + |ctr| - |known bits|*/
+
+  size_t snd_buf_size = one_pair_size * PROCESS_QUOTA * NSERVERS;
+  
+  int server_number = -1;
+  // { (server0 paris) | (server1 pairs) | ... | (serverK pairs) }
+
+  /* u8* snd_buf = (u8*) malloc(snd_buf_size); */
+  snd_buf_size = snd_buf_size + (-snd_buf_size % HPAGE_SIZE);
+  u8* snd_buf = (u8*) aligned_alloc(HPAGE_SIZE, snd_buf_size);
+  madvise(snd_buf, HPAGE_SIZE, MADV_HUGEPAGE);
+
+  /* Decide where to place the kth digest in server i buffer */
+  // How many bytes are reserverd for each server in snd_buf
+  size_t nbytes_per_server = one_pair_size * PROCESS_QUOTA;
+
+  
+  size_t offset = 0; /* which index within a  server buffer should we pick */
+
+  // use the mask to decide if the digest is distinguished or not.
+  /* it's distinguished if (mask_test & diges) == 0 */
+  const u64 mask_test = (1LL<<DIFFICULTY) - 1; 
+
+  /* pos i: How many messages we've generated to be sent to server i? */
+  u64 servers_ctr[NSERVERS] = {0};
+  int snd_ctr = 0; /* how many messages have been sent */
+
+  // ---------------------------------------------------------------------------
   
   /* Get a random message only once */
   CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* counter pointer */
@@ -85,13 +126,18 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   snprintf(txt, sizeof(txt), "sender #%d template=", myrank);
   print_byte_txt(txt, M,HASH_INPUT_SIZE);
   puts("\n");
+
   
   // ----------------------------- PART 1 --------------------------------- //
+  // Regenrate the long message in parallel!                                //
+  regenerate_long_message_digests();
+
+  // ----------------------------- PART 2 --------------------------------- //
   // 1-  Sen the initial input to all receiving servers 
   send_random_message_template(M);
 
 
-  // ------------------------------ PART 2 ----------------------------------- +
+  // ------------------------------ PART 3 ----------------------------------- +
   // 1- generate disitingusihed hashes                                         |
   // 2- decide which server should probe the disitingusihed hash               |
   // 3- if server i buffer has enough hashes, send them immediately.           |
@@ -100,44 +146,11 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   // dgst := N bytes of the digest                                             |
   // ctr  := (this is a shortcut that allows us not to send the whole message) |
   //---------------------------------------------------------------------------+
-  WORD_TYPE Mstate[NWORDS_STATE] = {HASH_INIT_STATE};
-  size_t one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
-                       + sizeof(CTR_TYPE); /* |dgst| + |ctr| - |known bits|*/
 
-  size_t snd_buf_size = one_pair_size * PROCESS_QUOTA * NSERVERS;
-  
-  int server_number = -1;
-  // { (server0 paris) | (server1 pairs) | ... | (serverK pairs) }
-
-  /* size_t snd_buf_size_aligned */
-  /* u8* snd_buf = (u8*) aligned_alloc(HPAGE_SIZE, one_pair_size */
-  /* 				               *PROCESS_QUOTA */
-  /* /\* 				               *NSERVERS); *\/ */
-  /* madvise(snd_buf, */
-  /* 	  one_pair_size*PROCESS_QUOTA*NSERVERS, */
-  /* 	 MADV_HUGEPAGE); /\* 2MiB *\/ */
-
-  /* u8* snd_buf = (u8*) malloc(snd_buf_size); */
-  snd_buf_size = snd_buf_size + (-snd_buf_size % HPAGE_SIZE);
-  u8* snd_buf = (u8*) aligned_alloc(HPAGE_SIZE, snd_buf_size);
-  madvise(snd_buf, HPAGE_SIZE, MADV_HUGEPAGE);
-
-  /* Decide where to place the kth digest in server i buffer */
-  // How many bytes are reserverd for each server in snd_buf
-  size_t nbytes_per_server = one_pair_size * PROCESS_QUOTA;
-  size_t offset = 0; /* which index within a  server buffer should we pick */
-
-  // use the mask to decide if the digest is distinguished or not.
-  /* it's distinguished if (mask_test & diges) == 0 */
-  const u64 mask_test = (1LL<<DIFFICULTY) - 1; 
-
-  /* pos i: How many messages we've generated to be sent to server i? */
-  u64 servers_ctr[NSERVERS] = {0};
-  int snd_ctr = 0; /* how many messages have been sent */
 
 
   
-  // ------------------------------ PART 2 ----------------------------------- +
+  // ------------------------------ PART 4 ----------------------------------- +
   // Generate hashes and send them 
   double time_start = wtime(); 
   printf("sender #%d: done init mpi, and sharing the its template."
@@ -174,8 +187,8 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
     /* After the counter save N-DEFINED_BYTES of MState */
     memcpy( &snd_buf[offset + sizeof(CTR_TYPE)], /* copy digest to snd_buf[offset] */
-	    ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
-	    N-DEFINED_BYTES );
+	    ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes, @todo skip the left most bytes */
+	    N-DEFINED_BYTES ); /* nbytes to be sent, compressed state. */
 
     servers_ctr[server_number] += 1;
     

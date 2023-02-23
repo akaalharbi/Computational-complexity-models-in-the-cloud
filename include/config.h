@@ -66,11 +66,13 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 7
+#define N 12
+/* record the whole state after each each interval has passed */
+#define INTERVAL (1LL<<30)
 
  /* store 2^L elements in the dictionary  */
 
-#define L 30
+#define L 43
 
 
 
@@ -88,8 +90,6 @@
 
 /* how big is our counter */
 #define CTR_TYPE u64
-/* record the whole state after each each interval has passed */
-#define INTERVAL MAX((NHASHES>>10), 2) 
 
 
 // sanity check
@@ -145,10 +145,13 @@
 #ifndef LONG_MESSAGE_MPI_CONFIG
 
 #define LONG_MESSAGE_MPI_CONFIG
+
 #define TAG_DICT_SND 0 /* send digest tag */
-#define TAG_RANDOM_MESSAGE 1
-#define TAG_SND_DGST 2
-#define TAG_MESSAGES_CANDIDATES 3
+/* rehashing defined part of long messageg is done for process i */
+#define TAG_DONE_HASHING 1
+#define TAG_RANDOM_MESSAGE 2
+#define TAG_SND_DGST 3
+#define TAG_MESSAGES_CANDIDATES 4
 #define ARCHIVE_SERVER NSERVERS
 // WHAT IS BUFF_SIZE? It doesn't seem to be used!
 //#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand

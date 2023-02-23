@@ -22,9 +22,9 @@ MPI_LINK = -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
 INCLUDE = -Iinclude $(MPI_INCLUDE)
 LDLIBS  =  $(MPI_LINK) -lm -L./lib/sha256_intel_avx/ -lsha256_avx 
 
-LDFLAGS = -fopenmp -pthread -O3 -flto  #-fsanitize=address
+LDFLAGS = -g -fopenmp -pthread -O3 -flto  #-fsanitize=address
 # note: -fanalyzer doesn't report when -flto is enabled
-CFLAGS =  -O3 -flto  -fopenmp -Wall -march=native -msha -fopt-info-all -g -fanalyzer #-fsanitize=address 
+CFLAGS =  -g -O3 -flto -fopenmp -Wall -march=native -msha -fopt-info-all -g -fanalyzer #-fsanitize=address 
 #CFLAGS += -DVERBOSE_LEVEL=2 
 
 
@@ -64,7 +64,7 @@ $(OBJDIR)/%.o: $(SRC)/%.c
 
 
 
-TARGETS = benchmark phase_i phase_ii phase_iii
+TARGETS = verify_data benchmark phase_i phase_ii phase_iii
 
 # REMOVE TARGETS FROM $(OBJECTS)
 TARGET_OBJECTS = $(addprefix $(OBJDIR)/,  $(addsuffix .o, $(TARGETS)) )
@@ -87,6 +87,9 @@ all: $(TARGETS) lib
 # we wish to build X:
 # 1- remove all $(TARGETS) members from dependencies
 # 2- add X.o as a dependency
+
+verify_data: $(OBJDIR)/verify_data.o $(COMMON_OBJECTS)
+	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 benchmark: $(OBJDIR)/benchmark.o $(COMMON_OBJECTS)
 	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
