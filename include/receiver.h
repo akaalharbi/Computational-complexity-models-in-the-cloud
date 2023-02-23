@@ -8,7 +8,7 @@
 #include "config.h"
 #include <mpi.h>
 
-void receiver(int myrank, MPI_Comm mpi_communicator, int nsenders);
+void receiver(int local_rank, int nsenders, MPI_Comm inter_comm);
 
 
 #endif 

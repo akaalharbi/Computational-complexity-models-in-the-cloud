@@ -27,7 +27,12 @@
 #include "shared.h" // shared variables for duplicate 
 #include "memory.h"
 #include "util_files.h"
-//#include <sys/random.h> // probably deadweight getrandom(void *buffer, size_t length, 1 
+//#include <sys/random.h> // probably deadweight getrandom(void *buffer, size_t
+//length, 1
+
+// @todo we can deduce counter in was_state_written_on_diesk from the nstates
+// we should simplify the code, and having few break points.
+
 
 // -----------------------------------------------------------------------------
 

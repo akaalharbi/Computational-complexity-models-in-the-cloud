@@ -62,7 +62,11 @@ static inline int lookup_multi_save(dict *d,
   // |full-msg| = NWORDS_INPUT*WORD_SIZE (config.h) it can be constructed     |
   // using msg and template.                                                  |
   // |dgst| = N-DEFINED_BYTES (should be N,but we skip know bits .e.g nserver)|
+  // - This function doesn't need the sender rank, it alread has the sender's |
+  //   template.                                                              |
   // -------------------------------------------------------------------------+
+
+
   /* the stream size is multiple of one_pair size */
   static int one_pair_size = sizeof(CTR_TYPE) + (N-DEFINED_BYTES)*sizeof(u8);
 
@@ -111,7 +115,12 @@ static inline int lookup_multi_save(dict *d,
 
 // -----------------------------------------------------------------------------
 // local function
-static void load_file_to_dict(dict *d, FILE *fp)
+// this function should be rewritten @todo 
+static void write_digest_to_dict(dict *d,
+				  u8* restrict rcv_buf,
+				  u8* restrict add_buf,
+				  const int nsenders,
+				  MPI_Comm inter_comm)
 {
   // ==========================================================================+
   // Summary: Load hashes from the file *fp, and try to store them in dict *d  |
@@ -122,83 +131,71 @@ static void load_file_to_dict(dict *d, FILE *fp)
   // `*fp` : File contain number of hashes larger than nelements               |
   // ==========================================================================+
 
-  /* Check that file exists, the file comes from external resources */  
-  if (!fp){
-    puts("I have been given a file that lives in nowhere");
-    return; // raise an error instead
-  }
+  // @todo note: not to forget we will change the direction right most bytes
+  // contain the distinguished point zeros and the bits.
+  MPI_Status status;
+  MPI_Request request;
 
   
-  size_t nchunks = 10000; 
-  size_t ndigests = get_file_size(fp) / N;
-  size_t nmemb = (ndigests/nchunks >=  1) ? ndigests/nchunks : 1;
-
-  /* read digests from file to this buffer  */
-  u8* digests = (u8*) malloc( N * nmemb * sizeof(u8));
+  /* A sender will send a 0 tag if it needs to hash more, otherwise it will send tag = 1 */
+  int ncompleted_senders = 0; 
+  size_t rcv_size = PROCESS_QUOTA*N;
 
 
-  /*  load one chunk each time */
-  for (size_t i = 0; i<nchunks; ++i) {
-    fread(digests, N, nmemb, fp);
+  //---------------------------------------------------------------------------+
+  // Receive digests and add them to dictionary
+  
+  /* Receive one message before */
+  MPI_Recv(rcv_buf,
+	   rcv_size,
+	   MPI_UNSIGNED_CHAR,
+	   MPI_ANY_SOURCE,
+	   MPI_ANY_TAG,
+	   inter_comm,
+	   &status);
+  
+  ncompleted_senders += status.MPI_TAG;
+
+  /* copy the received message and listen immediately */
+  memcpy(add_buf, rcv_buf, rcv_size);
+
+    
+
+  while (ncompleted_senders < nsenders) {
+    MPI_Irecv(rcv_buf, /* store in this location */
+	      rcv_size, /* How many bytes to receive  */
+	      MPI_UNSIGNED_CHAR,
+	      MPI_ANY_SOURCE, /* any sender */
+	      MPI_ANY_TAG,  /* tag = 1 means a sender has done its work */ 
+	      inter_comm,
+	      &request);
+
 
     /* add them to dictionary */
-    for (size_t j=0; j<nmemb; ++j) 
-      dict_add_element_to(d,
-			  &digests[j*N /* need to skip defined bytes */
-				   + DEFINED_BYTES] );
+    for (size_t j=0; j<PROCESS_QUOTA; ++j) 
+      dict_add_element_to(d, &add_buf[N*j]);
+
+
+    MPI_Wait(&request, &status);
+
+    ncompleted_senders += status.MPI_TAG;
   }
 
-  /* ndigests = nchunks*nmemb + remainder  */
-  // read the remainder digests, since ndigests may not mutlipe of nchunks
-  u8 stream_pt[N];
 
-  /* add as many hashes as possible */
-  while ( !feof(fp) ){
-    // use fread with a larger buffer @todo
-    fread(stream_pt, sizeof(u8), N, fp);
-    /* it adds the hash iff nprobes <= NPROBES_MAX */
-    dict_add_element_to(d, &stream_pt[DEFINED_BYTES]);
-  }
-
-  free(digests);
   return;
 }
 
 
-static inline void receiver_process_get_template(int myrank, int nproc, int nsenders, u8* templates)
-{
-
-  //---------------------------------------------------------------------------+
-  // --- : receive the initial inputs from all generating processors 
-  //---------------------------------------------------------------------------+
-
-  // process : 0 -> NSERVERS - 1 (receivers),
-  //         : NSERVERS -> nproc (senders)
-
-  MPI_Status status;
-
-  for (int i=0; i<nsenders; ++i){
-    //printf("receiver %d is listening to %d for the template\n", myrank, i + NSERVERS);
-    MPI_Recv(&templates[i*HASH_INPUT_SIZE],
-	     HASH_INPUT_SIZE,
-	     MPI_UNSIGNED_CHAR,
-	     i + NSERVERS, /*  */
-	     TAG_RANDOM_MESSAGE,
-	     MPI_COMM_WORLD,
-	     &status);
-
-  }
-}
 
 
 
-
-
-void receiver_process_task(dict* d,
-			   int myrank,
-			   int nproc,
-			   int nsenders,
-			   u8* templates )
+void receiver_process_task(int const myrank,
+			   size_t const rcv_array_size,
+			   dict* restrict d,
+			   u8* restrict templates,
+			   u8* restrict rcv_buf,
+			   u8* restrict lookup_buf,
+			   MPI_Comm inter_comm)
 {
   // todo check the loops, currently they are errornous!
   //---------------------------------------------------------------------------+
@@ -219,22 +216,13 @@ void receiver_process_task(dict* d,
   snprintf(file_name, sizeof(file_name), "data/messages/%d", myrank );
   FILE* fp = fopen(file_name, "a");
 
-  int one_pair_size = sizeof(u8)*(N-DEFINED_BYTES)
-                    + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
   
-  //+ receive message in this buffer
-  u8* rcv_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
-  
-  //+ copy rcv_buf to lookup_buf then listen to other sender using rcv_buf
-  u8* lookup_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
-
-  size_t rcv_array_size = one_pair_size*PROCESS_QUOTA;
   /* u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd); */
   
   MPI_Status status;
   MPI_Request request;
 
-  int* indices = (int*)malloc(sizeof(int)*nproc);
+  /* int* indices = (int*)malloc(sizeof(int)*nproc); */
 
   /* How many candidates were stored? and remove partial candidates */
   size_t nfound_cnd = get_file_size(fp) / HASH_INPUT_SIZE ;
@@ -258,7 +246,7 @@ void receiver_process_task(dict* d,
 	   MPI_UNSIGNED_CHAR,
 	   MPI_ANY_SOURCE,
 	   TAG_SND_DGST,
-	   MPI_COMM_WORLD,
+	   inter_comm,
 	   &status);
 
 
@@ -271,8 +259,8 @@ void receiver_process_task(dict* d,
   /* print_char(lookup_buf, rcv_array_size); */
   /* puts("-=-=-=-=-=-=-=-=-=-=-=-=-="); */
   
-  /* 1st sender has rank = NSERVER -scaling-> 1st sender name = 0 */
-  sender_name_scaled = status.MPI_SOURCE - NSERVERS; // who sent the message?
+  /* The sender rank in its respective local group  */
+  sender_name_scaled = status.MPI_SOURCE; // - NSERVERS; // who sent the message?
 
 
   while (NNEEDED_CND > nfound_cnd) {    
@@ -283,21 +271,21 @@ void receiver_process_task(dict* d,
 	      MPI_UNSIGNED_CHAR,
 	      MPI_ANY_SOURCE, /* sender */
 	      TAG_SND_DGST, 
-	      MPI_COMM_WORLD,
+	      inter_comm,
 	      &request);
 
-
-    // probe these messages and update the founded candidates
     /* printf("recv#%d probing sender #%d messages\n", */
     /* 	   myrank, sender_name_scaled); */
+
+    /* probe these messages and update the founded candidates */
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
 				    lookup_buf, /* messages to search in d */
 				    &templates[sender_name_scaled
 					       *HASH_INPUT_SIZE],
 				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
 				    fp, /* file to record cadidates */
-				    myrank,
-				    sender_name_scaled + NSERVERS);
+				    myrank, /* was-this only for debugging? */
+				    sender_name_scaled);
 
 
     if (nfound_cnd - old_nfound_candidates > 0) {
@@ -312,7 +300,7 @@ void receiver_process_task(dict* d,
 
 
    
-    sender_name_scaled = status.MPI_SOURCE - NSERVERS; // get the name of the new sender
+    sender_name_scaled = status.MPI_SOURCE; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
 
     /* printf("from %d:\n", status.MPI_SOURCE); */
@@ -323,7 +311,7 @@ void receiver_process_task(dict* d,
 
   // good job
   free(rcv_buf);
-  free(indices);
+  /* free(indices); */
   fclose(fp);
 
   printf("recv #%d done a good job\n", myrank);
@@ -332,28 +320,53 @@ void receiver_process_task(dict* d,
 }
 
 
-void receiver(int myrank, MPI_Comm mpi_communicator, int nsenders)
+void receiver(int local_rank, 
+	      int nsenders, /* How many senders in the remote group  */
+	      MPI_Comm inter_comm)
 {
   //--------------------------------------------------------------------------+
   // I'm a receiving process: receive hashes, probe them, and send candidates |
   // Process Numbers: [0,  NSERVERS - 1]                                      |
+  // inter_comm: for communicating with senders/                              |
+  // locaL_comm: essentially there is no communications going in this comm    |
   //--------------------------------------------------------------------------+
 
-  int nproc;
-  MPI_Comm_size(mpi_communicator, &nproc);  
+
+  //------------------------ INIT VARIABLES ----------------------------------+
+
+  int const  one_pair_size = sizeof(u8)*N
+                           + sizeof(CTR_TYPE); /* |dgst| + |ctr| */
+
+  size_t const rcv_array_size = one_pair_size*PROCESS_QUOTA;
+  
+  // receive message in this buffer regardless if it's pure digests or
+  // ctr||digests 
+  u8* rcv_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
+  
+  //+ copy rcv_buf to lookup_buf then listen to other sender using rcv_buf
+  u8* lookup_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
+
+
+
+  /* save initial random messages of each sender here  */
   u8* templates = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nsenders);
 
-  // PART 1: LOAD dictionary
+
   char txt[100];
-  snprintf(txt, sizeof(txt), "recv#%d before dict load", myrank);
+  snprintf(txt, sizeof(txt), "recv#%d before dict load", local_rank);
   print_memory_usage(txt);
 
   dict* d = dict_new(NSLOTS_MY_NODE);
   double time_start = wtime();
-  char file_name[FILE_NAME_MAX_LENGTH];
-  snprintf(file_name, sizeof(file_name), "data/digests/%d", myrank);
-  FILE* fp = fopen(file_name, "r");
-  load_file_to_dict(d, fp);
+
+
+  //--------------------------------- PART 1    -------------------------------+
+  // PART 1: Get the long message digests from all senders
+  write_digest_to_dict(d,
+		       rcv_buf,
+		       lookup_buf,
+		       nsenders,
+		       inter_comm);
 
 
   printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
@@ -361,25 +374,35 @@ void receiver(int myrank, MPI_Comm mpi_communicator, int nsenders)
 	 "It has %lu elms, file has %lu elms\n"
 	 "d->nslots = %lu, d->nelements=%lu, filling rate=%f \n"
 	 "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n",
-	 myrank, wtime() - time_start,
+	 local_rank, wtime() - time_start,
 	 d->nelements, d->nelements_asked_to_be_inserted,
 	 d->nslots, d->nelements,
 	 ((float) d->nelements)/d->nslots);
 
-  snprintf(txt, sizeof(txt), "recv#%d after  dict load", myrank);
+  snprintf(txt, sizeof(txt), "recv#%d after  dict load", local_rank);
   print_memory_usage(txt);
-  fclose(fp);
+
 
 
   
   // PART 2: Get templates from all senders
-  receiver_process_get_template(myrank, nproc, nsenders, templates);
+  MPI_Allgather(NULL, 0, NULL, /* receivers don't send */
+		templates, /* save messages here */
+		HASH_INPUT_SIZE,
+		MPI_UNSIGNED_CHAR,
+		inter_comm);
 
   // PART 3: Get templates from all senders
   /* listen to senders, probe their digest, in case a candidate is found: */
   /* save the message the generates the cadidate digest. */
   /* exit when enough number of candidates are found i.e. NNEEDED_CND */
-  receiver_process_task(d, myrank, nproc, nsenders, templates);
+  receiver_process_task(local_rank,
+			rcv_array_size,
+			d, /* dictionary pointer  */
+			templates,
+			rcv_buf,
+			lookup_buf,
+			inter_comm);
 
 
   free(templates);
