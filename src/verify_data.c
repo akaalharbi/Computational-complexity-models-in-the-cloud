@@ -34,7 +34,7 @@ int check_hashes_interval(const WORD_TYPE state_befoe[NWORDS_STATE],
   }
 
   
-  return (memcmp(state, state_after, HASH_STATE_SIZE) == 0);
+  return memcmp(state, state_after, HASH_STATE_SIZE);
   
 }
 // @todo discovered a bug in when phase_i rerun again
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
 
 
 
-  u64 state_number = 3718;
+  u64 state_number = 5101;
 
   u64 ctr = state_number*INTERVAL;
   
@@ -74,17 +74,13 @@ int main(int argc, char *argv[])
 
   
 
-
-
-
-
   int nbytes_non_equal = check_hashes_interval(state_before,
 					       state_after,
 					       ctr);
 
   int is_corrupt = (0 != nbytes_non_equal);
 
-
+  printf("nbytes_non_equal=%d\n", nbytes_non_equal);
   printf("Found a corrupt state? %d\n", is_corrupt);
 
   fclose(fp);

@@ -7,7 +7,7 @@
 #include <mpi.h>
 
 
-void sender(MPI_Comm inter_comm);
 
+void sender(int myrank, MPI_Comm mpi_communicator);
 
 #endif

@@ -61,10 +61,8 @@
 
 
 // @todo rename file, and truncate 
-void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
-			       size_t* nhashes_stored, /* out */
-			       WORD_TYPE state[NWORDS_STATE] /* out */
-			       )
+int load_checkpoint(WORD_TYPE state[NWORDS_STATE], /* out */
+		    CTR_TYPE* msg_ctr)
 {
   // ==========================================================================+
   // Summary: If phase_i_store was interrupted during its excution, load saved |
@@ -73,28 +71,13 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
   // --------------------------------------------------------------------------+
   // INPUTS:                                                                   |
   // - *msg_ctr: 
-
-
   FILE* fp;
   
   int does_file_exits = access("data/states", F_OK);
   if (does_file_exits == -1){
     puts("No states file has been found. Starting from the beginning");
-    fp = fopen("data/counters", "w");
-    fclose(fp); /* remove the counter file */
-    return;
+    return 0;
   }
-
-
-  does_file_exits = access("data/counters", F_OK);
-  if (does_file_exits == -1){
-    // delete the states file
-    puts("No counters file has been found. Starting from the beginning");
-    fp = fopen("data/states", "w");
-    fclose(fp); /* remove the counter file */
-    return;
-  }
-
 
   
   fp = fopen("data/states", "r");
@@ -103,17 +86,9 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
 	 "We will truncate the file to multiple states size if necessary\n",
 	  nstates);
 
+  if (nstates==0)
+    return 0;
 
-  
-
-  // in case of interruption, a partial state might be recorded
-  // remove the partial state. 
-  truncate("data/states", nstates*HASH_STATE_SIZE);    
-  truncate("data/counters", nstates*sizeof(CTR_TYPE));
-
-  if (nstates==0){
-    return;
-  }
 
   
   /* go to the last state */
@@ -122,28 +97,21 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
 	SEEK_SET); 
   
   fread(state, WORD_SIZE, NWORDS_STATE, fp);
-  puts("done with states reading");
+  
+  puts("state loaded = ");
+  print_char((u8*) state, HASH_STATE_SIZE);
   fclose(fp);
 
-  
-  fp = fopen("data/counters", "r");
-  printf("while found %lu counters\n",
-	 get_file_size(fp)/(sizeof(CTR_TYPE)));
-  
-  fseek(fp,
-	(nstates-1)*sizeof(CTR_TYPE),
-	SEEK_SET); 
-
-  puts("opened the counter file");
-  // max lenght of a line inside a file
-  fread(msg_ctr, sizeof(CTR_TYPE), 1, fp);
-
-  *nhashes_stored = nstates * INTERVAL; /* approximately how many hashes stored*/
-
   // Ensure that digests are multiple of N
+  truncate("data/states", nstates*HASH_STATE_SIZE);
+
+  *msg_ctr = (nstates - 1) * INTERVAL; /* approximately how many hashes stored*/
+
+
   /* truncate_digests(); */
-  
   printf("Loaded from disk: counter=%llu\n", *msg_ctr);
+
+  return 1;
 }
 
 
@@ -151,7 +119,8 @@ void was_state_written_on_disk(CTR_TYPE* msg_ctr, /* ou t*/
 
 void phase_i_store(CTR_TYPE msg_ctr,
 		   u64 nhashes_computed,
-		   WORD_TYPE state[NWORDS_STATE]){
+		   WORD_TYPE state[NWORDS_STATE],
+		   int was_there_data){
 
 
   		   /* const size_t n, */
@@ -216,11 +185,11 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
   /// INIT FILES: server files that will be send later and state
   FILE* states_file;
-  FILE* counters_file;
+
 
   // TOUCH FILES ON THE DISK
   states_file = fopen("data/states", "a");
-  counters_file = fopen("data/counters", "a");
+
 
   printf("interval=%lld, nhashes_stored≈%lld\n", INTERVAL, nhashes_computed);
   /// ----------------- PHASE I: Part 1/2   ------------------------  ///
@@ -232,13 +201,14 @@ void phase_i_store(CTR_TYPE msg_ctr,
 
   start = wtime(); /* get the time  */
 
-  /* Record the whole state */
-  fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
-  /* Record the counter  */
-  fwrite(msg_ctr_pt, sizeof(CTR_TYPE), 1, counters_file);
-  /* We would like to flush the data disk as soon we have them */
-  fflush(states_file);
-  fflush(counters_file);
+  if (!was_there_data) { /* record the first state iff there was no state file */
+    /* This ensure that last state in run_i won't be duplicated in run_{i+1} */
+    /* Record the whole state */
+    fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
+    /* We would like to flush the data disk as soon we have them */
+    fflush(states_file);
+  }
+
 
   
   /* if one server gets filled, it will */
@@ -259,16 +229,11 @@ void phase_i_store(CTR_TYPE msg_ctr,
       /* Record the whole state */
       fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
 
-      /* Record the counter  */
-      fwrite(msg_ctr_pt, sizeof(CTR_TYPE), 1, counters_file);
-
 
       /* We would like to flush the data disk as soon we have them */
       fflush(states_file);
-      fflush(counters_file);
 
       MB = (INTERVAL * N) / (u64) 1000000;
-      
       printf("2^%2.4f hashes, elapsed %0.2fsec,  write %0.2f MB/S\n"
 	     " #hashes≈%llu, 2^%0.3f hashes/sec,  msg_ctr=%llu\n"
 	     "---------------------------------\n",
@@ -288,15 +253,11 @@ void phase_i_store(CTR_TYPE msg_ctr,
   /* Record the whole state */
   fwrite(state, sizeof(WORD_TYPE), NWORDS_STATE, states_file);
   /* Record the counter  */
-  fwrite(msg_ctr_pt, sizeof(CTR_TYPE), 1, counters_file);
+
   /* We would like to flush the data disk as soon we have them */
   fflush(states_file);
-  fflush(counters_file);
 
-  
   fclose(states_file);
-  fclose(counters_file);
-
 
   elapsed = wtime() - elapsed;
   printf("done in %fsec\n", elapsed);
@@ -315,10 +276,10 @@ int main(){
   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
 
   /* update state and msg_ctr  if was some date befoer in the disk */
-  was_state_written_on_disk(&msg_ctr, &nhashes_stored, state);
+  int was_there_data = load_checkpoint( state, &msg_ctr );
 
   /* continue hashing  */
-  phase_i_store(msg_ctr, nhashes_stored, state);
+  phase_i_store(msg_ctr, nhashes_stored, state, was_there_data);
   
 
 }

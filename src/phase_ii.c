@@ -106,7 +106,7 @@ int main(int argc, char* argv[])
     MPI_Intercomm_create(local_comm, 0, MPI_COMM_WORLD, NSERVERS, 0, &inter_comm);
 
     /* It knows the number of receivers from NSERVERS from config.h */
-    sender(inter_comm); 
+    /* sender(inter_comm);  */
   }
   else if (myrank < NSERVERS){ /* receiver, repeat infinitely  */
     /* Creat inter-comm from sender point of view:  */
