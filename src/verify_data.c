@@ -71,19 +71,19 @@ int main(int argc, char *argv[])
   printf("ctr=%llu, INTERVAL=%llu\n", ctr, INTERVAL);
   puts("Going to check...");
 
-<<<<<<< HEAD
+
   
-  int non_equal_bytes = check_hashes_interval(state_before,
-					      state_after,
-					      ctr);
-  int is_corrupt = 
-=======
+
+
+
+
+
   int nbytes_non_equal = check_hashes_interval(state_before,
 					       state_after,
 					       ctr);
 
   int is_corrupt = (0 != nbytes_non_equal);
->>>>>>> 02a8764b17fd59c1e32605790bdc240c8260083d
+
 
   printf("Found a corrupt state? %d\n", is_corrupt);
 
