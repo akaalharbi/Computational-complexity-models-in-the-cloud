@@ -6,7 +6,7 @@
 #include "hash.h"
 #include "numbers_shorthands.h"
 #include "util_char_arrays.h"
-
+#include "util_files.h"
 int check_hashes_interval(const WORD_TYPE state_befoe[NWORDS_STATE],
 			  const WORD_TYPE state_after[NWORDS_STATE],
 			  const CTR_TYPE ctr){
@@ -46,14 +46,16 @@ int main(int argc, char *argv[])
   /* if (argc != 2) */
   /*   return 0; */
 
-  u64 state_number = 1630;
+  u64 state_number = 3718;
   u64 ctr = state_number*INTERVAL;
   
   WORD_TYPE state_before[NWORDS_STATE];
   WORD_TYPE state_after[NWORDS_STATE];
   
   FILE* fp = fopen("data/states", "r");
-
+  size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
+  printf("There are %lu middle states\n", nstates);
+  
   fseek(fp, (HASH_STATE_SIZE)*(state_number), SEEK_CUR);
   fread(state_before, 1, HASH_STATE_SIZE,  fp);
 
@@ -64,10 +66,11 @@ int main(int argc, char *argv[])
   printf("ctr=%llu, INTERVAL=%llu\n", ctr, INTERVAL);
   puts("Going to check...");
 
-  
-  int is_corrupt = (0 == check_hashes_interval(state_before,
+  int nbytes_non_equal = check_hashes_interval(state_before,
 					       state_after,
-					       ctr));
+					       ctr);
+
+  int is_corrupt = (0 != nbytes_non_equal);
 
   printf("Found a corrupt state? %d\n", is_corrupt);
 

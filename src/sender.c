@@ -48,7 +48,7 @@ static void send_random_message_template(u8 M[HASH_INPUT_SIZE])
 } /* clear stack variables */
 
 
-static void generate_long_message_digests(){
+static void regenerate_long_message_digests(){
   /// The long message has been sent in a reduced form to save space on the hard disk
   /// Each process will take a unique part of the file data/states and compute enough
   /// hashes.
@@ -72,10 +72,11 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
   /* M = 64bit ctr || 64bit nonce || random value */
 
+  // @todo edit this part
   u8 M[HASH_INPUT_SIZE]; /* random message base */
+
   // 16 messages for avx, each message differs from the other in the counter part
   u8 Mavx[16][HASH_INPUT_SIZE];  /* except counter, they are all the same */
-
 
   // Save the distinguished stata here.
   WORD_TYPE Mstate[NWORDS_STATE] = {HASH_INIT_STATE};
@@ -129,7 +130,7 @@ void sender(int myrank, MPI_Comm mpi_communicator)
   
   // ----------------------------- PART 1 --------------------------------- //
   // Regenrate the long message in parallel!                                //
-  
+  regenerate_long_message_digests();
 
   // ----------------------------- PART 2 --------------------------------- //
   // 1-  Sen the initial input to all receiving servers 
@@ -186,8 +187,8 @@ void sender(int myrank, MPI_Comm mpi_communicator)
 
     /* After the counter save N-DEFINED_BYTES of MState */
     memcpy( &snd_buf[offset + sizeof(CTR_TYPE)], /* copy digest to snd_buf[offset] */
-	    ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes */
-	    N-DEFINED_BYTES );
+	    ((u8*)Mstate) + DEFINED_BYTES, /* skip defined bytes, @todo skip the left most bytes */
+	    N-DEFINED_BYTES ); /* nbytes to be sent, compressed state. */
 
     servers_ctr[server_number] += 1;
     

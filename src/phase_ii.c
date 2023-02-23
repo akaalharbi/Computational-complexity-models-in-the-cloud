@@ -69,7 +69,8 @@ int main(int argc, char* argv[])
   //  2- consumers: ranks [0, NSERVERS-1] receive hashes and probe them in the |
   //                in its dictionary. Save those that return positive answer  |
   // ==========================================================================+
-
+  // Note: recievers' global and local rank are the same!
+  //       this is not the case for the senders.
 
 
   // --------------------- INIT MPI & Shared Variables ------------------------+
@@ -93,9 +94,9 @@ int main(int argc, char* argv[])
   MPI_Comm_split(MPI_COMM_WORLD, color, myrank, &local_comm);
   
   /* How many procs that are going t send */
-  int nsenders = nproc - NSERVERS;
 
-  printf("There are %d senders\n", nsenders);
+
+
 
 
   // Who am I? a sender,  or a receiver?
@@ -104,14 +105,19 @@ int main(int argc, char* argv[])
     /* local leader: local rank 0, remote leader: global rank NSERVES, tag=0  */
     MPI_Intercomm_create(local_comm, 0, MPI_COMM_WORLD, NSERVERS, 0, &inter_comm);
 
-    sender(myrank, inter_comm); /* never ends :) */
+    /* It knows the number of receivers from NSERVERS from config.h */
+    sender(inter_comm); 
   }
   else if (myrank < NSERVERS){ /* receiver, repeat infinitely  */
     /* Creat inter-comm from sender point of view:  */
     /* local leader: local rank 0(global rank NSERVERS), remote leader: global rank 0, tag=0  */
     MPI_Intercomm_create(local_comm, 0, MPI_COMM_WORLD, 0, 0, &inter_comm);
 
-    receiver(myrank, inter_comm, nsenders);
+    int nsenders, local_rank /* local rank */;
+    MPI_Comm_remote_size(inter_comm, &nsenders);
+    MPI_Comm_rank(local_comm, &local_rank);
+    
+    receiver(local_rank, nsenders, inter_comm);
   }
 
 

@@ -145,10 +145,13 @@
 #ifndef LONG_MESSAGE_MPI_CONFIG
 
 #define LONG_MESSAGE_MPI_CONFIG
+
 #define TAG_DICT_SND 0 /* send digest tag */
-#define TAG_RANDOM_MESSAGE 1
-#define TAG_SND_DGST 2
-#define TAG_MESSAGES_CANDIDATES 3
+/* rehashing defined part of long messageg is done for process i */
+#define TAG_DONE_HASHING 1
+#define TAG_RANDOM_MESSAGE 2
+#define TAG_SND_DGST 3
+#define TAG_MESSAGES_CANDIDATES 4
 #define ARCHIVE_SERVER NSERVERS
 // WHAT IS BUFF_SIZE? It doesn't seem to be used!
 //#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
