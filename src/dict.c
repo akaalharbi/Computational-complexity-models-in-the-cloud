@@ -253,6 +253,17 @@ int dict_has_elm(dict *d, u8 *state)
     // get new fresh keys from one bucket
     dict_keys_simd = SIMD_LOAD_SI((REG_TYPE*)  &(d->values[idx]));
 
+
+    // -------------------------------------------------//
+    //                   TEST 1:                        //
+    /* is one the slots empty? then no point of probing */
+    //- ------------------------------------------------//
+    // no need for the commented instruction since we only check the first value
+    // comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
+    // copy the value of the first slot of the bucket, check is it 0?
+    if (d->values[idx] == 0)
+      return 0;
+    
     // -----------------------------------------------//
     //                   TEST 1                       //
     /*  Does key equal one of the slots?              */
@@ -272,17 +283,11 @@ int dict_has_elm(dict *d, u8 *state)
       return 1; /* we will hash the whole message again */
     }
 
-    // -------------------------------------------------//
-    //                   TEST 2: skipped                //
-    /* is one the slots empty? then no point of probing */
-    //- ------------------------------------------------//
-    // no need for the commented instruction since we only check the first value
-    // comp_vect_simd = _mm256_cmpeq_epi64(dict_keys_simd, zero_vect);
-    // copy the value of the first slot of the bucket, check is it 0?
-    // with this new version we don't need to check if the first element is 0
-    // for two reasons: 1- The loop size is already defined.
-    // 2- if we hit zero but kept moving then worst case scenario we wil have a
-    // false positive we just need to increase the number of needed hits.
+    
+
+
+
+
     
 
 

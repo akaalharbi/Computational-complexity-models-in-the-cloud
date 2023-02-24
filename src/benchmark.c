@@ -122,7 +122,7 @@ size_t time_sha_avx512(){
   
   for (size_t i = 0; i<(nmsgs/16); ++i) {
     state_ptr = sha256_multiple_x16(msg.M);
-    ctr += ((state[3] & 0xFF) == 0) ;
+    ctr += ((state_ptr[3] & 0xFF) == 0) ;
   }
 
   elapsed = wtime() - start;

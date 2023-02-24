@@ -231,8 +231,8 @@ void receiver_process_task(int const myrank,
   truncate(file_name, nfound_cnd*HASH_INPUT_SIZE);
   size_t old_nfound_candidates = nfound_cnd;
 
-  /* 1st sender has rank = NSERVER -scaling-> 1st sender name = 0 */
-  int sender_name_scaled = 0; 
+  /* with inter-communication, 1st sendre has name 0 */
+  int sender_name = 0;  
 
 
   //---------------------------------------------------------------------------+
@@ -261,7 +261,7 @@ void receiver_process_task(int const myrank,
   /* puts("-=-=-=-=-=-=-=-=-=-=-=-=-="); */
   
   /* The sender rank in its respective local group  */
-  sender_name_scaled = status.MPI_SOURCE; // - NSERVERS; // who sent the message?
+  sender_name = status.MPI_SOURCE; // - NSERVERS; // who sent the message?
 
 
   while (NNEEDED_CND > nfound_cnd) {    
@@ -281,12 +281,11 @@ void receiver_process_task(int const myrank,
     /* probe these messages and update the founded candidates */
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
 				    lookup_buf, /* messages to search in d */
-				    &templates[sender_name_scaled
-					       *HASH_INPUT_SIZE],
-				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
+				    &templates[sender_name * HASH_INPUT_SIZE],
+				    PROCESS_QUOTA,/* how many msgs in rcv_buf*/
 				    fp, /* file to record cadidates */
-				    myrank, /* was-this only for debugging? */
-				    sender_name_scaled);
+				    myrank, /* was-this only for debugging? */ // @todo
+				    sender_name); /* why do we need sender name here? */
 
 
     if (nfound_cnd - old_nfound_candidates > 0) {
@@ -300,8 +299,8 @@ void receiver_process_task(int const myrank,
     MPI_Wait(&request, &status);
 
 
-   
-    sender_name_scaled = status.MPI_SOURCE; // get the name of the new sender
+    /* update buffers according to the new message */
+    sender_name = status.MPI_SOURCE; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
 
     /* printf("from %d:\n", status.MPI_SOURCE); */
@@ -361,7 +360,8 @@ void receiver(int local_rank,
   double time_start = wtime();
 
 
-  //--------------------------------- PART 1    -------------------------------+
+
+  //--------------------------------- PART 1 ----------------------------------+
   // PART 1: Get the long message digests from all senders
   write_digest_to_dict(d,
 		       rcv_buf,
@@ -385,7 +385,7 @@ void receiver(int local_rank,
 
 
 
-  
+  //--------------------------------- PART 2 ----------------------------------+
   // PART 2: Get templates from all senders
   MPI_Allgather(NULL, 0, NULL, /* receivers don't send */
 		templates, /* save messages here */
