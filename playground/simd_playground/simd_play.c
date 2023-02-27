@@ -129,14 +129,47 @@ int main(int argc, char* argv[]){
 
 
   
-  uint64_t AMIZERO[4] = {0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF, 0xFFFFFFFFFFFFFFFF};
+  /* uint64_t AMIZERO[4] = {0x01, 0xF, 0xF, 0x0}; */
+  /* __m256i amizero = _mm256_loadu_si256((__m256i*) AMIZERO); */
+
+  /* __m256i zero = _mm256_setzero_si256(); */
+  /* print_m25i(zero, "zero begin"); */
+
+  /* uint8_t maks = _mm256_cmpeq_epi32_mask(amizero, zero); */
+  /* /\* uint8_t maks = _mm256_cmpeq_epi32_mask(amizero, zero); *\/ */
+
+  
+  /* print_m25i(amizero, "amizero begin"); */
+  /* int is_it = _mm256_testz_si256(amizero, amizero); */
+  /* printf("is_it=%d\n", is_it); */
+  /* printf("mask=%x\n", maks); */
+  /* #ifdef __SIZEOF_INT128__ */
+  /* puts("we have 128bit support"); */
+  /* #endif  */
+
+
+  uint32_t AMIZERO[8] = {0x01, 0x0, 0x0, 0x1, 1, 2, 3, 4};
   __m256i amizero = _mm256_loadu_si256((__m256i*) AMIZERO);
+
+  __m256i zero = _mm256_setzero_si256();
+  print_m25i(zero, "zero begin");
+
+  uint8_t mask = _mm256_cmpeq_epi32_mask(amizero, zero);
+  /* uint8_t maks = _mm256_cmpeq_epi32_mask(amizero, zero); */
+
+  
   print_m25i(amizero, "amizero begin");
   int is_it = _mm256_testz_si256(amizero, amizero);
+
+  
   printf("is_it=%d\n", is_it);
+  printf("mask=%x\n", mask);
+  printf("#trailing zeros = %d\n", __builtin_ctz(0));
+
   #ifdef __SIZEOF_INT128__
   puts("we have 128bit support");
   #endif 
+
 }
 
 

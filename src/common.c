@@ -109,10 +109,27 @@ u32 to_which_server(u8 state[HASH_STATE_SIZE])
 
 
 
-void cpy_transposed_state(u32* Mstate, u32* tr_state,  int lane){
+void copy_transposed_state(u32 *Mstate, u32 *tr_state, int lane)
+{
   for (int i = 0; i<NWORDS_STATE; ++i) {
     Mstate[i] = tr_state[lane + i*16];
   }
+}
+
+
+void copy_transposed_digest(u8 *digest, u32 *tr_state, int lane)
+{
+  for (int i = 0; i<(N/WORD_SIZE); ++i) 
+    memcpy(&digest[i*WORD_SIZE],
+	   &tr_state[lane + i*16],
+	   WORD_SIZE);
+
+
+  /* copy the rest of the bytes */
+  memcpy(&digest[(N/WORD_SIZE)*WORD_SIZE],
+	 &tr_state[lane + (N/WORD_SIZE)*16],
+	 N - (N/WORD_SIZE) );
+
 }
 
 

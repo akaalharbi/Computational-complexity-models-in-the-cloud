@@ -32,8 +32,10 @@
 
 
 void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
-			     u8 M[HASH_INPUT_SIZE], /* in, out */
-			     WORD_TYPE Mstate[NWORDS_STATE]/* out*/)
+			     u8  digests[16 * N]/* out*/,
+			     CTR_TYPE counters[16], /* out */
+			     CTR_TYPE* ctr /* in , out */,
+			     int* n_dist_points /* out */)
 
 {
   // ==========================================================================+
@@ -63,17 +65,26 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
   static u32* states_avx_ptr;
 
   /* copy the counter part of M */
-  CTR_TYPE local_ctr = ((CTR_TYPE*) M)[0]; 
 
+
+  /* This forces us to use avx512, we should not!  */
+  const REG_TYPE zero = SIMD_SETZERO_SI();
+  const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(MASK);
+  static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
+  static REG_TYPE cmp_vect;
+  
+  static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
+  
 
   
   while (1) { /* loop till a dist pt found */
-    
+
+    // why not use avx instruction?
     for (int i=0; i<(AVX_SIZE/WORD_SIZE_BITS); ++i) {
-      ((CTR_TYPE*)Mavx[i])[0] = local_ctr+(i+1); /* increase counter part in M by 1 */
+      ((CTR_TYPE*)Mavx[i])[0] = (*ctr)+(i+1); /* increase counter part in M by 1 */
     }
 
-    local_ctr += (AVX_SIZE/WORD_SIZE_BITS); /* update counter locally */
+    *ctr += (AVX_SIZE/WORD_SIZE_BITS); /* update counter locally */
     
 
     #ifdef  __AVX512F__
@@ -89,20 +100,44 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
     #endif
 
 
-    // test for distinguished point
-
-    // @todo vectorize the procedure!
-    /* for (int i=0; i< (AVX_SIZE/WORD_SIZE_BITS); ++i) { // 8 for avx2,  16 for avx512 */
-      
-    /*   if ((states_avx_ptr[i] & dist_test) == 0) { */
-    /* 	/\* copy the message that produces distinguish point along with its counter *\/ */
-    /* 	cpy_transposed_state(Mstate, states_avx_ptr, i); */
-    /* 	memcpy(M, Mavx[i], HASH_INPUT_SIZE); */
-    /* 	return; */
-    /*   } */
-    /* } */
+    // test for distinguishedn point
+    /* load the last words of digests  */
+    digests_last_word = SIMD_LOAD_SI(&states_avx_ptr[(N_NWORDS_CEIL - 1) * HASH_STATE_SIZE]);
+    /* is it a distinguish point? */
     
-  }
+    cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
+    
+
+
+    
+    /* This is a bit annoying */
+    #ifdef __AVX512F__ 
+    cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
+    #endif
+
+    #ifndef __AVX512F__
+    cmp_mask  =_mm256_movemask_epi8( SIMD_CMP_EPI32(cmp_vect, zero) ) ;
+    #endif
+
+
+    if (cmp_mask) { /* found at least a distinguished point? */
+      
+      *n_dist_points = __builtin_popcount(cmp_mask);
+      int idx = 0;
+      int trailing_zeros = 0;
+
+      for (int i=0; i<*n_dist_points; ++i){
+	/* Basically get the index of the set bit in cmp_mask */
+	trailing_zeros = __builtin_ctz(cmp_mask); 
+	idx += trailing_zeros;
+	cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
+	/* update counter the ith counter */
+	counters[i] = Mavx[idx][0];
+	copy_transposed_digest(&digests[i*N], states_avx_ptr, idx);
+      }
+      return; /* we're done */
+    } /* end if (cmp_mask) */
+  } /* end while(1) */
 }
 
 
@@ -151,7 +186,8 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 
   /* random message base */
   u8 M[HASH_INPUT_SIZE]; 
-  u8 Mavx[16][HASH_INPUT_SIZE];
+  u8 Mavx[16][HASH_INPUT_SIZE]; /* non-transposed! */
+  u8 state_avx[16][HASH_STATE_SIZE]; /* non-transposed */
 
 
 

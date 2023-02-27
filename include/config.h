@@ -82,7 +82,15 @@
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 0
+#define DIFFICULTY 2
+/* How many words are needed to accommedate N */
+#define N_NWORDS_CEIL CEILING(N, WORD_SIZE)
+/* since there migh be an empty space on the right side of the word, we shift */
+/* the mask that of the distinguished point test to the left */
+#define SHIFT_AMOUNT (N_NWORDS_CEIL * 32 - N * 8)
+#define MASK_UNSHIFTED ((1 << DIFFICULTY) - 1)
+#define MASK (MASK_UNSHIFTED << SHIFT_AMOUNT)
+
 
 /* we are not going to hold more than 32 bits in a dict entry */
 #define MAX_VAL_SIZE 32 /* in bits */
@@ -196,10 +204,15 @@
 #define SIMD_TEST is_not_zero
 #define SIMD_SET1_EPI32 _mm512_set1_epi32
 #define SIMD_SET1_EPI16 _mm512_set1_epi16
+#define SIMD_SETZERO_SI  _mm512_setzero_si512
 
+  
 // todo check these 
 #define SIMD_CMP_EPI32 _mm512_cmpeq_epi32_mask
 #define SIMD_CMP_EPI16 _mm512_cmpeq_epi16_mask
+
+#define SIMD_AND_EPI32 _mm512_and_epi32
+
 
 #define SIMD_SET1_EPI8 _mm_set1_epi8
 #define SIMD_CMP_EPI8 _mm_cmpeq_epi8
@@ -218,9 +231,11 @@
 
 #define SIMD_SET1_EPI32 _mm256_set1_epi32
 #define SIMD_SET1_EPI16 _mm256_set1_epi16
+#define SIMD_SETZERO_SI _mm256_setzero_si256
 
 #define SIMD_CMP_EPI32 _mm256_cmpeq_epi32
 #define SIMD_CMP_EPI16 _mm256_cmpeq_epi16
+#define SIMD_AND_EPI32 _mm256_and_epi32
 
 // we better avoid this case :(
 /* #define SIMD_SET1_EPI8 _mm256_set1_epi8 */
