@@ -123,12 +123,17 @@ static void write_digest_to_dict(dict *d,
 				  MPI_Comm inter_comm)
 {
   // ==========================================================================+
-  // Summary: Load hashes from the file *fp, and try to store them in dict *d  |
-  // Note: dict* d has the right to reject inserting element.                   |
+  // Summary: Listen to senders who regenerates the long messsage digests, and |
+  //          record the received digests in the dictionary.                   |
   // --------------------------------------------------------------------------+
   // INPUTS:                                                                   |
   // `*d`: Dictionary that will keep elements from *fp.                        |
-  // `*fp` : File contain number of hashes larger than nelements               |
+  // `rcv_buf`: this buffer will be used to record message from senders.       |
+  // `add_buf`: this is used to copy the rcv_buf, so it can listen again.      |
+  // `nsenders`: this is used to know when to stop listening. since each sender|
+  //             after done hashing, it will send a different tag.             |
+  // `inter_comm`: MPI inter communication object that seperates senders and   |
+  //               receivers into two disjoint groups.                         |
   // ==========================================================================+
 
   // @todo note: not to forget we will change the direction right most bytes
@@ -170,15 +175,16 @@ static void write_digest_to_dict(dict *d,
 	      inter_comm,
 	      &request);
 
-
     /* add them to dictionary */
     for (size_t j=0; j<PROCESS_QUOTA; ++j) 
       dict_add_element_to(d, &add_buf[N*j]);
 
-
     MPI_Wait(&request, &status);
-
+    /* If a sender is done hashing, it will make rcv_buf = {0}, and has tag=1 */
+    /* The dictionary by design will ignore all zero messages */
     ncompleted_senders += status.MPI_TAG;
+    /* copy it to a safe buffer, so it can listen again */
+    memcpy(add_buf, rcv_buf, rcv_size);
   }
 
 
@@ -214,15 +220,10 @@ void receiver_process_task(int const myrank,
   
   char file_name[FILE_NAME_MAX_LENGTH]; /* "data/messages/%d" */
   snprintf(file_name, sizeof(file_name), "data/messages/%d", myrank );
-  FILE* fp = fopen(file_name, "a");
-
-  
-  /* u8* initial_inputs = (u8*) malloc(sizeof(u8)*HASH_INPUT_SIZE*nproc_snd); */
+  FILE* fp = fopen(file_name, "a"); /* register message candidates here */
   
   MPI_Status status;
   MPI_Request request;
-
-  /* int* indices = (int*)malloc(sizeof(int)*nproc); */
 
   /* How many candidates were stored? and remove partial candidates */
   size_t nfound_cnd = get_file_size(fp) / HASH_INPUT_SIZE ;
@@ -230,8 +231,8 @@ void receiver_process_task(int const myrank,
   truncate(file_name, nfound_cnd*HASH_INPUT_SIZE);
   size_t old_nfound_candidates = nfound_cnd;
 
-  /* 1st sender has rank = NSERVER -scaling-> 1st sender name = 0 */
-  int sender_name_scaled = 0; 
+  /* with inter-communication, 1st sendre has name 0 */
+  int sender_name = 0;  
 
 
   //---------------------------------------------------------------------------+
@@ -260,7 +261,7 @@ void receiver_process_task(int const myrank,
   /* puts("-=-=-=-=-=-=-=-=-=-=-=-=-="); */
   
   /* The sender rank in its respective local group  */
-  sender_name_scaled = status.MPI_SOURCE; // - NSERVERS; // who sent the message?
+  sender_name = status.MPI_SOURCE; // - NSERVERS; // who sent the message?
 
 
   while (NNEEDED_CND > nfound_cnd) {    
@@ -280,12 +281,11 @@ void receiver_process_task(int const myrank,
     /* probe these messages and update the founded candidates */
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
 				    lookup_buf, /* messages to search in d */
-				    &templates[sender_name_scaled
-					       *HASH_INPUT_SIZE],
-				    PROCESS_QUOTA,/* how many msgs in rcv_buf */
+				    &templates[sender_name * HASH_INPUT_SIZE],
+				    PROCESS_QUOTA,/* how many msgs in rcv_buf*/
 				    fp, /* file to record cadidates */
-				    myrank, /* was-this only for debugging? */
-				    sender_name_scaled);
+				    myrank, /* was-this only for debugging? */ // @todo
+				    sender_name); /* why do we need sender name here? */
 
 
     if (nfound_cnd - old_nfound_candidates > 0) {
@@ -299,8 +299,8 @@ void receiver_process_task(int const myrank,
     MPI_Wait(&request, &status);
 
 
-   
-    sender_name_scaled = status.MPI_SOURCE; // get the name of the new sender
+    /* update buffers according to the new message */
+    sender_name = status.MPI_SOURCE; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
 
     /* printf("from %d:\n", status.MPI_SOURCE); */
@@ -360,7 +360,8 @@ void receiver(int local_rank,
   double time_start = wtime();
 
 
-  //--------------------------------- PART 1    -------------------------------+
+
+  //--------------------------------- PART 1 ----------------------------------+
   // PART 1: Get the long message digests from all senders
   write_digest_to_dict(d,
 		       rcv_buf,
@@ -384,7 +385,7 @@ void receiver(int local_rank,
 
 
 
-  
+  //--------------------------------- PART 2 ----------------------------------+
   // PART 2: Get templates from all senders
   MPI_Allgather(NULL, 0, NULL, /* receivers don't send */
 		templates, /* save messages here */

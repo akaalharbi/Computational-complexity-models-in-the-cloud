@@ -20,7 +20,7 @@ int check_hashes_interval(const WORD_TYPE state_befoe[NWORDS_STATE],
   /* register counter in M */
   ((u64*)M)[0] = ctr;
 
-  for (size_t i=0; i<INTERVAL+2; ++i) {
+  for (size_t i=0; i<INTERVAL; ++i) {
 
     hash_single(state, M);
     ++( ((u64*)M)[0]) ;
@@ -34,7 +34,7 @@ int check_hashes_interval(const WORD_TYPE state_befoe[NWORDS_STATE],
   }
 
   
-  return (memcmp(state, state_after, HASH_STATE_SIZE) == 0);
+  return memcmp(state, state_after, HASH_STATE_SIZE);
   
 }
 // @todo discovered a bug in when phase_i rerun again
@@ -46,7 +46,11 @@ int main(int argc, char *argv[])
   /* if (argc != 2) */
   /*   return 0; */
 
-  u64 state_number = 3718;
+
+
+
+  u64 state_number = 5101;
+
   u64 ctr = state_number*INTERVAL;
   
   WORD_TYPE state_before[NWORDS_STATE];
@@ -57,8 +61,9 @@ int main(int argc, char *argv[])
   printf("There are %lu middle states\n", nstates);
   
   fseek(fp, (HASH_STATE_SIZE)*(state_number), SEEK_CUR);
-  fread(state_before, 1, HASH_STATE_SIZE,  fp);
 
+  
+  fread(state_before, 1, HASH_STATE_SIZE,  fp);
   fread(state_after, 1,  HASH_STATE_SIZE, fp);
 
   print_char((u8*) state_before, HASH_STATE_SIZE);
@@ -66,12 +71,16 @@ int main(int argc, char *argv[])
   printf("ctr=%llu, INTERVAL=%llu\n", ctr, INTERVAL);
   puts("Going to check...");
 
+
+  
+
   int nbytes_non_equal = check_hashes_interval(state_before,
 					       state_after,
 					       ctr);
 
   int is_corrupt = (0 != nbytes_non_equal);
 
+  printf("nbytes_non_equal=%d\n", nbytes_non_equal);
   printf("Found a corrupt state? %d\n", is_corrupt);
 
   fclose(fp);

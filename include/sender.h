@@ -7,7 +7,7 @@
 #include <mpi.h>
 
 
-void sender(MPI_Comm inter_comm);
 
+void sender(MPI_Comm local_comm, MPI_Comm inter_comm);
 
 #endif
