@@ -37,30 +37,8 @@
 // -----------------------------------------------------------------------------
 
 
-/* static void truncate_digests(){ */
-/*   /// Truncate all files in data/digests to a multiple of N bytes */
-/*   char file_name[FILE_NAME_MAX_LENGTH]; */
-/*   size_t file_size;  */
-/*   size_t ndigests; */
-/*   FILE* fp; */
-
-/*   for (size_t i = 0; i<NSERVERS; ++i){ */
-/*     snprintf(file_name, FILE_NAME_MAX_LENGTH, "data/digests/%lu", i); */
-/*     fp = fopen(file_name, "r"); */
-/*     file_size = get_file_size(fp); */
-/*     ndigests = file_size/N; */
-/*     printf("file %s had %lu bytes\n", file_name, file_size); */
-    
-/*     truncate(file_name, N*ndigests); */
-/*     file_size = get_file_size(fp); */
-/*     printf("file %s has %lu bytes\n", file_name, file_size); */
-
-/*     fclose(fp); */
-/*   } */
-/* } */
 
 
-// @todo rename file, and truncate 
 int load_checkpoint(WORD_TYPE state[NWORDS_STATE], /* out */
 		    CTR_TYPE* msg_ctr)
 {

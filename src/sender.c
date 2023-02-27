@@ -29,7 +29,11 @@
 #include "c_sha256_avx.h"
 
 
-
+inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
+{
+  for (int i=0; i<(AVX_SIZE/WORD_SIZE_BITS); ++i) 
+    ((CTR_TYPE*)Mavx[i])[0] += (i+1); /* increase counter part in M by 1 */
+}
 
 void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
 			     u8  digests[16 * N]/* out*/,
@@ -38,6 +42,7 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
 			     int* n_dist_points /* out */)
 
 {
+
   // ==========================================================================+
   // Summary: Generates hashes till a distinguished point is found. Mutates M  |
   //          and resests Mstate in the process. Suitable for phase ii use only|
@@ -49,26 +54,25 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
   // - Mavx[lane][HASH_INPUT_SIZE]: place holder for messages to be hashed     |
   //      using avx. they are copies of M, however counter part  increases by  |
   //      one for each lane.                                                   |
-  // - M[HASH_INPUT_SIZE] : initial value of the random message, when we found |
-  //   a disitingusihed point in on of Mavx, we coput Mavx[lane] to M          |
-  // - Mstate: This should be the initial state of sha256.                     |
-  // - dist_test: (2^nzeros - 1), e.g. a point is distinguished if it has 3    |
-  //              at the end, then the test is 2^3 - 1 = 7                     |
+  // - digests[16*N]: Record the resulted digest of the distinguished points   |
+  //  Record distinguished points in order. It contains at least 1 dist point  |
+  // - ctr : update the last counter we found
   // --------------------------------------------------------------------------+
   // WARNING: this function can't deal with more than 32zeros as dist_test     |
-  // NOTE: we are only working on the first word                               |
+  // NOTE: |
   // --------------------------------------------------------------------------+
   // TODO: use hash_multiple instead                                           |
   // --------------------------------------------------------------------------+
 
   /* no need to construct init state with each call of the function */ 
-  static u32* states_avx_ptr;
+  static u32* states_avx_ptr; /* store the resulted digests here  */
 
   /* copy the counter part of M */
 
 
   /* This forces us to use avx512, we should not!  */
   const REG_TYPE zero = SIMD_SETZERO_SI();
+  /* use this mask to check if a digest is a distinguished point or not! */
   const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(MASK);
   static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
   static REG_TYPE cmp_vect;
@@ -79,14 +83,11 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
   
   while (1) { /* loop till a dist pt found */
 
-    // why not use avx instruction?
-    for (int i=0; i<(AVX_SIZE/WORD_SIZE_BITS); ++i) {
-      ((CTR_TYPE*)Mavx[i])[0] = (*ctr)+(i+1); /* increase counter part in M by 1 */
-    }
+    /* */
+    increment_message(Mavx);
+    *ctr += (AVX_SIZE/WORD_SIZE_BITS); /* update counter */
 
-    *ctr += (AVX_SIZE/WORD_SIZE_BITS); /* update counter locally */
-    
-
+    /* Hash multiple messages at once */
     #ifdef  __AVX512F__
     /* HASH 16 MESSAGES AT ONCE */
     states_avx_ptr = sha256_multiple_x16(Mavx);
@@ -100,15 +101,11 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
     #endif
 
 
-    // test for distinguishedn point
+    // test for distinguishedn point //
     /* load the last words of digests  */
     digests_last_word = SIMD_LOAD_SI(&states_avx_ptr[(N_NWORDS_CEIL - 1) * HASH_STATE_SIZE]);
     /* is it a distinguish point? */
-    
     cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
-    
-
-
     
     /* This is a bit annoying */
     #ifdef __AVX512F__ 
@@ -121,19 +118,21 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
 
 
     if (cmp_mask) { /* found at least a distinguished point? */
-      
       *n_dist_points = __builtin_popcount(cmp_mask);
-      int idx = 0;
+      int lane = 0;
       int trailing_zeros = 0;
 
-      for (int i=0; i<*n_dist_points; ++i){
-	/* Basically get the index of the set bit in cmp_mask */
+      for (int i=0; i < (*n_dist_points); ++i){
+        /* Basically get the index of the set bit in cmp_mask */
 	trailing_zeros = __builtin_ctz(cmp_mask); 
-	idx += trailing_zeros;
+	lane += trailing_zeros;
 	cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
-	/* update counter the ith counter */
-	counters[i] = Mavx[idx][0];
-	copy_transposed_digest(&digests[i*N], states_avx_ptr, idx);
+
+        /* update counter the ith counter */
+	counters[i] = ((CTR_TYPE*)Mavx[lane])[0];
+
+	/* get the digest to digests vector */
+	copy_transposed_digest(&digests[i*N], states_avx_ptr, lane);
       }
       return; /* we're done */
     } /* end if (cmp_mask) */
@@ -154,10 +153,32 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
   /* M = 64bit ctr || 64bit nonce || random value */
   /* 16 messages for avx, each message differs om the other in the counter part */
   /* except counter, they are all the same */
-  u32* statesAVX;
+  u32* states_avx_ptr;
   
-  
+  FILE* fp = fopen("data/states", "r");
+  int myrank;
+  MPI_Comm_rank(inter_comm, &myrank);
 
+  size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
+  size_t begin = myrank * (nstates/nsenders);
+  size_t end = (myrank + 1) * (nstates/nsenders);
+  int ctr = begin*INTERVAL;
+  
+  
+  if (myrank == (nsenders-1))
+    end = nstates;
+
+  /* get all states that i should work on: */
+  WORD_TYPE* states = (WORD_TYPE*) malloc((end - begin) * sizeof(WORD_TYPE));
+  fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
+  fread(states, WORD_SIZE, (end - begin), fp);
+  
+  
+  for (size_t ith_state = begin; ith_state<end; ++ith_state){
+    for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
+      /* states_avx_ptr =  */
+    }
+  }
 }
 
 
