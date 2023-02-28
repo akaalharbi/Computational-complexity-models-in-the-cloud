@@ -41,6 +41,60 @@ static void process_transpose_digests(u32* restrict tr_states,
 				      size_t* nfull_buffers,
 				      size_t* restrict server_counters,
 				      size_t* restrict indices_full );
+  
+
+static inline void extract_dist_points(u32* restrict tr_states, /* in transposesd */
+				WORD_TYPE Mavx[16][NWORDS_STATE], /* don't edit the content */
+				u32* restrict states, /* out */
+				u64* msg_ctrs_out, /* out  */
+				int* restrict n_dist_points)
+{
+  /* This forces us to use avx512, we should not!  */
+  const REG_TYPE zero = SIMD_SETZERO_SI();
+  /* use this mask to check if a digest is a distinguished point or not! */
+  const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(MASK);
+  static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
+  static REG_TYPE cmp_vect;
+
+  static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
+
+
+  // test for distinguishedn point //
+    /* load the last words of digests  */
+    digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1) * HASH_STATE_SIZE]);
+    /* is it a distinguish point? */
+    cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
+    
+    /* This is a bit annoying */
+    #ifdef __AVX512F__ 
+    cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
+    #endif
+
+    #ifndef __AVX512F__
+    cmp_mask  = _mm256_movemask_epi8( SIMD_CMP_EPI32(cmp_vect, zero) );
+    #endif
+
+if (cmp_mask) { /* found at least a distinguished point? */
+      *n_dist_points = __builtin_popcount(cmp_mask);
+      int lane = 0;
+      int trailing_zeros = 0;
+
+      for (int i=0; i < (*n_dist_points); ++i){
+        /* Basically get the index of the set bit in cmp_mask */
+	trailing_zeros = __builtin_ctz(cmp_mask); 
+	lane += trailing_zeros;
+	cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
+       
+        /* update counter the ith counter */
+	counters[i] = ((CTR_TYPE*)Mavx[lane])[0];
+
+	/* get the digest to digests vector */
+	copy_transposed_digest(&digests[i*N], states_avx_ptr, lane);
+      }
+      return; /* we're done */
+    } /* end if (cmp_mask) */
+  
+}
 
 
 
@@ -82,17 +136,6 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
   /* copy the counter part of M */
 
 
-  /* This forces us to use avx512, we should not!  */
-  const REG_TYPE zero = SIMD_SETZERO_SI();
-  /* use this mask to check if a digest is a distinguished point or not! */
-  const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(MASK);
-  static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
-  static REG_TYPE cmp_vect;
-  
-  static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
-  
-
-  
   while (1) { /* loop till a dist pt found */
 
     /* */
@@ -114,41 +157,8 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
     #endif
 
 
-    // test for distinguishedn point //
-    /* load the last words of digests  */
-    digests_last_word = SIMD_LOAD_SI(&states_avx_ptr[(N_NWORDS_CEIL - 1) * HASH_STATE_SIZE]);
-    /* is it a distinguish point? */
-    cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
+
     
-    /* This is a bit annoying */
-    #ifdef __AVX512F__ 
-    cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
-    #endif
-
-    #ifndef __AVX512F__
-    cmp_mask  = _mm256_movemask_epi8( SIMD_CMP_EPI32(cmp_vect, zero) );
-    #endif
-
-
-    if (cmp_mask) { /* found at least a distinguished point? */
-      *n_dist_points = __builtin_popcount(cmp_mask);
-      int lane = 0;
-      int trailing_zeros = 0;
-
-      for (int i=0; i < (*n_dist_points); ++i){
-        /* Basically get the index of the set bit in cmp_mask */
-	trailing_zeros = __builtin_ctz(cmp_mask); 
-	lane += trailing_zeros;
-	cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
-
-        /* update counter the ith counter */
-	counters[i] = ((CTR_TYPE*)Mavx[lane])[0];
-
-	/* get the digest to digests vector */
-	copy_transposed_digest(&digests[i*N], states_avx_ptr, lane);
-      }
-      return; /* we're done */
-    } /* end if (cmp_mask) */
   } /* end while(1) */
 }
 
