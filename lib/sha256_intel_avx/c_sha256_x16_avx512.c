@@ -15,23 +15,28 @@ typedef uint8_t u8;
 #define SHA256_H5 0x9b05688c
 #define SHA256_H6 0x1f83d9ab
 #define SHA256_H7 0x5be0cd19
-// @todo adapt 512
-void sha256_mb_init_digest_avx512(uint32_t *digest)
+
+
+
+static void sha256_mb_init_digest_avx512(uint32_t *digest, uint32_t state[8])
 {
 	/* 8 is sufficient for AVX2, 16 goes all the way to AVX512 */
 	for (int lane = 0; lane < 16; lane++) {
-        digest[lane + 0*16] = SHA256_H0;
-        digest[lane + 1*16] = SHA256_H1;
-        digest[lane + 2*16] = SHA256_H2;
-        digest[lane + 3*16] = SHA256_H3;
-        digest[lane + 4*16] = SHA256_H4;
-        digest[lane + 5*16] = SHA256_H5;
-        digest[lane + 6*16] = SHA256_H6;
-        digest[lane + 7*16] = SHA256_H7;
+        digest[lane + 0*16] = state[0];
+        digest[lane + 1*16] = state[1];
+        digest[lane + 2*16] = state[2];
+        digest[lane + 3*16] = state[3];
+        digest[lane + 4*16] = state[4];
+        digest[lane + 5*16] = state[5];
+        digest[lane + 6*16] = state[6];
+        digest[lane + 7*16] = state[7];
     }
 }
 
-uint32_t* sha256_multiple_x16(uint8_t msg[16][64]){
+
+
+
+uint32_t* sha256_multiple_x16(uint8_t msg[16][64], uint32_t state[8]){
   //---------------------------------------------------------------------------+
   // The unfortunate convention 16 is the number of lanes, in avx2 it will only|
   // use 8 of them. However, it's mandatory to supply 16 messages.             |
@@ -46,7 +51,7 @@ uint32_t* sha256_multiple_x16(uint8_t msg[16][64]){
   
   // 32 bytes = 512 bits (input size)
   static SHA256_ARGS args; /* test static */
-  sha256_mb_init_digest_avx512(args.digest);
+  sha256_mb_init_digest_avx512(args.digest, state);
 
   for (int lane=0; lane<AVX2_NLANES_SHA256; ++lane) {
     args.data_ptr[lane] = msg[lane];

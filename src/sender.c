@@ -27,13 +27,24 @@
 #include "sender.h"
 #include <sys/mman.h>
 #include "c_sha256_avx.h"
-
+#include "arch_avx512_type1.h"
 
 inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
 {
   for (int i=0; i<(AVX_SIZE/WORD_SIZE_BITS); ++i) 
     ((CTR_TYPE*)Mavx[i])[0] += (i+1); /* increase counter part in M by 1 */
 }
+
+
+static void process_transpose_digests(u32* restrict tr_states,
+				      u8* restrict work_buf,
+				      size_t* nfull_buffers,
+				      size_t* restrict server_counters,
+				      size_t* restrict indices_full );
+
+
+
+
 
 void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
 			     u8  digests[16 * N]/* out*/,
@@ -66,7 +77,8 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
 
   /* no need to construct init state with each call of the function */ 
   static u32* states_avx_ptr; /* store the resulted digests here  */
-
+  static u32 init_state[8]  = {HASH_INIT_STATE};
+  
   /* copy the counter part of M */
 
 
@@ -87,16 +99,17 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
     increment_message(Mavx);
     *ctr += (AVX_SIZE/WORD_SIZE_BITS); /* update counter */
 
+
     /* Hash multiple messages at once */
     #ifdef  __AVX512F__
     /* HASH 16 MESSAGES AT ONCE */
-    states_avx_ptr = sha256_multiple_x16(Mavx);
+    states_avx_ptr = sha256_multiple_x16(Mavx, init_state);  
     #endif
 
     #ifndef  __AVX512F__
     #ifdef    __AVX2__
     /* HASH 16 MESSAGES AT ONCE */
-    states_avx_ptr = sha256_multiple_oct(Mavx);
+    states_avx_ptr = sha256_multiple_oct(Mavx, init_state);
     #endif
     #endif
 
@@ -113,7 +126,7 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
     #endif
 
     #ifndef __AVX512F__
-    cmp_mask  =_mm256_movemask_epi8( SIMD_CMP_EPI32(cmp_vect, zero) ) ;
+    cmp_mask  = _mm256_movemask_epi8( SIMD_CMP_EPI32(cmp_vect, zero) );
     #endif
 
 
@@ -140,9 +153,11 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
 }
 
 
-static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
+static void regenerate_long_message_digests(u8 Mavx[16][64],
 					    u8* restrict work_buf,
-					    u8* restrict snd_buf,
+					    u8* bsnd_buf,
+					    size_t* restrict servers_counters,
+					    size_t* restrict indices,
 					    int nsenders,
 					    MPI_Comm inter_comm)
 {
@@ -153,33 +168,97 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
   /* M = 64bit ctr || 64bit nonce || random value */
   /* 16 messages for avx, each message differs om the other in the counter part */
   /* except counter, they are all the same */
-  u32* states_avx_ptr;
-  
+
+  size_t nfull_buffers = 0;
   FILE* fp = fopen("data/states", "r");
   int myrank;
-  MPI_Comm_rank(inter_comm, &myrank);
+  size_t server_id, idx;
 
+  MPI_Comm_rank(inter_comm, &myrank);
+  
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
   size_t begin = myrank * (nstates/nsenders);
   size_t end = (myrank + 1) * (nstates/nsenders);
-  int ctr = begin*INTERVAL;
-  
+
   
   if (myrank == (nsenders-1))
     end = nstates;
 
   /* get all states that i should work on: */
-  WORD_TYPE* states = (WORD_TYPE*) malloc((end - begin) * sizeof(WORD_TYPE));
+  WORD_TYPE* states = (WORD_TYPE*) malloc((end - begin) * sizeof(WORD_TYPE));  
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
   fread(states, WORD_SIZE, (end - begin), fp);
+
+  /* Hash buffers init */
+  SHA256_ARGS args;
+  MPI_Buffer_attach(bsnd_buf,
+		    PROCESS_QUOTA*N*NSERVERS
+		    + NSERVERS*MPI_BSEND_OVERHEAD);
   
-  
-  for (size_t ith_state = begin; ith_state<end; ++ith_state){
+  /* Hash the long message again, 16 at a time */
+  for (size_t step = 0; step<(end - begin)/16; ++step){
+    /* Read fresh states, and put them in transposed way  */
+    for (int lane = 0; lane < 16; lane++) {
+      args.digest[lane + 0*16] = states[NWORDS_STATE*(step*16 + lane) + 0];
+      args.digest[lane + 1*16] = states[NWORDS_STATE*(step*16 + lane) + 1];
+      args.digest[lane + 2*16] = states[NWORDS_STATE*(step*16 + lane) + 2];
+      args.digest[lane + 3*16] = states[NWORDS_STATE*(step*16 + lane) + 3];
+      args.digest[lane + 4*16] = states[NWORDS_STATE*(step*16 + lane) + 4];
+      args.digest[lane + 5*16] = states[NWORDS_STATE*(step*16 + lane) + 5];
+      args.digest[lane + 6*16] = states[NWORDS_STATE*(step*16 + lane) + 6];
+      args.digest[lane + 7*16] = states[NWORDS_STATE*(step*16 + lane) + 7];
+
+      args.data_ptr[lane] = Mavx[lane]; /* copy data */
+      ((u64*) args.data_ptr[lane])[0] = (step*16 + lane)*INTERVAL;
+    }
+
+
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
-      /* states_avx_ptr =  */
+      call_sha256_x16_avx512_from_c(&args, 1);
+      /* hash and update server buffers */
+      /* It also, tells us how many buffers we need to send  */
+      process_transpose_digests(args.digest,
+				work_buf,
+				&nfull_buffers,
+				servers_counters,
+				indices);
+      
+      /* send messages that are ready to be sent */
+      for (size_t i = 0; i<nfull_buffers; ++i){
+	server_id  = indices[i];
+	idx = server_id*PROCESS_QUOTA*N;
+	/* copy the the  */
+	MPI_Bsend(&work_buf[idx],
+		  PROCESS_QUOTA*N,
+		  MPI_UNSIGNED_CHAR,
+		  server_id,
+		  TAG_DICT_SND,
+		  inter_comm);
+      } /* we can work now on work_buf */
+
+      for (int lane = 0; lane<16; ++lane) /* increment counter */
+	((u64*) args.data_ptr[lane])[0] += 1;
+
     }
   }
+
+  int attached_size;
+  MPI_Buffer_detach(&bsnd_buf, &attached_size);
+  /* clear buffer after use  */
+  memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
+
+  /* Tell every receiver that you are done! */
+  for (int server=0; server<NSERVERS; ++server) 
+    MPI_Send(work_buf,
+	     PROCESS_QUOTA*N,
+	     MPI_UNSIGNED_CHAR,
+	     server,
+	     TAG_DONE_HASHING,
+	     inter_comm);
+
+
 }
+
 
 
 static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],
@@ -207,25 +286,21 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 
   /* random message base */
   u8 M[HASH_INPUT_SIZE]; 
-  u8 Mavx[16][HASH_INPUT_SIZE]; /* non-transposed! */
-  u8 state_avx[16][HASH_STATE_SIZE]; /* non-transposed */
+  u8 Mavx[16][HASH_INPUT_SIZE] = {0}; /* non-transposed! */
+  u8 state_avx[16][HASH_STATE_SIZE] ; /* non-transposed */
 
 
+
+  /* Sending related buffers allocation  */
 
   /* |dgst| + |ctr| */
   size_t const one_pair_size = sizeof(u8)*N + sizeof(CTR_TYPE); 
   size_t const  nbytes_per_server = one_pair_size * PROCESS_QUOTA;
   /* { (server0 paris..) | (server1 pairs...) | ... | (serverK pairs...) } */
-  u8* work_buf = (u8*) malloc( nbytes_per_server * NSERVERS );
-  u8* snd_buf = (u8*) malloc(nbytes_per_server);
-
-  /* /\* Decide where to place the kth digest in server i buffer *\/ */
-  /* int server_number = -1; /\* what is this for ? *\/ */
-  /* size_t offset = 0; /\* which index within a  server buffer should we pick *\/ */
-
-  /* /\* pos i: How many messages we've generated to be sent to server i? *\/ */
-  /* u64 servers_ctr[NSERVERS] = {0}; */
-  /* int snd_ctr = 0; /\* how many messages have been sent *\/ */
+  u8* work_buf = (u8*) malloc(nbytes_per_server * NSERVERS );
+  u8* bsnd_buf = (u8*) malloc(nbytes_per_server * NSERVERS);
+  size_t* server_counters = malloc(sizeof(size_t)*NSERVERS);
+  size_t* indices_full = malloc(sizeof(size_t)*NSERVERS);
 
 
   
@@ -249,7 +324,9 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   // Regenrate the long message in parallel!                                //
   regenerate_long_message_digests(Mavx,
 				  work_buf,
-				  snd_buf,
+				  bsnd_buf,
+				  server_counters,
+				  indices_full,
 				  nsenders,
 				  inter_comm);
 
@@ -353,9 +430,13 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   /* } */ 
 
 
-  free(snd_buf);
+
   free(work_buf);
-  
+  free(bsnd_buf);
+  free(server_counters);
+  free(indices_full);
+  free(msg_ctr_pt);
+
   return; // au revoir.
 
 } // MPI_Finalize
