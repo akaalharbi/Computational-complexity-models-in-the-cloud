@@ -208,8 +208,8 @@
 
   
 // todo check these 
-#define SIMD_CMP_EPI32 _mm512_cmpeq_epi32_mask
-#define SIMD_CMP_EPI16 _mm512_cmpeq_epi16_mask
+#define SIMD_CMP_EPI32(X, Y) _mm512_cmpeq_epi32_mask(X, Y)
+#define SIMD_CMP_EPI16(X, Y) _mm512_cmpeq_epi16_mask(X, Y)
 
 #define SIMD_AND_EPI32 _mm512_and_epi32
 
@@ -233,33 +233,33 @@
 #define SIMD_SET1_EPI16 _mm256_set1_epi16
 #define SIMD_SETZERO_SI _mm256_setzero_si256
 
-#define SIMD_CMP_EPI32 _mm256_cmpeq_epi32
-#define SIMD_CMP_EPI16 _mm256_cmpeq_epi16
+#define SIMD_CMP_EPI32(X, Y) _mm256_movemask_epi8(_mm256_cmpeq_epi32(X, Y))
+#define SIMD_CMP_EPI16(X, Y) _mm256_movemask_epi8(_mm256_cmpeq_epi16(X, Y))
 #define SIMD_AND_EPI32 _mm256_and_epi32
 
 // we better avoid this case :(
 /* #define SIMD_SET1_EPI8 _mm256_set1_epi8 */
 /* #define SIMD_CMP_EPI8 _mm256_cmpeq_epi8 */
 
-#elif defined(__SSE4_1__)
-#define REG_TYPE __m128i
-#define REG_TYPE_CMP __m128i
-#define AVX_SIZE  128
-#define ALIGNMENT 16
-#define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES))
+/* #elif defined(__SSE4_1__) */
+/* #define REG_TYPE __m128i */
+/* #define REG_TYPE_CMP __m128i */
+/* #define AVX_SIZE  128 */
+/* #define ALIGNMENT 16 */
+/* #define SIMD_LEN  (AVX_SIZE / (8*VAL_SIZE_BYTES)) */
 
-#define SIMD_LOAD_SI _mm_load_si128
-#define SIMD_TEST _mm_testz_si128 /* as fast as RER C */
+/* #define SIMD_LOAD_SI _mm_load_si128 */
+/* #define SIMD_TEST _mm_testz_si128 /\* as fast as RER C *\/ */
 
 
-#define SIMD_SET1_EPI32 _mm_set1_epi32
-#define SIMD_SET1_EPI16 _mm_set1_epi16
+/* #define SIMD_SET1_EPI32 _mm_set1_epi32 */
+/* #define SIMD_SET1_EPI16 _mm_set1_epi16 */
 
-#define SIMD_CMP_EPI32 _mm_cmpeq_epi32
-#define SIMD_CMP_EPI16 _mm_cmpeq_epi16
+/* #define SIMD_CMP_EPI32 _mm_cmpeq_epi32 */
+/* #define SIMD_CMP_EPI16 _mm_cmpeq_epi16 */
 
-#define SIMD_SET1_EPI8 _mm_set1_epi8
-#define SIMD_CMP_EPI8 _mm_cmpeq_epi8
+/* #define SIMD_SET1_EPI8 _mm_set1_epi8 */
+/* #define SIMD_CMP_EPI8 _mm_cmpeq_epi8 */
 
 #else
  #error "Please consider buying a modern device"
@@ -311,14 +311,14 @@
 #define VAL_TYPE u32 /* unsigned char */
 // SIMD instructions has to be adapted according to the size
 #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
-#define SIMD_CMP_VALTYPE SIMD_CMP_EPI32
+#define SIMD_CMP_VALTYPE(X, Y) SIMD_CMP_EPI32(X, Y)
 
 #else
 #define VAL_SIZE_BYTES 2 /* byte */
 #define VAL_TYPE u16 /* unsigned char */
 // SIMD instructions has to be adapted according to the size
 #define SIMD_SET1_VALTYPE SIMD_SET1_EPI16
-#define SIMD_CMP_VALTYPE SIMD_CMP_EPI16
+#define SIMD_CMP_VALTYPE(X, Y) SIMD_CMP_EPI16(X, Y)
 
 #endif
 
