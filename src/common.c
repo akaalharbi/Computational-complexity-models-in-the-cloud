@@ -128,7 +128,7 @@ void copy_transposed_digest(u8 *digest, u32 *tr_state, int lane)
   /* copy the rest of the bytes */
   memcpy(&digest[(N/WORD_SIZE)*WORD_SIZE],
 	 &tr_state[lane + (N/WORD_SIZE)*16],
-	 N - (N/WORD_SIZE) );
+	 N - (N/WORD_SIZE)*WORD_SIZE );
 
 }
 

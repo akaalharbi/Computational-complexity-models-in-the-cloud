@@ -36,18 +36,12 @@ inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
 }
 
 
-static void process_transpose_digests(u32* restrict tr_states,
-				      u8* restrict work_buf,
-				      size_t* nfull_buffers,
-				      size_t* restrict server_counters,
-				      size_t* restrict indices_full );
-  
 
-static inline void extract_dist_points(u32* restrict tr_states, /* in transposesd */
-				WORD_TYPE Mavx[16][NWORDS_STATE], /* don't edit the content */
-				u32* restrict states, /* out */
-				u64* msg_ctrs_out, /* out  */
-				int* restrict n_dist_points)
+void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
+			 u8 Mavx[restrict 16][HASH_INPUT_SIZE], 
+			 u8 digests[restrict 16 * N], /* out */
+			 CTR_TYPE msg_ctrs_out[restrict 16], /* out */
+			 int* n_dist_points) /* out */
 {
 
   // ==========================================================================+
@@ -64,22 +58,18 @@ static inline void extract_dist_points(u32* restrict tr_states, /* in transposes
   const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(MASK);
   static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
   static REG_TYPE cmp_vect;
-
   static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
 
-
   // test for distinguishedn point //
+
   /* load the last words of digests, we assume digest is aligned  */
   digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1) * HASH_STATE_SIZE]);
-  /* is it a distinguish point? */
+  /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
-    
-  /* This is a bit annoying */
+  /* cmp_mask will have the ith bit = 1 if the ith element in cmp_vect is -1 */
+  // Please the if is in one direction. 
   cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
 
-
-
-  
   if (cmp_mask) { /* found at least a distinguished point? */
     *n_dist_points = __builtin_popcount(cmp_mask);
     int lane = 0;
@@ -87,17 +77,17 @@ static inline void extract_dist_points(u32* restrict tr_states, /* in transposes
 
     for (int i=0; i < (*n_dist_points); ++i){
       /* Basically get the index of the set bit in cmp_mask */
+      /* Daniel Lemire has other methods that are found in his blog */
       trailing_zeros = __builtin_ctz(cmp_mask); 
       lane += trailing_zeros;
       cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
        
       /* update counter the ith counter */
-      counters[i] = ((CTR_TYPE*)Mavx[lane])[0];
+      msg_ctrs_out[i] = ((CTR_TYPE*)Mavx[lane])[0];
 
       /* get the digest to digests vector */
-      copy_transposed_digest(&digests[i*N], states_avx_ptr, lane);
+      copy_transposed_digest(&digests[i*N], tr_states, lane);
     }
-    return; /* we're done */
   } /* end if (cmp_mask) */
   
 }
@@ -106,11 +96,11 @@ static inline void extract_dist_points(u32* restrict tr_states, /* in transposes
 
 
 
-void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
-			     u8  digests[16 * N]/* out*/,
-			     CTR_TYPE counters[16], /* out */
-			     CTR_TYPE* ctr /* in , out */,
-			     int* n_dist_points /* out */)
+void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
+			     u8  digests[restrict 16 * N]/* out*/,
+			     CTR_TYPE msg_ctrs[restrict 16], /* out */
+			     CTR_TYPE* restrict  ctr /* in , out */,
+			     int*  n_dist_points /* out */)
 
 {
 
@@ -136,12 +126,13 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
   // --------------------------------------------------------------------------+
 
   /* no need to construct init state with each call of the function */ 
-  static u32* states_avx_ptr; /* store the resulted digests here  */
+  static u32* tr_states; /* store the resulted digests here  */
   static u32 init_state[8]  = {HASH_INIT_STATE};
   
   /* copy the counter part of M */
 
-
+  *n_dist_points = 0;
+  
   while (1) { /* loop till a dist pt found */
 
     /* */
@@ -152,28 +143,32 @@ void find_hash_distinguished(u8 Mavx[16][HASH_INPUT_SIZE], /* in*/
     /* Hash multiple messages at once */
     #ifdef  __AVX512F__
     /* HASH 16 MESSAGES AT ONCE */
-    states_avx_ptr = sha256_multiple_x16(Mavx, init_state);  
+    tr_states = sha256_multiple_x16(Mavx, init_state);  
     #endif
 
     #ifndef  __AVX512F__
     #ifdef    __AVX2__
     /* HASH 16 MESSAGES AT ONCE */
-    states_avx_ptr = sha256_multiple_oct(Mavx, init_state);
+    tr_states = sha256_multiple_oct(Mavx, init_state);
     #endif
     #endif
 
-
-
-    
+    /* Check if tr_states has  distinguished point(s) */
+    extract_dist_points(tr_states, Mavx, digests, msg_ctrs, n_dist_points);
+    if (*n_dist_points) {
+      return; /* found a distinguished point */
+    }
   } /* end while(1) */
 }
 
 
-static void regenerate_long_message_digests(u8 Mavx[16][64],
+static void regenerate_long_message_digests(u8 Mavx[restrict 16][64],
+					    u8  digests[restrict 16 * N],
+					    CTR_TYPE msg_ctrs[restrict 16],
 					    u8* restrict work_buf,
 					    u8* bsnd_buf,
-					    size_t* restrict servers_counters,
-					    size_t* restrict indices,
+					    size_t servers_counters[restrict NSERVERS],
+					    size_t indices[restrict NSERVERS],
 					    int nsenders,
 					    MPI_Comm inter_comm)
 {
@@ -189,7 +184,8 @@ static void regenerate_long_message_digests(u8 Mavx[16][64],
   FILE* fp = fopen("data/states", "r");
   int myrank;
   size_t server_id, idx;
-
+  int n_dist_points = 0;
+  
   MPI_Comm_rank(inter_comm, &myrank);
   
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
@@ -230,14 +226,25 @@ static void regenerate_long_message_digests(u8 Mavx[16][64],
 
 
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
+      /* hash 16 messages  */
       call_sha256_x16_avx512_from_c(&args, 1);
-      /* hash and update server buffers */
-      /* It also, tells us how many buffers we need to send  */
-      process_transpose_digests(args.digest,
-				work_buf,
-				&nfull_buffers,
-				servers_counters,
-				indices);
+      /* update message counters */
+      /* increment_message(args.data_ptr); */
+
+      extract_dist_points(args.digest, /* transposed state */
+			  Mavx, /* messages used */
+			  digests, /* save the distinguished hashes here */
+			  msg_ctrs, /* messages are the same except counter */
+			  &n_dist_points); /* how many dist points found? */
+
+      /* put the distinguished points in specific serverss buffer */
+      for (int i = 0; i<n_dist_points; ++i){
+	server_id = to_which_server(&digests[i*N]);
+	/* where to put digest in server_id buffer? */
+	idx = servers_counters[server_id];
+	//+ @todo start here
+      }
+      
       
       /* send messages that are ready to be sent */
       for (size_t i = 0; i<nfull_buffers; ++i){

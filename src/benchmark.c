@@ -101,7 +101,7 @@ typedef struct {
 
 size_t time_sha_avx512(){
   // place holder for the 16 messages
-
+  
   #pragma omp parallel
   {
   size_t nmsgs = 1600000LL;
@@ -117,12 +117,11 @@ size_t time_sha_avx512(){
   double start = wtime(); /* timing */
 
 
-  uint32_t state[8];
-  uint32_t* state_ptr = state;
+  uint32_t state[8] = {HASH_INIT_STATE};
+
   
   for (size_t i = 0; i<(nmsgs/16); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
-    ctr += ((state_ptr[3] & 0xFF) == 0) ;
+    sha256_multiple_x16(msg.M, state);
   }
 
   elapsed = wtime() - start;
@@ -159,11 +158,11 @@ size_t time_sha_one_avx512_other_sha_ni(){
   double start = wtime(); /* timing */
 
 
-  uint32_t state[8];
+  uint32_t state[8] = {HASH_INIT_STATE};
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/16); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
+    state_ptr = sha256_multiple_x16(msg.M, state);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
@@ -224,11 +223,11 @@ size_t time_sha_avx512_single_thread(){
   double start = wtime(); /* timing */
 
 
-  uint32_t state[8];
+  uint32_t state[8] = {HASH_STATE_SIZE};
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/16); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
+    state_ptr = sha256_multiple_x16(msg.M, state);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
@@ -263,11 +262,11 @@ size_t time_sha_avx256(){
   double start = wtime(); /* timing */
 
 
-  uint32_t state[8];
+  uint32_t state[8] = {HASH_INIT_STATE};
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/8); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
+    state_ptr = sha256_multiple_x16(msg.M, state);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
@@ -303,11 +302,11 @@ size_t time_sha_avx256_single(){
   double start = wtime(); /* timing */
 
 
-  uint32_t state[8];
+  uint32_t state[8] = {HASH_INIT_STATE};
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/8); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
+    state_ptr = sha256_multiple_x16(msg.M, state);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
