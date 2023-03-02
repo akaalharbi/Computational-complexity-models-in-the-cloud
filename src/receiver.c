@@ -118,7 +118,6 @@ static inline int lookup_multi_save(dict *d,
 // this function should be rewritten @todo 
 static void write_digest_to_dict(dict *d,
 				  u8* restrict rcv_buf,
-				  u8* restrict add_buf,
 				  const int nsenders,
 				  MPI_Comm inter_comm)
 {
@@ -139,9 +138,6 @@ static void write_digest_to_dict(dict *d,
   // @todo note: not to forget we will change the direction right most bytes
   // contain the distinguished point zeros and the bits.
   MPI_Status status;
-  MPI_Request request;
-
-  
   /* A sender will send a 0 tag if it needs to hash more, otherwise it will send tag = 1 */
   int ncompleted_senders = 0; 
   size_t rcv_size = PROCESS_QUOTA*N;
@@ -151,44 +147,24 @@ static void write_digest_to_dict(dict *d,
   // Receive digests and add them to dictionary
   
   /* Receive one message before */
-  MPI_Recv(rcv_buf,
-	   rcv_size,
-	   MPI_UNSIGNED_CHAR,
-	   MPI_ANY_SOURCE,
-	   MPI_ANY_TAG,
-	   inter_comm,
-	   &status);
-  
-  ncompleted_senders += status.MPI_TAG;
-
-  /* copy the received message and listen immediately */
-  memcpy(add_buf, rcv_buf, rcv_size);
-
-    
-
   while (ncompleted_senders < nsenders) {
-    MPI_Irecv(rcv_buf, /* store in this location */
+    MPI_Recv(rcv_buf, /* store in this location */
 	      rcv_size, /* How many bytes to receive  */
 	      MPI_UNSIGNED_CHAR,
 	      MPI_ANY_SOURCE, /* any sender */
 	      MPI_ANY_TAG,  /* tag = 1 means a sender has done its work */ 
 	      inter_comm,
-	      &request);
+	      &status);
+
 
     /* add them to dictionary */
     for (size_t j=0; j<PROCESS_QUOTA; ++j) 
-      dict_add_element_to(d, &add_buf[N*j]);
+      dict_add_element_to(d, &rcv_buf[N*j]);
 
-    MPI_Wait(&request, &status);
     /* If a sender is done hashing, it will make rcv_buf = {0}, and has tag=1 */
     /* The dictionary by design will ignore all zero messages */
     ncompleted_senders += status.MPI_TAG;
-    /* copy it to a safe buffer, so it can listen again */
-    memcpy(add_buf, rcv_buf, rcv_size);
   }
-
-
-  return;
 }
 
 
@@ -342,10 +318,11 @@ void receiver(int local_rank,
   // receive message in this buffer regardless if it's pure digests or
   // ctr||digests 
   u8* rcv_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
-  
   //+ copy rcv_buf to lookup_buf then listen to other sender using rcv_buf
   u8* lookup_buf = (u8*) malloc(one_pair_size * PROCESS_QUOTA);
 
+  memset(rcv_buf, 0, one_pair_size*PROCESS_QUOTA);
+  memset(lookup_buf, 0, one_pair_size*PROCESS_QUOTA);
 
 
   /* save initial random messages of each sender here  */
@@ -360,12 +337,10 @@ void receiver(int local_rank,
   double time_start = wtime();
 
 
-
   //--------------------------------- PART 1 ----------------------------------+
   // PART 1: Get the long message digests from all senders
   write_digest_to_dict(d,
 		       rcv_buf,
-		       lookup_buf,
 		       nsenders,
 		       inter_comm);
 
@@ -386,6 +361,7 @@ void receiver(int local_rank,
 
 
   //--------------------------------- PART 2 ----------------------------------+
+  // corresponds to part 2.b in senders
   // PART 2: Get templates from all senders
   MPI_Allgather(NULL, 0, NULL, /* receivers don't send */
 		templates, /* save messages here */
@@ -393,7 +369,8 @@ void receiver(int local_rank,
 		MPI_UNSIGNED_CHAR,
 		inter_comm);
 
-  // PART 3: Get templates from all senders
+
+  //--------------------------------- PART 2 ----------------------------------+
   /* listen to senders, probe their digest, in case a candidate is found: */
   /* save the message the generates the cadidate digest. */
   /* exit when enough number of candidates are found i.e. NNEEDED_CND */

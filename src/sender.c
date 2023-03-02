@@ -127,7 +127,6 @@ void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 
   /* no need to construct init state with each call of the function */ 
   static u32* tr_states; /* store the resulted digests here  */
-  static u32 init_state[8]  = {HASH_INIT_STATE};
   
   /* copy the counter part of M */
 
@@ -143,13 +142,13 @@ void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
     /* Hash multiple messages at once */
     #ifdef  __AVX512F__
     /* HASH 16 MESSAGES AT ONCE */
-    tr_states = sha256_multiple_x16(Mavx, init_state);  
+    tr_states = sha256_multiple_x16(Mavx);  
     #endif
 
     #ifndef  __AVX512F__
     #ifdef    __AVX2__
     /* HASH 16 MESSAGES AT ONCE */
-    tr_states = sha256_multiple_oct(Mavx, init_state);
+    tr_states = sha256_multiple_oct(Mavx);
     #endif
     #endif
 
@@ -162,13 +161,12 @@ void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 }
 
 
-static void regenerate_long_message_digests(u8 Mavx[restrict 16][64],
+static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
 					    u8  digests[restrict 16 * N],
 					    CTR_TYPE msg_ctrs[restrict 16],
 					    u8* restrict work_buf,
 					    u8* bsnd_buf,
 					    size_t servers_counters[restrict NSERVERS],
-					    size_t indices[restrict NSERVERS],
 					    int nsenders,
 					    MPI_Comm inter_comm)
 {
@@ -180,7 +178,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][64],
   /* 16 messages for avx, each message differs om the other in the counter part */
   /* except counter, they are all the same */
 
-  size_t nfull_buffers = 0;
   FILE* fp = fopen("data/states", "r");
   int myrank;
   size_t server_id, idx;
@@ -220,8 +217,10 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][64],
       args.digest[lane + 6*16] = states[NWORDS_STATE*(step*16 + lane) + 6];
       args.digest[lane + 7*16] = states[NWORDS_STATE*(step*16 + lane) + 7];
 
-      args.data_ptr[lane] = Mavx[lane]; /* copy data */
-      ((u64*) args.data_ptr[lane])[0] = (step*16 + lane)*INTERVAL;
+      /* adjust the counter part */
+      ((u64*) Mavx[lane])[0] = (step*16 + lane)*INTERVAL;
+      args.data_ptr[lane] = Mavx[lane]; /* point data */
+      
     }
 
 
@@ -229,7 +228,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][64],
       /* hash 16 messages  */
       call_sha256_x16_avx512_from_c(&args, 1);
       /* update message counters */
-      /* increment_message(args.data_ptr); */
 
       extract_dist_points(args.digest, /* transposed state */
 			  Mavx, /* messages used */
@@ -242,32 +240,40 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][64],
 	server_id = to_which_server(&digests[i*N]);
 	/* where to put digest in server_id buffer? */
 	idx = servers_counters[server_id];
-	//+ @todo start here
+
+	/* copy the digest to the server buffer */
+	memcpy(&work_buf[server_id*PROCESS_QUOTA*N
+			+ idx*N],
+	       &digests[N*i],
+	       N);
+
+	++servers_counters[server_id];
+	/* if the server buffer is full send immediately */
+	if (servers_counters[server_id] == PROCESS_QUOTA){
+	  MPI_Bsend(&work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
+		    N*PROCESS_QUOTA, /* How many characteres will be sent. */
+		    MPI_UNSIGNED_CHAR, 
+		    server_id, /* receiver */
+		    TAG_DICT_SND, /* 0 */
+		    inter_comm);
+
+	  servers_counters[server_id] = 0;
+	}
       }
       
       
-      /* send messages that are ready to be sent */
-      for (size_t i = 0; i<nfull_buffers; ++i){
-	server_id  = indices[i];
-	idx = server_id*PROCESS_QUOTA*N;
-	/* copy the the  */
-	MPI_Bsend(&work_buf[idx],
-		  PROCESS_QUOTA*N,
-		  MPI_UNSIGNED_CHAR,
-		  server_id,
-		  TAG_DICT_SND,
-		  inter_comm);
-      } /* we can work now on work_buf */
-
-      for (int lane = 0; lane<16; ++lane) /* increment counter */
-	((u64*) args.data_ptr[lane])[0] += 1;
-
+      increment_message(Mavx); /* changes should carry to args.data_ptr */
+      /* for (int lane = 0; lane<16; ++lane){ */
+      /* 	((u64*) Mavx[lane])[0] += 1; */
+      /* 	args.data_ptr[lane] = Mavx[lane]; /\* not sure this is necessary *\/ */
+      /* } */
+      
     }
   }
 
   int attached_size;
   MPI_Buffer_detach(&bsnd_buf, &attached_size);
-  /* clear buffer after use  */
+  /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
 
   /* Tell every receiver that you are done! */
@@ -278,18 +284,75 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][64],
 	     server,
 	     TAG_DONE_HASHING,
 	     inter_comm);
-
-
 }
 
 
 
-static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],
-				    u8* restrict work_buf, /* servers digests here */
-				    u8* restrict snd_buf, /* snd_buf */
+static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg */
+				    u8  digests[restrict 16 * N],
+				    CTR_TYPE msg_ctrs[restrict 16],
+				    u8* restrict work_buf,
+				    u8* bsnd_buf,
+				    size_t servers_counters[restrict NSERVERS],
 				    MPI_Comm inter_comm)
 {
-  u32* statesAVX;
+  u32* states_avx;
+  int n_dist_points = 0; /* At the beginning we no dist points
+			  */
+  size_t server_id=0, idx=0;
+  
+  MPI_Buffer_attach(bsnd_buf,
+		    PROCESS_QUOTA*(N+sizeof(CTR_TYPE))*NSERVERS
+		    + NSERVERS*MPI_BSEND_OVERHEAD);
+
+
+  while (1) {
+    /* 1- hash, 2- increment message counters, 3- extract disit point if any */
+    states_avx = sha256_multiple_x16(Mavx);
+    increment_message(Mavx);
+    extract_dist_points(states_avx, Mavx, digests, msg_ctrs, &n_dist_points);
+
+    /* put the distinguished points in specific serverss buffer */
+    for (int i = 0; i<n_dist_points; ++i){ /* n_dist_points might be 0 */
+      server_id = to_which_server(&digests[i*N]);
+      /* where to put digest in server_id buffer? (this is a local view) */
+      idx = servers_counters[server_id];
+
+
+      /* 1 element = ctr||dgst  */
+      /* #elments in  server buffer = PROCESS_QUOTA */
+      /* There are NSERVERS in total */
+      /* copy the ctr to the server buffer */
+      memcpy(&work_buf[( N + sizeof(CTR_TYPE)  )/* one element size */
+		       *( PROCESS_QUOTA*server_id + idx)],/* #elments skipped */
+	     &msg_ctrs[i], /* counter of the message i  */
+	     sizeof(CTR_TYPE));
+
+      /* copy the digest to the server buffer */
+      memcpy(&work_buf[( N + sizeof(CTR_TYPE)  ) /* one element size */
+		       *( PROCESS_QUOTA*server_id + idx) /* #elments skipped */
+		       + sizeof(CTR_TYPE)], /* write after the counter part */
+	     &digests[N*i],
+	     N);
+
+      ++servers_counters[server_id];
+      /* if the server buffer is full send immediately */
+      if (servers_counters[server_id] == PROCESS_QUOTA){
+	  
+	MPI_Bsend(&work_buf[server_id*PROCESS_QUOTA*(N+sizeof(CTR_TYPE))],
+		  (N+sizeof(CTR_TYPE))*PROCESS_QUOTA, /* #chars to be sent */
+		  MPI_UNSIGNED_CHAR, 
+		  server_id, /* receiver */
+		  TAG_DICT_SND, /* 0 */
+		  inter_comm);
+	servers_counters[server_id] = 0;
+      }
+    }
+  }
+  
+  
+  
+  
 }
 
 
@@ -310,31 +373,52 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   /* random message base */
   u8 M[HASH_INPUT_SIZE]; 
   u8 Mavx[16][HASH_INPUT_SIZE] = {0}; /* non-transposed! */
-  u8 state_avx[16][HASH_STATE_SIZE] ; /* non-transposed */
+  u8 digests[16 * N] ; /* save the distinguished digests here (manually) */
+  CTR_TYPE msg_ctrs[16]; /* save thde counters of the dist digests (manually) */
 
-
+  
 
   /* Sending related buffers allocation  */
 
   /* |dgst| + |ctr| */
   size_t const one_pair_size = sizeof(u8)*N + sizeof(CTR_TYPE); 
   size_t const  nbytes_per_server = one_pair_size * PROCESS_QUOTA;
+
+  /* pair = (ctr||dgst) */
   /* { (server0 paris..) | (server1 pairs...) | ... | (serverK pairs...) } */
   u8* work_buf = (u8*) malloc(nbytes_per_server * NSERVERS );
+
+  /* attach to MPI_BSend, not worked directly on! */
   u8* bsnd_buf = (u8*) malloc(nbytes_per_server * NSERVERS);
+  /* ith_entry : how many non-sent element stored in server i buffer */
   size_t* server_counters = malloc(sizeof(size_t)*NSERVERS);
-  size_t* indices_full = malloc(sizeof(size_t)*NSERVERS);
+
 
 
   
-  /* Get a random message only once */
-  CTR_TYPE* msg_ctr_pt = (CTR_TYPE*) M; /* counter pointer */
-  getrandom(M, HASH_INPUT_SIZE, 1);
-  msg_ctr_pt[0] = 0; /* zeroing the first 64bits of M */
 
-  /* // copy the the random message to all avx messages */
-  /* for (int i = 0; i<16; ++i)  */
-  /*   memcpy(Mavx[i], M, HASH_INPUT_SIZE); */
+  
+  // ----------------------------- PART 1 --------------------------------- //
+  // Regenrate the long message in parallel!                                //
+  regenerate_long_message_digests(Mavx,
+				  digests,
+				  msg_ctrs,
+				  work_buf,
+				  bsnd_buf,
+				  server_counters,
+				  nsenders,
+				  inter_comm);
+
+
+  // ----------------------------- PART 2.a ----------------------------------- //
+  /* Get a random message only once */
+  CTR_TYPE*ctr_pt = (CTR_TYPE*) M; /* counter pointer */
+  getrandom(M, HASH_INPUT_SIZE, 1);
+  ctr_pt[0] = 0; /* zeroing the first 64bits of M */
+
+  // copy the the random message to all avx messages
+  for (int i = 0; i<16; ++i)
+    memcpy(Mavx[i], M, HASH_INPUT_SIZE);
 
   // print the template. this is not necessary.
   char txt[50];
@@ -343,17 +427,7 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   puts("\n");
 
   
-  // ----------------------------- PART 1 --------------------------------- //
-  // Regenrate the long message in parallel!                                //
-  regenerate_long_message_digests(Mavx,
-				  work_buf,
-				  bsnd_buf,
-				  server_counters,
-				  indices_full,
-				  nsenders,
-				  inter_comm);
-
-  // ----------------------------- PART 2 --------------------------------- //
+  // ----------------------------- PART 2.b ---------------------------------- //
   // 1-  Sen the initial input to all receiving servers 
   MPI_Allgather(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, NULL, 0, NULL, inter_comm);
 
@@ -367,98 +441,21 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   // dgst := N bytes of the digest                                             |
   // ctr  := (this is a shortcut that allows us not to send the whole message) |
   //---------------------------------------------------------------------------+
-
-
-
-  
-  // ------------------------------ PART 4 ----------------------------------- +
-  // Generate hashes and send them
-  generate_random_digests(Mavx, work_buf, snd_buf, inter_comm);
-  
-  /* double time_start = wtime();  */
-  /* printf("sender #%d: done init mpi, and sharing the its template." */
-  /* 	 "going to generate hashes \n", myrank); */
-  
-  /* // find_hash_distinguished_init();  */
-
-
-  /* while(1) { /\* when do we break? never! *\/ */
-  /*   /\* Find a message that produces distinguished point *\/ */
-  /*   find_hash_distinguished(Mavx, */
-  /* 			    M, /\* save the message that generates dist here *\/ */
-  /* 			    Mstate); /\* save the distinguished state here *\/ */
-
-  /*   //+ decide to which server to add to?  */
-  /*   server_number = to_which_server((u8*) Mstate); */
-
-
-  /*   /\* 1st term: go to server booked memory, 2nd: location of 1st free place*\/ */
-  /*   offset = server_number * nbytes_per_server */
-  /*          + servers_ctr[server_number] * one_pair_size; */
-  /*   // recall que one_pair_size =  |dgst| + |ctr| - |known bits| */
-
-
-
-
-  /*   // record a pair (msg, dgst), msg is just the counter in our case */
-  /*   /\* record the counter  *\/ */
-  /*   memcpy(&snd_buf[ offset ], */
-  /* 	   M, */
-  /* 	   sizeof(CTR_TYPE) ); */
-
-  /*   /\* After the counter save N-DEFINED_BYTES of MState *\/ */
-  /*   memcpy( &snd_buf[offset + sizeof(CTR_TYPE)], /\* copy digest to snd_buf[offset] *\/ */
-  /* 	    ((u8*)Mstate) + DEFINED_BYTES, /\* skip defined bytes, @todo skip the left most bytes *\/ */
-  /* 	    N-DEFINED_BYTES ); /\* nbytes to be sent, compressed state. *\/ */
-
-  /*   servers_ctr[server_number] += 1; */
-    
-    
-  /*   if (servers_ctr[server_number] >= PROCESS_QUOTA){ */
-  /*     printf("===============================================\n" */
-  /*            "sender #%d -> recv #%d before sending %0.4fsec\n" */
-  /* 	     "===============================================\n\n", */
-  /* 	     myrank, server_number, wtime() -  time_start ); */
-
-  /*     time_start = wtime(); */
-  /*     MPI_Send(&snd_buf[server_number*nbytes_per_server], */
-  /* 		PROCESS_QUOTA*one_pair_size, */
-  /* 		MPI_UNSIGNED_CHAR, */
-  /* 		server_number, */
-  /* 		TAG_SND_DGST, */
-  /* 		MPI_COMM_WORLD); */
-
-  /*     /\* if (snd_ctr > 0) { *\/ */
-  /*     /\* 	printf("to %d\n", server_number); *\/ */
-  /*     /\* 	print_char(&snd_buf[server_number*nbytes_per_server], PROCESS_QUOTA*one_pair_size); *\/ */
-  /*     /\* 	print_attack_information(); *\/ */
-  /*     /\* } *\/ */
-
-  /*     /\* else { *\/ */
-  /*     /\* 	printf("i am %d to %d\n", myrank, server_number); *\/ */
-  /*     /\* 	print_char(&snd_buf[server_number*nbytes_per_server], PROCESS_QUOTA*one_pair_size); *\/ */
-  /*     /\* } *\/ */
-
-
-  /*     ++snd_ctr; */
-
-  /*     printf("-----------------------------------------------\n" */
-  /*            "sender #%d -> recv #%d sending done %0.4fsec\n" */
-  /* 	     "-----------------------------------------------\n\n", */
-  /* 	     myrank, server_number, wtime() -  time_start ); */
-
-  /*     servers_ctr[server_number] = 0; */
-  /*     time_start = wtime(); */
-  /*   } */
-  /* } */ 
+  generate_random_digests(Mavx,
+			  digests,
+			  msg_ctrs,
+			  work_buf,
+			  bsnd_buf,
+			  server_counters,
+			  inter_comm);
 
 
 
   free(work_buf);
   free(bsnd_buf);
   free(server_counters);
-  free(indices_full);
-  free(msg_ctr_pt);
+  free(ctr_pt);
+  
 
   return; // au revoir.
 

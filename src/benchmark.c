@@ -116,12 +116,8 @@ size_t time_sha_avx512(){
   double elapsed = 0;
   double start = wtime(); /* timing */
 
-
-  uint32_t state[8] = {HASH_INIT_STATE};
-
-  
   for (size_t i = 0; i<(nmsgs/16); ++i) {
-    sha256_multiple_x16(msg.M, state);
+    sha256_multiple_x16(msg.M);
   }
 
   elapsed = wtime() - start;
@@ -158,12 +154,11 @@ size_t time_sha_one_avx512_other_sha_ni(){
   double start = wtime(); /* timing */
 
 
-  uint32_t state[8] = {HASH_INIT_STATE};
-  uint32_t* state_ptr = state;
+
+  uint32_t* state_ptr;
   
   for (size_t i = 0; i<(nmsgs/16); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M, state);
-    ctr += ((state[3] & 0xFF) == 0) ;
+    state_ptr = sha256_multiple_x16(msg.M);
   }
 
   elapsed = wtime() - start;
@@ -227,7 +222,7 @@ size_t time_sha_avx512_single_thread(){
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/16); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M, state);
+    state_ptr = sha256_multiple_x16(msg.M);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
@@ -266,7 +261,7 @@ size_t time_sha_avx256(){
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/8); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M, state);
+    state_ptr = sha256_multiple_x16(msg.M);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
@@ -306,7 +301,7 @@ size_t time_sha_avx256_single(){
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/8); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M, state);
+    state_ptr = sha256_multiple_x16(msg.M);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
