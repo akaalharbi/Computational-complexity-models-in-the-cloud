@@ -80,6 +80,7 @@ all: $(TARGETS) lib
 	mkdir -p data/digests
 	mkdir -p data/messages
 	mkdir -p data/stats
+	mkdir -p data/verify
 
 
 

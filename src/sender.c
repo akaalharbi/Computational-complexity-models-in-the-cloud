@@ -194,9 +194,12 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
     end = nstates;
 
   /* get all states that i should work on: */
-  WORD_TYPE* states = (WORD_TYPE*) malloc((end - begin) * sizeof(WORD_TYPE));  
+  /* get all states that i should work on: */
+  WORD_TYPE* states = (WORD_TYPE*) malloc((end - begin)
+					  * sizeof(WORD_TYPE)
+					  * NWORDS_STATE);
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
-  fread(states, WORD_SIZE, (end - begin), fp);
+  fread(states, HASH_STATE_SIZE, (end - begin), fp);
 
   /* Hash buffers init */
   SHA256_ARGS args;

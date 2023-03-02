@@ -109,10 +109,10 @@ u32 to_which_server(u8 state[HASH_STATE_SIZE])
 
 
 
-void copy_transposed_state(u32 *Mstate, u32 *tr_state, int lane)
+void copy_transposed_state(u32 *state, u32 *tr_state, int lane)
 {
   for (int i = 0; i<NWORDS_STATE; ++i) {
-    Mstate[i] = tr_state[lane + i*16];
+    state[i] = tr_state[lane + i*16];
   }
 }
 
