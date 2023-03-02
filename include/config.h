@@ -88,8 +88,8 @@
 /* since there migh be an empty space on the right side of the word, we shift */
 /* the mask that of the distinguished point test to the left */
 #define SHIFT_AMOUNT (N_NWORDS_CEIL * 32 - N * 8)
-#define MASK_UNSHIFTED ((1 << DIFFICULTY) - 1)
-#define MASK (MASK_UNSHIFTED << SHIFT_AMOUNT)
+#define DIST_PT_MASK_UNSHIFTED ((1 << DIFFICULTY) - 1)
+#define DIST_PT_MASK (DIST_PT_MASK_UNSHIFTED << SHIFT_AMOUNT)
 
 
 /* we are not going to hold more than 32 bits in a dict entry */

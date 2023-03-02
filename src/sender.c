@@ -55,7 +55,7 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   /* Init an AVX512/AVX2 vector */
   const REG_TYPE zero = SIMD_SETZERO_SI();
   /* use this mask to check if a digest is a distinguished point or not! */
-  const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(MASK);
+  const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(DIST_PT_MASK);
   static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
   static REG_TYPE cmp_vect;
   static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
