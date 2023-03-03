@@ -30,10 +30,15 @@ static void verify_middle_states(int myrank,
   
   u8 Mavx[16][HASH_INPUT_SIZE] = {0};
   u32 current_states[16*8] = {0}; /* are the states after each hashing */
+  u32 tmp[16*8] = {0}; /* are the states after each hashing */
   u32 next_states[16*8] = {0}; /* next in the sense after INTERVAL hashin */
   u32 tr_states[16*8] = {0}; /* same as current_states but transposed */
 
 
+  u32 state_singe[8];
+
+
+  
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
   size_t begin = myrank * (nstates/nprocesses);
   size_t end = (myrank + 1) * (nstates/nprocesses);
@@ -75,14 +80,21 @@ static void verify_middle_states(int myrank,
     local_idx = global_idx - begin ;
 
     /* form the state to be accepted to the uint32_t *sha256_multiple_x16_tr(u32*, u32*) */
-    transpose_state(tr_states, &states[local_idx*16]);
+    transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
+
+    
     print_byte_txt("tr_state", (u8*)tr_states, HASH_STATE_SIZE*16);
     puts("");    
     untranspose_state(current_states, tr_states);
     print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16);
     puts("");
     print_byte_txt("state", (u8*)&states[local_idx*16], HASH_STATE_SIZE*16);
+
+
+
     
+    memcpy(state_singe, &states[local_idx*NWORDS_STATE], HASH_STATE_SIZE);
+
     /* we will test eventually transpose(tr_states) =?= next_states */
     memcpy(next_states,
 	   &states[(local_idx + 1)*NWORDS_STATE],
@@ -97,19 +109,37 @@ static void verify_middle_states(int myrank,
 
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
       /* hash 16 messages and copy it to tr_states  */
-      memcpy(tr_states,
+      memcpy(tmp,
 	     sha256_multiple_x16_tr(Mavx, tr_states),
 	     16*HASH_STATE_SIZE);
       
+      memcpy(tr_states, tmp, 16*HASH_STATE_SIZE);
+
+      /* hash_single(state_singe, Mavx[0]); */
       /* update message counters */
       for (int lane = 0; lane<16; ++lane)
 	((u64*) Mavx[lane])[0] += 1;
+
+
+      /* /\* check we have the same hashes *\/ */
+      /* untranspose_state(current_states, tr_states); */
+
+      /* nbytes_non_equal = memcmp(current_states, state_singe, HASH_STATE_SIZE); */
+      /* if (nbytes_non_equal != 0) { */
+      /* 	printf("hurray at %lu\n", hash_n); */
+      /* 	print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16); */
+      /* 	puts(""); */
+      /* 	print_byte_txt("single", (u8*)state_singe, HASH_STATE_SIZE); */
+      /* 	puts(""); */
+      /* } */
+
+      
     } /* end for hash interval */
 
 
     /* check we have the same hashes */
     untranspose_state(current_states, tr_states);
-    
+
     nbytes_non_equal = memcmp(current_states, next_states, 16*HASH_STATE_SIZE);
     is_corrupt = (0 != nbytes_non_equal);
 
@@ -119,7 +149,7 @@ static void verify_middle_states(int myrank,
 	     memcmp(current_states, next_states, 16*HASH_STATE_SIZE));
       
       fprintf(fp_verify, "found a curropt state at global_idx=%lu\n", global_idx);
-      print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*1);
+      print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16);
       puts("");
       print_byte_txt("next", (u8*)next_states, HASH_STATE_SIZE*16);
     }
@@ -137,8 +167,6 @@ static void verify_middle_states(int myrank,
   fclose(fp);
   fclose(fp_verify);
 }
-
-
 
 
 

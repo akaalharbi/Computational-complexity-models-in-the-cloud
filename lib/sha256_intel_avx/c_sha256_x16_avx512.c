@@ -38,15 +38,15 @@ void sha256_mb_init_digest_avx512(uint32_t *digest)
 void sha256_init_digest_avx512(uint32_t *digest, uint32_t tr_states[16*8])
 {
 	/* 8 is sufficient for AVX2, 16 goes all the way to AVX512 */
-	for (int lane = 0; lane < 16; lane++) {
-        digest[lane + 0] = tr_states[lane + 1];
-        digest[lane + 1] = tr_states[lane + 2];
-        digest[lane + 2] = tr_states[lane + 3];
-        digest[lane + 3] = tr_states[lane + 4];
-        digest[lane + 4] = tr_states[lane + 5];
-        digest[lane + 5] = tr_states[lane + 6];
-        digest[lane + 6] = tr_states[lane + 7];
-        digest[lane + 7] = tr_states[lane + 8];
+	for (int i = 0; i < 16*8; ++i) {
+        digest[i] = tr_states[i];
+        digest[i] = tr_states[i];
+        digest[i] = tr_states[i];
+        digest[i] = tr_states[i];
+        digest[i] = tr_states[i];
+        digest[i] = tr_states[i];
+        digest[i] = tr_states[i];
+        digest[i] = tr_states[i];
     }
 }
 
