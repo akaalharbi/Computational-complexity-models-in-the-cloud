@@ -178,6 +178,10 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
   /* 16 messages for avx, each message differs om the other in the counter part */
   /* except counter, they are all the same */
 
+  u32 current_states[16*8] = {0}; /* are the states after each hashing */
+  u32 tr_states[16*8] = {0}; /* same as current_states but transposed */
+
+  
   FILE* fp = fopen("data/states", "r");
   int myrank;
   size_t server_id, idx;
@@ -188,52 +192,58 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
   size_t begin = myrank * (nstates/nsenders);
   size_t end = (myrank + 1) * (nstates/nsenders);
+  size_t global_idx; /* where are we in the states file */
+  size_t local_idx; /* where are we in the buffer copied from states file  */
 
   
   if (myrank == (nsenders-1))
-    end = nstates;
+    end = nstates; /* get the rest of states */
+
 
   /* get all states that i should work on: */
   /* get all states that i should work on: */
   WORD_TYPE* states = (WORD_TYPE*) malloc((end - begin)
 					  * sizeof(WORD_TYPE)
 					  * NWORDS_STATE);
+  /* only load states that i am going to work on */
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
+  fclose(fp);
 
+  
   /* Hash buffers init */
-  SHA256_ARGS args;
+
   MPI_Buffer_attach(bsnd_buf,
 		    PROCESS_QUOTA*N*NSERVERS
 		    + NSERVERS*MPI_BSEND_OVERHEAD);
   
   /* Hash the long message again, 16 at a time */
-  for (size_t step = 0; step<(end - begin)/16; ++step){
-    /* Read fresh states, and put them in transposed way  */
-    for (int lane = 0; lane < 16; lane++) {
-      args.digest[lane + 0*16] = states[NWORDS_STATE*(step*16 + lane) + 0];
-      args.digest[lane + 1*16] = states[NWORDS_STATE*(step*16 + lane) + 1];
-      args.digest[lane + 2*16] = states[NWORDS_STATE*(step*16 + lane) + 2];
-      args.digest[lane + 3*16] = states[NWORDS_STATE*(step*16 + lane) + 3];
-      args.digest[lane + 4*16] = states[NWORDS_STATE*(step*16 + lane) + 4];
-      args.digest[lane + 5*16] = states[NWORDS_STATE*(step*16 + lane) + 5];
-      args.digest[lane + 6*16] = states[NWORDS_STATE*(step*16 + lane) + 6];
-      args.digest[lane + 7*16] = states[NWORDS_STATE*(step*16 + lane) + 7];
+  for (global_idx = begin; global_idx<end; global_idx += 16){
+    /* local_idx = 0 -> (end-global)/16 */
+    local_idx = global_idx - begin ;
 
-      /* adjust the counter part */
-      ((u64*) Mavx[lane])[0] = (step*16 + lane)*INTERVAL;
-      args.data_ptr[lane] = Mavx[lane]; /* point data */
-      
-    }
+
+    /* Read fresh 16 states, and put them in transposed way  */
+    transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
+    /* set message counters */
+    for (int lane = 0; lane<16; ++lane)
+      ((u64*) Mavx[lane])[0] = INTERVAL * (global_idx + lane);
+
 
 
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
-      /* hash 16 messages  */
-      call_sha256_x16_avx512_from_c(&args, 1);
-      /* update message counters */
-      increment_message(Mavx); /* changes should carry to args.data_ptr */
+      /* hash 16 messages and copy it to tr_states  */
+      memcpy(tr_states,
+	     sha256_multiple_x16_tr(Mavx, tr_states),
+	     16*HASH_STATE_SIZE);
+      /* increment the message counters after hashing */
+      for (int lane = 0; lane<16; ++lane)
+	((u64*) Mavx[lane])[0] += 1;
 
-      extract_dist_points(args.digest, /* transposed state */
+
+      // up to this point it seems everything is fine
+      /* todo check thish function */
+      extract_dist_points(tr_states, /* transposed states */
 			  Mavx, /* messages used */
 			  digests, /* save the distinguished hashes here */
 			  msg_ctrs, /* messages are the same except counter */
@@ -262,18 +272,10 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
 		    inter_comm);
 
 	  servers_counters[server_id] = 0;
-	}
-      }
-      
-      
-
-      /* for (int lane = 0; lane<16; ++lane){ */
-      /* 	((u64*) Mavx[lane])[0] += 1; */
-      /* 	args.data_ptr[lane] = Mavx[lane]; /\* not sure this is necessary *\/ */
-      /* } */
-      
-    }
-  }
+	}/* end if */
+      } /* end for n_dist_points */
+    } /* end for hash_n */
+  } /* end for global_idx */
 
   int attached_size;
   MPI_Buffer_detach(&bsnd_buf, &attached_size);
