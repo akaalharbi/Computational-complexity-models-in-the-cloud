@@ -231,6 +231,7 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
       /* hash 16 messages  */
       call_sha256_x16_avx512_from_c(&args, 1);
       /* update message counters */
+      increment_message(Mavx); /* changes should carry to args.data_ptr */
 
       extract_dist_points(args.digest, /* transposed state */
 			  Mavx, /* messages used */
@@ -265,7 +266,7 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
       }
       
       
-      increment_message(Mavx); /* changes should carry to args.data_ptr */
+
       /* for (int lane = 0; lane<16; ++lane){ */
       /* 	((u64*) Mavx[lane])[0] += 1; */
       /* 	args.data_ptr[lane] = Mavx[lane]; /\* not sure this is necessary *\/ */

@@ -109,12 +109,42 @@ u32 to_which_server(u8 state[HASH_STATE_SIZE])
 
 
 
-void copy_transposed_state(u32 *state, u32 *tr_state, int lane)
+
+
+void transpose_state(u32 dest[restrict 16*8],
+		     u32 src[restrict 16*8])
 {
-  for (int i = 0; i<NWORDS_STATE; ++i) {
-    state[i] = tr_state[lane + i*16];
+  for (int lane = 0; lane < 16; lane++) {
+    dest[lane + 0*16] = src[8 * lane + 0];
+    dest[lane + 1*16] = src[8 * lane + 1];
+    dest[lane + 2*16] = src[8 * lane + 2];
+    dest[lane + 3*16] = src[8 * lane + 3];
+    dest[lane + 4*16] = src[8 * lane + 4];
+    dest[lane + 5*16] = src[8 * lane + 5];
+    dest[lane + 6*16] = src[8 * lane + 6];
+    dest[lane + 7*16] = src[8 * lane + 7];
   }
+
 }
+
+
+void untranspose_state(u32 dest[restrict 16*8],
+		       u32 src[restrict  8*16])
+{
+  /* looks stupid but I am not passing dimension as an argument */
+    for (int lane = 0; lane < 16; lane++) {
+    dest[8 * lane + 0] = src[lane + 0*16];
+    dest[8 * lane + 1] = src[lane + 1*16];
+    dest[8 * lane + 2] = src[lane + 2*16];
+    dest[8 * lane + 3] = src[lane + 3*16];
+    dest[8 * lane + 4] = src[lane + 4*16];
+    dest[8 * lane + 5] = src[lane + 5*16];
+    dest[8 * lane + 6] = src[lane + 6*16];
+    dest[8 * lane + 7] = src[lane + 7*16];
+  }
+
+}
+
 
 
 void copy_transposed_digest(u8 *digest, u32 *tr_state, int lane)

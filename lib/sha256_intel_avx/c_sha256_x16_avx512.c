@@ -15,7 +15,10 @@ typedef uint8_t u8;
 #define SHA256_H5 0x9b05688c
 #define SHA256_H6 0x1f83d9ab
 #define SHA256_H7 0x5be0cd19
-// @todo adapt 512
+
+
+
+
 void sha256_mb_init_digest_avx512(uint32_t *digest)
 {
 	/* 8 is sufficient for AVX2, 16 goes all the way to AVX512 */
@@ -30,6 +33,23 @@ void sha256_mb_init_digest_avx512(uint32_t *digest)
         digest[lane + 7*16] = SHA256_H7;
     }
 }
+
+
+void sha256_init_digest_avx512(uint32_t *digest, uint32_t tr_states[16*8])
+{
+	/* 8 is sufficient for AVX2, 16 goes all the way to AVX512 */
+	for (int lane = 0; lane < 16; lane++) {
+        digest[lane + 0] = tr_states[lane + 1];
+        digest[lane + 1] = tr_states[lane + 2];
+        digest[lane + 2] = tr_states[lane + 3];
+        digest[lane + 3] = tr_states[lane + 4];
+        digest[lane + 4] = tr_states[lane + 5];
+        digest[lane + 5] = tr_states[lane + 6];
+        digest[lane + 6] = tr_states[lane + 7];
+        digest[lane + 7] = tr_states[lane + 8];
+    }
+}
+
 
 uint32_t* sha256_multiple_x16(uint8_t msg[16][64]){
   //---------------------------------------------------------------------------+
@@ -56,6 +76,27 @@ uint32_t* sha256_multiple_x16(uint8_t msg[16][64]){
 
   return args.digest;
 };
+
+uint32_t *sha256_multiple_x16_tr(uint8_t msg[16][64], uint32_t tr_states[16 * 8])
+{
+
+  /* this function takes data NON-TRASNPOSED and states TRANSPOSED */
+  
+  // 32 bytes = 512 bits (input size)
+  static SHA256_ARGS args; /* test static */
+  sha256_init_digest_avx512(args.digest, tr_states);
+
+  for (int lane=0; lane<AVX2_NLANES_SHA256; ++lane) {
+    args.data_ptr[lane] = msg[lane];
+  }
+  call_sha256_x16_avx512_from_c(&args, 1);
+
+
+  return args.digest;
+  
+}  
+
+
 
 
 #ifdef TESTMAIN
