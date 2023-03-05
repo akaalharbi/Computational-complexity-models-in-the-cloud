@@ -12,6 +12,8 @@
 #include "arch_avx512_type1.h"
 #include "common.h"
 #include "c_sha256_avx.h"
+
+
 /// Verify that the states file is not corrupted in parallel (MPI)
 
 
@@ -74,7 +76,10 @@ static void verify_middle_states(int myrank,
 
 
   /* Hash the long message again, 16 at a time */
-  for (global_idx = begin; global_idx < end; global_idx += 16){
+  for (global_idx = begin;
+       global_idx < end;
+       global_idx += NHASH_LANES)
+    {
     /* local_idx = 0 -> (end-global)/16 */
     local_idx = global_idx - begin ;
 
@@ -83,31 +88,60 @@ static void verify_middle_states(int myrank,
     /* memcpy(state_singe, &states[local_idx*NWORDS_STATE], HASH_STATE_SIZE); */
 
     /* we will test eventually transpose(tr_states) =?= next_states */
+  
     memcpy(next_states,
 	   &states[(local_idx + 1)*NWORDS_STATE],
 	   HASH_STATE_SIZE*16);
+    
 
+    
     /* set message counters */
-    for (int lane = 0; lane<16; ++lane)
+    for (int lane = 0; lane<NHASH_LANES; ++lane)
       ((u64*) Mavx[lane])[0] = INTERVAL * (global_idx + lane);
 
     elapsed = wtime();
 
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
       /* hash 16 messages and copy it to tr_states  */
+      #ifdef  __AVX512F__
       memcpy(tr_states,
 	     sha256_multiple_x16_tr(Mavx, tr_states),
 	     16*HASH_STATE_SIZE);
+      #endif
 
+      #ifndef  __AVX512F__
+      #ifdef    __AVX2__
+      memcpy(tr_states,
+	     sha256_multiple_oct_tr(Mavx, tr_states),
+	     8*HASH_STATE_SIZE);
+      #endif
+      #endif
+
+
+      
       /* hash_single(state_singe, Mavx[0]); */
 
+
+    /* /\* Hash multiple messages at once *\/ */
+
+    /* /\* HASH 16 MESSAGES AT ONCE *\/ */
+    /* tr_states = sha256_multiple_x16(Mavx);   */
+    /* #endif */
+
+    /* #ifndef  __AVX512F__ */
+    /* #ifdef    __AVX2__ */
+    /* /\* HASH 16 MESSAGES AT ONCE *\/ */
+    /* tr_states = sha256_multiple_oct(Mavx); */
+    /* #endif */
+    /* #endif */
+      
       /* update message counters */
       for (int lane = 0; lane<16; ++lane)
 	((u64*) Mavx[lane])[0] += 1;
 
 
       /* /\* check we have the same hashes *\/ */
-      untranspose_state(current_states, tr_states);
+      /* untranspose_state(current_states, tr_states); */
 
       /* nbytes_non_equal = memcmp(current_states, state_singe, HASH_STATE_SIZE); */
       /* if (nbytes_non_equal != 0) { */
@@ -123,7 +157,9 @@ static void verify_middle_states(int myrank,
     /* check we have the same hashes */
     untranspose_state(current_states, tr_states);
 
-    nbytes_non_equal = memcmp(current_states, next_states, 16*HASH_STATE_SIZE);
+    nbytes_non_equal = memcmp(current_states,
+			      next_states,
+			      NHASH_LANES*HASH_STATE_SIZE);
     is_corrupt = (0 != nbytes_non_equal);
 
     if (is_corrupt) {

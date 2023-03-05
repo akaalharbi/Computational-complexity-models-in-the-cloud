@@ -199,6 +199,7 @@
 
 
 
+
 #define SIMD_LOAD_SI _mm512_load_si512
 /* #define SIMD_TEST _mm512_test_epi64_mask */
 #define SIMD_TEST is_not_zero
@@ -235,7 +236,7 @@
 
 #define SIMD_CMP_EPI32(X, Y) _mm256_movemask_epi8(_mm256_cmpeq_epi32(X, Y))
 #define SIMD_CMP_EPI16(X, Y) _mm256_movemask_epi8(_mm256_cmpeq_epi16(X, Y))
-#define SIMD_AND_EPI32 _mm256_and_epi32
+#define SIMD_AND_EPI32  _mm256_andnot_si256 //@todo check!
 
 // we better avoid this case :(
 /* #define SIMD_SET1_EPI8 _mm256_set1_epi8 */
@@ -263,7 +264,9 @@
 
 #else
  #error "Please consider buying a modern device"
-#endif // end avx testing 
+#endif // end avx testing
+
+#define NHASH_LANES ((AVX_SIZE)/(WORD_SIZE_BITS))
 
 // -------------------------------------------------------------------------+
 //                     Part b: Set the best vector type                     |
