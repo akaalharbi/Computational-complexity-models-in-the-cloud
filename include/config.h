@@ -68,7 +68,7 @@
 /* bytes i.e n := 8*N bits */
 #define N 12
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<20)
+#define INTERVAL (1LL<<30)
 
  /* store 2^L elements in the dictionary  */
 

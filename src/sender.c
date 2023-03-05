@@ -37,6 +37,8 @@ inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
 
 
 
+
+
 void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 			 u8 Mavx[restrict 16][HASH_INPUT_SIZE], 
 			 u8 digests[restrict 16 * N], /* out */
@@ -63,7 +65,8 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   // test for distinguishedn point //
 
   /* load the last words of digests, we assume digest is aligned  */
-  digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1) * HASH_STATE_SIZE]);
+  digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1)
+					      * HASH_STATE_SIZE]);
   /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
   /* cmp_mask will have the ith bit = 1 if the ith element in cmp_vect is -1 */
