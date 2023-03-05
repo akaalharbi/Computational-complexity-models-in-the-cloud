@@ -48,7 +48,7 @@ int check_hashes_interval_single(const WORD_TYPE state_befoe[NWORDS_STATE],
   
 }
 
-static void verify_middle_states(int myrank,
+static inline void verify_middle_states(int myrank,
 				 int nprocesses,
 				 MPI_Comm inter_comm)
 {
@@ -60,10 +60,10 @@ static void verify_middle_states(int myrank,
   int nbytes_non_equal = 0;
   double elapsed = 0;
   
-  u8 Mavx[16][HASH_INPUT_SIZE] = {0};
-  u32 current_states[16*8] = {0}; /* are the states after each hashing */
-  u32 next_states[16*8] = {0}; /* next in the sense after INTERVAL hashin */
-  u32 tr_states[16*8] = {0}; /* same as current_states but transposed */
+  u8 Mavx[16][HASH_INPUT_SIZE] __attribute__ ((aligned (32))) = {0};
+  u32 current_states[16*8] __attribute__ ((aligned (32))) = {0}; /* are the states after each hashing */
+  u32 next_states[16*8] __attribute__ ((aligned (32))) = {0}; /* next in the sense after INTERVAL hashin */
+  u32 tr_states[16*8] __attribute__ ((aligned (32))) = {0}; /* same as current_states but transposed */
 
 
   /* u32 state_singe[8]; */
@@ -154,18 +154,18 @@ static void verify_middle_states(int myrank,
       /* hash_single(state_singe, Mavx[0]); */
 
 
-    /* /\* Hash multiple messages at once *\/ */
+      /* /\* Hash multiple messages at once *\/ */
 
-    /* /\* HASH 16 MESSAGES AT ONCE *\/ */
-    /* tr_states = sha256_multiple_x16(Mavx);   */
-    /* #endif */
+      /* /\* HASH 16 MESSAGES AT ONCE *\/ */
+      /* tr_states = sha256_multiple_x16(Mavx);   */
+      /* #endif */
 
-    /* #ifndef  __AVX512F__ */
-    /* #ifdef    __AVX2__ */
-    /* /\* HASH 16 MESSAGES AT ONCE *\/ */
-    /* tr_states = sha256_multiple_oct(Mavx); */
-    /* #endif */
-    /* #endif */
+      /* #ifndef  __AVX512F__ */
+      /* #ifdef    __AVX2__ */
+      /* /\* HASH 16 MESSAGES AT ONCE *\/ */
+      /* tr_states = sha256_multiple_oct(Mavx); */
+      /* #endif */
+      /* #endif */
       
       /* update message counters */
       for (int lane = 0; lane<16; ++lane)
@@ -185,7 +185,8 @@ static void verify_middle_states(int myrank,
       /* } */
     } /* end for hash interval */
 
-
+    elapsed = wtime() - elapsed;
+    
     /* check we have the same hashes */
     untranspose_state(current_states, tr_states);
 
@@ -205,7 +206,7 @@ static void verify_middle_states(int myrank,
       puts("");
       print_byte_txt("next", (u8*)next_states, HASH_STATE_SIZE*16);
     }
-    elapsed = wtime() - elapsed;
+
     
     printf("rank=%d, step=%lu, is_corrupt=%d, elapsed=%0.2fsec, 2^%0.2f hashes/sec\n",
 	    myrank,

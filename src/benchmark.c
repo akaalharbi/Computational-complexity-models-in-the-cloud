@@ -321,6 +321,59 @@ size_t time_sha_avx256_single(){
 
 
 
+void bench_long_message_gen()
+{
+  size_t nmsgs = (1LL<<25);
+  
+  u8 Mavx[16][HASH_INPUT_SIZE] = {0};
+  u32 tr_states[16*8] = {0}; /* same as current_states but transposed */
+
+  getrandom(tr_states, 16*8, 1);
+  getrandom(Mavx , 16*HASH_INPUT_SIZE, 1);
+
+  double elapsed = 0;
+  double start = wtime(); /* timing */
+
+
+  
+  for (size_t i = 0; i<(nmsgs/NHASH_LANES); ++i) {
+      /* hash 16 messages and copy it to tr_states  */    
+      #ifdef  __AVX512F__
+      memcpy(tr_states,
+	     sha256_multiple_x16_tr(Mavx, tr_states),
+	     16*HASH_STATE_SIZE);
+      #endif
+
+      #ifndef  __AVX512F__
+      #ifdef    __AVX2__
+      /* sha256_multiple_oct_tr(Mavx, tr_states); */
+
+      memcpy(tr_states,
+	     sha256_multiple_oct_tr(Mavx, tr_states),
+	     8*HASH_STATE_SIZE);
+      #endif
+      #endif
+
+    
+    /* update message counters */
+    for (int lane = 0; lane<16; ++lane)
+      ((u64*) Mavx[lane])[0] += 1;
+
+  }
+
+  elapsed = wtime() - start;
+  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
+  
+  printf("regenarate long_message  elapsed %0.2fsec"
+	 "i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
+	 elapsed, (nmsgs)/elapsed,
+	 log2((nmsgs)/elapsed),
+	 hashed_MB/elapsed);
+
+ 
+}
+
+
 int main(int argc, char *argv[])
 {
 
@@ -334,7 +387,7 @@ int main(int argc, char *argv[])
   /* time_sha_avx512(); */
   #endif
   /* puts("==============================================\n"); */
-  #ifdef  __AVX512F__
+  #ifdef  __AVX512F__ 
   time_sha_avx512_single_thread();
   #endif
   /* puts("==============================================\n"); */
@@ -342,9 +395,13 @@ int main(int argc, char *argv[])
   /* puts("==============================================\n"); */
   /* time_sha_avx256(); */
   /* puts("==============================================\n"); */
-  time_sha_avx256_single();
+  /* time_sha_avx256_single(); */
   /* puts("==============================================\n"); */
-  
+  bench_long_message_gen();
+  puts("==============================================\n");
+
+
+  return 0;
   printf("sizeof(dict)=%lu bytes\n", sizeof(dict));
 
   /* Benchmark dictionary query  */
