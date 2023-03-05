@@ -84,13 +84,19 @@ uint32_t *sha256_multiple_x16_tr(uint8_t msg[16][64], uint32_t tr_states[16 * 8]
   
   // 32 bytes = 512 bits (input size)
   static SHA256_ARGS args; /* test static */
-  sha256_init_digest_avx512(args.digest, tr_states);
+  /* if the function was called before don't init the data*/
+  static int inited = 0;
+
+  if (!inited) {
+    sha256_init_digest_avx512(args.digest, tr_states);
+  }
+
 
   for (int lane=0; lane<AVX2_NLANES_SHA256; ++lane) {
     args.data_ptr[lane] = msg[lane];
   }
   call_sha256_x16_avx512_from_c(&args, 1);
-
+  inited = 1;
 
   return args.digest;
   

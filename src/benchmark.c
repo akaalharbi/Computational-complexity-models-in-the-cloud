@@ -99,6 +99,8 @@ typedef struct {
   uint8_t M[16][64];
 } msg_avx;
 
+
+#ifdef  __AVX512F__
 size_t time_sha_avx512(){
   // place holder for the 16 messages
   
@@ -237,7 +239,7 @@ size_t time_sha_avx512_single_thread(){
 
   return 0;
 }
-
+#endif
 
 size_t time_sha_avx256(){
   // place holder for the 16 messages
@@ -261,7 +263,7 @@ size_t time_sha_avx256(){
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/8); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
+    state_ptr = sha256_multiple_oct(msg.M);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
@@ -301,7 +303,7 @@ size_t time_sha_avx256_single(){
   uint32_t* state_ptr = state;
   
   for (size_t i = 0; i<(nmsgs/8); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
+    state_ptr = sha256_multiple_oct(msg.M);
     ctr += ((state[3] & 0xFF) == 0) ;
   }
 
@@ -328,16 +330,19 @@ int main(int argc, char *argv[])
 	 dict_memory(NSLOTS_MY_NODE),
 	 log2(dict_memory(NSLOTS_MY_NODE)));
 
-
+  #ifdef  __AVX512F__
   /* time_sha_avx512(); */
+  #endif
   /* puts("==============================================\n"); */
+  #ifdef  __AVX512F__
   time_sha_avx512_single_thread();
+  #endif
   /* puts("==============================================\n"); */
   /* time_sha_one_avx512_other_sha_ni(); */
   /* puts("==============================================\n"); */
   /* time_sha_avx256(); */
   /* puts("==============================================\n"); */
-  /* time_sha_avx256_single(); */
+  time_sha_avx256_single();
   /* puts("==============================================\n"); */
   
   printf("sizeof(dict)=%lu bytes\n", sizeof(dict));

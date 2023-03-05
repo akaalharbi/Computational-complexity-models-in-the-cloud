@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,7 +17,36 @@
 
 /// Verify that the states file is not corrupted in parallel (MPI)
 
+int check_hashes_interval_single(const WORD_TYPE state_befoe[NWORDS_STATE],
+				 const WORD_TYPE state_after[NWORDS_STATE],
+				 const CTR_TYPE ctr){
 
+
+  u8 M[HASH_INPUT_SIZE] = {0};
+  /* We don't want to modify arguments */
+  WORD_TYPE state[NWORDS_STATE];
+  memcpy(state, state_befoe, HASH_STATE_SIZE);
+  
+  /* register counter in M */
+  ((u64*)M)[0] = ctr;
+
+  for (size_t i=0; i<INTERVAL; ++i) {
+
+    hash_single(state, M);
+    ++( ((u64*)M)[0]) ;
+
+    if (memcmp(state, state_after, HASH_STATE_SIZE) == 0){
+      printf("i=%lu\n",i );
+      print_char((u8*) state, HASH_STATE_SIZE);
+      print_char((u8*) state_after, HASH_STATE_SIZE);
+
+    }
+  }
+
+  
+  return memcmp(state, state_after, HASH_STATE_SIZE);
+  
+}
 
 static void verify_middle_states(int myrank,
 				 int nprocesses,
@@ -111,6 +141,8 @@ static void verify_middle_states(int myrank,
 
       #ifndef  __AVX512F__
       #ifdef    __AVX2__
+      /* sha256_multiple_oct_tr(Mavx, tr_states); */
+
       memcpy(tr_states,
 	     sha256_multiple_oct_tr(Mavx, tr_states),
 	     8*HASH_STATE_SIZE);
@@ -146,7 +178,7 @@ static void verify_middle_states(int myrank,
       /* nbytes_non_equal = memcmp(current_states, state_singe, HASH_STATE_SIZE); */
       /* if (nbytes_non_equal != 0) { */
       /* 	printf("hurray at %lu\n", hash_n); */
-      /* 	print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16); */
+      /*  	print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16); */
       /* 	puts(""); */
       /* 	print_byte_txt("single", (u8*)state_singe, HASH_STATE_SIZE); */
       /* 	puts(""); */
@@ -162,23 +194,32 @@ static void verify_middle_states(int myrank,
 			      NHASH_LANES*HASH_STATE_SIZE);
     is_corrupt = (0 != nbytes_non_equal);
 
-    if (is_corrupt) {
-      printf("found a curropt state at global_idx=%lu\n", global_idx);
-      printf("first hash=%d\n",
-	     memcmp(current_states, next_states, 16*HASH_STATE_SIZE));
+    /* if (is_corrupt) { */
+    /*   printf("found a curropt state at global_idx=%lu\n", global_idx); */
+    /*   printf("first hash=%d\n", */
+    /* 	     memcmp(current_states, next_states, 16*HASH_STATE_SIZE)); */
       
-      fprintf(fp_verify, "found a curropt state at global_idx=%lu\n", global_idx);
-      fflush(fp_verify);
-      print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16);
-      puts("");
-      print_byte_txt("next", (u8*)next_states, HASH_STATE_SIZE*16);
-    }
+    /*   fprintf(fp_verify, "found a curropt state at global_idx=%lu\n", global_idx); */
+    /*   fflush(fp_verify); */
+    /*   print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16); */
+    /*   puts(""); */
+    /*   print_byte_txt("next", (u8*)next_states, HASH_STATE_SIZE*16); */
+    /* } */
     elapsed = wtime() - elapsed;
-    fprintf(fp_verify, "rank=%d, step=%lu, is_corrupt=%d, elapsed=%0.2fsec\n",
+    
+    printf("rank=%d, step=%lu, is_corrupt=%d, elapsed=%0.2fsec, 2^%0.2f hashes/sec\n",
+	    myrank,
+	    global_idx,
+	    is_corrupt,
+	    elapsed,
+	    log2(INTERVAL/elapsed));
+
+    fprintf(fp_verify, "rank=%d, step=%lu, is_corrupt=%d, elapsed=%0.2fsec, 2^%0.2f hashes/sec\n",
 	   myrank,
 	   global_idx,
 	   is_corrupt,
-	   elapsed);
+	    elapsed,
+	    log2(INTERVAL/elapsed));
     fflush(fp_verify);
   }
 
