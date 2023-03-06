@@ -77,7 +77,10 @@ uint32_t* sha256_multiple_x16(uint8_t msg[16][64]){
   return args.digest;
 };
 
-uint32_t *sha256_multiple_x16_tr(uint8_t msg[16][64], uint32_t tr_states[16 * 8])
+uint32_t *sha256_multiple_x16_tr(uint8_t msg[16][64],
+				 uint32_t tr_states[16 * 8],
+				 int inited)
+  
 {
 
   /* this function takes data NON-TRASNPOSED and states TRANSPOSED */
@@ -85,7 +88,6 @@ uint32_t *sha256_multiple_x16_tr(uint8_t msg[16][64], uint32_t tr_states[16 * 8]
   // 32 bytes = 512 bits (input size)
   static SHA256_ARGS args; /* test static */
   /* if the function was called before don't init the data*/
-  static int inited = 0;
 
   if (!inited) {
     sha256_init_digest_avx512(args.digest, tr_states);

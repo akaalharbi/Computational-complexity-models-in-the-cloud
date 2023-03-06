@@ -122,8 +122,8 @@ static void verify_middle_states(int myrank,
   size_t end = (myrank + 1) * (nstates/nprocesses);
   size_t global_idx; /* where are we in the states file */
   size_t local_idx; /* where are we in the buffer copied from states file  */
-  
-  int print_rank = 0; /* only for debugging */
+  int inited = 0; /* 0 if we need to clear the avx register */
+ 
     
   if (myrank == (nprocesses-1))
     return; /* coward solution */
@@ -148,27 +148,24 @@ static void verify_middle_states(int myrank,
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
 
-  // let's say everything up to this point is perfect!
-  printf("rank=%d, begin=%lu\n", myrank, begin);
-
 
   /* Hash the long message again, 16 at a time */
   for (global_idx = begin; global_idx < end; global_idx += 16){
     /* local_idx = 0 -> (end-global)/16 */
     local_idx = global_idx - begin ;
-
-    /* form the state to be accepted to the uint32_t *sha256_multiple_x16_tr(u32*, u32*) */
+    inited = 0; /* please clear the avx register */
+    
+    /* form the state to be accepted to the uint32_t *sha256_multiple_x16_tr */
     transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
 
     
-    print_byte_txt("tr_state", (u8*)tr_states, HASH_STATE_SIZE*16);
-    puts("");    
+    /* print_byte_txt("tr_state", (u8*)tr_states, HASH_STATE_SIZE*16); */
+    /* puts("");     */
+    // the below line should be commented as well
     untranspose_state(current_states, tr_states);
-    print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16);
-    puts("");
-    print_byte_txt("state", (u8*)&states[local_idx*16], HASH_STATE_SIZE*16);
-
-
+    /* print_byte_txt("current", (u8*)current_states, HASH_STATE_SIZE*16); */
+    /* puts(""); */
+    /* print_byte_txt("state", (u8*)&states[local_idx*16], HASH_STATE_SIZE*16); */
 
     
     memcpy(state_singe, &states[local_idx*NWORDS_STATE], HASH_STATE_SIZE);
@@ -186,10 +183,13 @@ static void verify_middle_states(int myrank,
     elapsed = wtime();
 
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
+      /* we can get rid of tmp copying */
+      
       /* hash 16 messages and copy it to tr_states  */
       memcpy(tmp,
-	     sha256_multiple_x16_tr(Mavx, tr_states),
+	     sha256_multiple_x16_tr(Mavx, tr_states, inited),
 	     16*HASH_STATE_SIZE);
+      inited = 1;
       
       memcpy(tr_states, tmp, 16*HASH_STATE_SIZE);
 
@@ -221,7 +221,7 @@ static void verify_middle_states(int myrank,
     nbytes_non_equal = memcmp(current_states, next_states, 16*HASH_STATE_SIZE);
     is_corrupt = (0 != nbytes_non_equal);
 
-    if (is_corrupt) {
+    if (is_corrupt && myrank==0) {
       printf("found a curropt state at global_idx=%lu\n", global_idx);
       printf("first hash=%d\n",
 	     memcmp(current_states, next_states, 16*HASH_STATE_SIZE));

@@ -340,7 +340,7 @@ void bench_long_message_gen()
       /* hash 16 messages and copy it to tr_states  */    
       #ifdef  __AVX512F__
       memcpy(tr_states,
-	     sha256_multiple_x16_tr(Mavx, tr_states),
+	     sha256_multiple_x16_tr(Mavx, tr_states, 0),
 	     16*HASH_STATE_SIZE);
       #endif
 

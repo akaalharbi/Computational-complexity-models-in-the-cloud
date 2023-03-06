@@ -236,8 +236,9 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
 
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
       /* hash 16 messages and copy it to tr_states  */
+      // todo fix me please 
       memcpy(tr_states,
-	     sha256_multiple_x16_tr(Mavx, tr_states),
+	     sha256_multiple_x16_tr(Mavx, tr_states, 0),
 	     16*HASH_STATE_SIZE);
       /* increment the message counters after hashing */
       for (int lane = 0; lane<16; ++lane)

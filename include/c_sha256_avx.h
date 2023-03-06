@@ -19,6 +19,8 @@ uint32_t *sha256_multiple_oct_tr(uint8_t msg[16][64],
 
 uint32_t *sha256_multiple_x16(uint8_t msg[16][64]);
 
-uint32_t *sha256_multiple_x16_tr(uint8_t msg[16][64], uint32_t tr_states[16 * 8]);
+uint32_t *sha256_multiple_x16_tr(uint8_t msg[16][64],
+                                 uint32_t tr_states[16 * 8], int inited);
+
 
 #endif
