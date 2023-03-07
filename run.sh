@@ -1,7 +1,6 @@
-make purge
-make all
-
-./phase_i
-mpirun --oversubscribe -np 20 ./phase_ii
-cat data/messages/* > data/messages/archive
-./phase_iii
+cd lib/sha256_intel_avx/
+sudo-g5k apt install nasm
+make clean && make all
+cd ../../
+make clean && make all
+mpirun -machinefile $OAR_NODEFILE ./verify_data
