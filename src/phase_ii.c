@@ -48,6 +48,7 @@
 #include "common.h"
 #include "sender.h"
 #include "receiver.h"
+#define INTERCOMME_TAG 17
 
 // checklist: msg||dgst 
 
@@ -103,20 +104,31 @@ int main(int argc, char* argv[])
   if (myrank >= NSERVERS){
     /* Creat inter-comm from sender point of view:  */
     /* local leader: local rank 0, remote leader: global rank NSERVES, tag=0  */
-    MPI_Intercomm_create(local_comm, 0, MPI_COMM_WORLD, NSERVERS, 0, &inter_comm);
+    MPI_Intercomm_create(local_comm,
+			 0, /* local leader */
+			 MPI_COMM_WORLD, /*where to find remote leader */
+			 0, /* remote leader rank in peer_comm */
+			 INTERCOMME_TAG, 
+			 &inter_comm);/* new intercomm */
 
     /* It knows the number of receivers from NSERVERS from config.h */
     sender(local_comm, inter_comm);
   }
+
   else if (myrank < NSERVERS){ /* receiver, repeat infinitely  */
     /* Creat inter-comm from sender point of view:  */
     /* local leader: local rank 0(global rank NSERVERS), remote leader: global rank 0, tag=0  */
-    MPI_Intercomm_create(local_comm, 0, MPI_COMM_WORLD, 0, 0, &inter_comm);
+    MPI_Intercomm_create(local_comm, 
+			 0, /* local communicator */
+			 MPI_COMM_WORLD, 
+			 NSERVERS, /* remote leader rank in peercomm */
+			 INTERCOMME_TAG, 
+			 &inter_comm);/* newly created intercomm */
 
     int nsenders, local_rank /* local rank */;
     MPI_Comm_remote_size(inter_comm, &nsenders);
     MPI_Comm_rank(local_comm, &local_rank);
-    
+
     receiver(local_rank, nsenders, inter_comm);
   }
 
