@@ -65,7 +65,8 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   // test for distinguishedn point //
 
   /* load the last words of digests, we assume digest is aligned  */
-  digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1)
+  /* load last significant row in tr_state i.e. last words of each digest */
+  digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1)*16
 					      * HASH_STATE_SIZE]);
   /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
@@ -164,12 +165,14 @@ void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 }
 
 
-static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
+static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
+					    u32 tr_states[restrict 16*8],
 					    u8  digests[restrict 16 * N],
 					    CTR_TYPE msg_ctrs[restrict 16],
 					    u8* restrict work_buf,
 					    u8* bsnd_buf,
 					    size_t servers_counters[restrict NSERVERS],
+					    int myrank,
 					    int nsenders,
 					    MPI_Comm inter_comm)
 {
@@ -181,41 +184,40 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
   /* 16 messages for avx, each message differs om the other in the counter part */
   /* except counter, they are all the same */
 
-  u32 current_states[16*8] = {0}; /* are the states after each hashing */
-  u32 tr_states[16*8] = {0}; /* same as current_states but transposed */
-
-  
   FILE* fp = fopen("data/states", "r");
-  int myrank;
-  size_t server_id, idx;
-  int n_dist_points = 0;
+  int server_id, n_dist_points;
+  double elapsed = 0;
   
-  MPI_Comm_rank(inter_comm, &myrank);
-  
+  /* u8 Mavx[16][HASH_INPUT_SIZE] = {0}; */
+  /* u32 tr_states[16*8] = {0}; /\* same as current_states but transposed *\/ */
+
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
   size_t begin = myrank * (nstates/nsenders);
   size_t end = (myrank + 1) * (nstates/nsenders);
   size_t global_idx; /* where are we in the states file */
   size_t local_idx; /* where are we in the buffer copied from states file  */
+  size_t idx; /* */
+  int inited = 0; /* 0 if we need to clear the avx register */
 
-  
+
   if (myrank == (nsenders-1))
     end = nstates; /* get the rest of states */
 
 
-  /* get all states that i should work on: */
+
   /* get all states that i should work on: */
   WORD_TYPE* states = (WORD_TYPE*) malloc((end - begin)
 					  * sizeof(WORD_TYPE)
 					  * NWORDS_STATE);
+
+
   /* only load states that i am going to work on */
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
   fclose(fp);
 
   
-  /* Hash buffers init */
-
+  /* Attached buffered memory to MPI process  */
   MPI_Buffer_attach(bsnd_buf,
 		    PROCESS_QUOTA*N*NSERVERS
 		    + NSERVERS*MPI_BSEND_OVERHEAD);
@@ -224,7 +226,7 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
   for (global_idx = begin; global_idx<end; global_idx += 16){
     /* local_idx = 0 -> (end-global)/16 */
     local_idx = global_idx - begin ;
-
+    inited = 0; /* tell sha256_x16 to copy the state */
 
     /* Read fresh 16 states, and put them in transposed way  */
     transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
@@ -232,39 +234,48 @@ static void regenerate_long_message_digests(u8 Mavx[16][HASH_INPUT_SIZE],
     for (int lane = 0; lane<16; ++lane)
       ((u64*) Mavx[lane])[0] = INTERVAL * (global_idx + lane);
 
-
-
+    elapsed = wtime();
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
       /* hash 16 messages and copy it to tr_states  */
       // todo fix me please 
       memcpy(tr_states,
-	     sha256_multiple_x16_tr(Mavx, tr_states, 0),
+	     sha256_multiple_x16_tr(Mavx, tr_states, inited),
 	     16*HASH_STATE_SIZE);
+      inited = 1; /* sha256_x16 has alread a copy of the state */
+      
       /* increment the message counters after hashing */
       for (int lane = 0; lane<16; ++lane)
 	((u64*) Mavx[lane])[0] += 1;
 
-
       // up to this point it seems everything is fine
       /* todo check thish function */
+
       extract_dist_points(tr_states, /* transposed states */
 			  Mavx, /* messages used */
 			  digests, /* save the distinguished hashes here */
 			  msg_ctrs, /* messages are the same except counter */
 			  &n_dist_points); /* how many dist points found? */
 
+      printf("n_dist_points = %d\n", n_dist_points);
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
+	printf("dist pt, rank%d, server_id=%d, idx(with in server buffer)=%lu, idx=%llu",
+	       myrank,
+	       server_id,
+	       idx,
+	       server_id*PROCESS_QUOTA*N+ idx*N);
+
 	server_id = to_which_server(&digests[i*N]);
 	/* where to put digest in server_id buffer? */
 	idx = servers_counters[server_id];
-
 	/* copy the digest to the server buffer */
-	memcpy(&work_buf[server_id*PROCESS_QUOTA*N
+        memcpy(&work_buf[server_id*PROCESS_QUOTA*N
 			+ idx*N],
 	       &digests[N*i],
 	       N);
 
+
+	
 	++servers_counters[server_id];
 	/* if the server buffer is full send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
@@ -381,8 +392,11 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   MPI_Comm_size(local_comm, &nsenders);
 
   /* random message base */
-  u8 M[HASH_INPUT_SIZE]; 
-  u8 Mavx[16][HASH_INPUT_SIZE] = {0}; /* non-transposed! */
+  u8 M[HASH_INPUT_SIZE];
+  /* non-transposed messages */
+  u8 Mavx[16][HASH_INPUT_SIZE] = {0};
+  /* transoposed states  */
+  u32 tr_states[16*8] __attribute__ ((aligned(64))) = {0};  
   u8 digests[16 * N] ; /* save the distinguished digests here (manually) */
   CTR_TYPE msg_ctrs[16]; /* save thde counters of the dist digests (manually) */
 
@@ -402,6 +416,7 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   u8* bsnd_buf = (u8*) malloc(nbytes_per_server * NSERVERS);
   /* ith_entry : how many non-sent element stored in server i buffer */
   size_t* server_counters = malloc(sizeof(size_t)*NSERVERS);
+  memset(server_counters, 0, sizeof(size_t)*NSERVERS);
 
 
 
@@ -411,11 +426,13 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   // ----------------------------- PART 1 --------------------------------- //
   // Regenrate the long message in parallel!                                //
   regenerate_long_message_digests(Mavx,
+				  tr_states,
 				  digests,
 				  msg_ctrs,
 				  work_buf,
 				  bsnd_buf,
 				  server_counters,
+				  myrank,
 				  nsenders,
 				  inter_comm);
 

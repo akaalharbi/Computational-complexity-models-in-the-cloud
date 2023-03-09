@@ -51,6 +51,8 @@ int check_hashes_interval_single(const WORD_TYPE state_befoe[NWORDS_STATE],
 void verify_region(size_t start, size_t end)
 {
 
+  /* this code use sha_ni and only works on a single node */
+
   #pragma omp parallel for
   for (size_t state_number=start; state_number<end; ++state_number) {
     u64 state_number = 5101;
@@ -108,7 +110,6 @@ static void verify_middle_states(int myrank,
   
   u8 Mavx[16][HASH_INPUT_SIZE] = {0};
   u32 current_states[16*8] = {0}; /* are the states after each hashing */
-  /* u32 tmp[16*8] = {0}; /\* are the states after each hashing *\/ */
   u32 next_states[16*8] = {0}; /* next in the sense after INTERVAL hashin */
   u32 tr_states[16*8] = {0}; /* same as current_states but transposed */
 
@@ -118,8 +119,8 @@ static void verify_middle_states(int myrank,
 
   
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
-  size_t begin = myrank * (nstates/nprocesses);
-  size_t end = (myrank + 1) * (nstates/nprocesses);
+  size_t begin = (myrank * nstates)/nprocesses;
+  size_t end = ((myrank + 1) * nstates)/nprocesses;
   size_t global_idx; /* where are we in the states file */
   size_t local_idx; /* where are we in the buffer copied from states file  */
   int inited = 0; /* 0 if we need to clear the avx register */
@@ -147,7 +148,7 @@ static void verify_middle_states(int myrank,
   /* only load states that i am going to work on */
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
-
+  
 
   /* Hash the long message again, 16 at a time */
   for (global_idx = begin; global_idx < end; global_idx += 16){
@@ -157,10 +158,7 @@ static void verify_middle_states(int myrank,
     
     /* form the state to be accepted to the uint32_t *sha256_multiple_x16_tr */
     transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
-
-    /* this line should be removed as well */
-    untranspose_state(current_states, tr_states);
-    
+    /* untranspose_state(current_states, tr_states); */ // no need to it.
     memcpy(state_singe, &states[local_idx*NWORDS_STATE], HASH_STATE_SIZE);
 
     /* we will test eventually transpose(tr_states) =?= next_states */
@@ -172,9 +170,7 @@ static void verify_middle_states(int myrank,
     for (int lane = 0; lane<16; ++lane)
       ((u64*) Mavx[lane])[0] = INTERVAL * (global_idx + lane);
 
-
     elapsed = wtime();
-
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
       /* we can get rid of tmp copying */
       

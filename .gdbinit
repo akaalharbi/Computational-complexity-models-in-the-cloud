@@ -1,2 +1,2 @@
-break sender.c:188
-break receiver.c:318
+# break sender.c:extract_dist_points
+# break sender.c:261

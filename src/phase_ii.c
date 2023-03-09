@@ -98,12 +98,9 @@ int main(int argc, char* argv[])
 
 
 
-
-
   // Who am I? a sender,  or a receiver?
   if (myrank >= NSERVERS){
     /* Creat inter-comm from sender point of view:  */
-    /* local leader: local rank 0, remote leader: global rank NSERVES, tag=0  */
     MPI_Intercomm_create(local_comm,
 			 0, /* local leader */
 			 MPI_COMM_WORLD, /*where to find remote leader */
@@ -112,12 +109,12 @@ int main(int argc, char* argv[])
 			 &inter_comm);/* new intercomm */
 
     /* It knows the number of receivers from NSERVERS from config.h */
+    printf("I am a sender with rank %d\n", myrank);
     sender(local_comm, inter_comm);
   }
 
   else if (myrank < NSERVERS){ /* receiver, repeat infinitely  */
     /* Creat inter-comm from sender point of view:  */
-    /* local leader: local rank 0(global rank NSERVERS), remote leader: global rank 0, tag=0  */
     MPI_Intercomm_create(local_comm, 
 			 0, /* local communicator */
 			 MPI_COMM_WORLD, 
