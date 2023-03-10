@@ -169,7 +169,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 					    u32 tr_states[restrict 16*8],
 					    u8  digests[restrict 16 * N],
 					    CTR_TYPE msg_ctrs[restrict 16],
-					    u8* restrict work_buf,
+					    u8* work_buf,
 					    u8* bsnd_buf,
 					    size_t servers_counters[restrict NSERVERS],
 					    int myrank,
@@ -183,6 +183,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* M = 64bit ctr || 64bit nonce || random value */
   /* 16 messages for avx, each message differs om the other in the counter part */
   /* except counter, they are all the same */
+  /* u8* bsnd_buf = (u8*) malloc((((sizeof(u8)*N + sizeof(CTR_TYPE))* PROCESS_QUOTA) + MPI_BSEND_OVERHEAD) */
+  /* 			      * NSERVERS); */
 
   FILE* fp = fopen("data/states", "r");
   int server_id, n_dist_points;
@@ -192,8 +194,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* u32 tr_states[16*8] = {0}; /\* same as current_states but transposed *\/ */
 
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
-  size_t begin = myrank * (nstates/nsenders);
-  size_t end = (myrank + 1) * (nstates/nsenders);
+  size_t begin = (myrank * nstates)/nsenders;
+  size_t end = ((myrank + 1) * nstates)/nsenders;
+ 
   size_t global_idx; /* where are we in the states file */
   size_t local_idx; /* where are we in the buffer copied from states file  */
   size_t idx; /* */
@@ -202,7 +205,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
   if (myrank == (nsenders-1))
     end = nstates; /* get the rest of states */
-
 
 
   /* get all states that i should work on: */
@@ -216,17 +218,23 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
   fclose(fp);
 
+  printf("rank%d, begin=%lu, end=%lu, nstates=%lu\n",
+	 myrank, begin, end, nstates);
   
   /* Attached buffered memory to MPI process  */
+
   MPI_Buffer_attach(bsnd_buf,
-		    PROCESS_QUOTA*N*NSERVERS
-		    + NSERVERS*MPI_BSEND_OVERHEAD);
+		    (N+MPI_BSEND_OVERHEAD)*NSERVERS);
+
   
   /* Hash the long message again, 16 at a time */
   for (global_idx = begin; global_idx<end; global_idx += 16){
     /* local_idx = 0 -> (end-global)/16 */
     local_idx = global_idx - begin ;
     inited = 0; /* tell sha256_x16 to copy the state */
+
+    printf("global_idx = %lu, end = %lu\n", global_idx, end);
+
 
     /* Read fresh 16 states, and put them in transposed way  */
     transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
@@ -249,7 +257,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
       // up to this point it seems everything is fine
       /* todo check thish function */
-
+      /* why the number of distinguished points is always 16 */
       extract_dist_points(tr_states, /* transposed states */
 			  Mavx, /* messages used */
 			  digests, /* save the distinguished hashes here */
@@ -259,35 +267,42 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       printf("n_dist_points = %d\n", n_dist_points);
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
-	printf("dist pt, rank%d, server_id=%d, idx(with in server buffer)=%lu, idx=%llu",
-	       myrank,
-	       server_id,
-	       idx,
-	       server_id*PROCESS_QUOTA*N+ idx*N);
-
 	server_id = to_which_server(&digests[i*N]);
+
 	/* where to put digest in server_id buffer? */
 	idx = servers_counters[server_id];
-	/* copy the digest to the server buffer */
+
+        /* copy the digest to the server buffer */
         memcpy(&work_buf[server_id*PROCESS_QUOTA*N
 			+ idx*N],
 	       &digests[N*i],
 	       N);
 
+        ++servers_counters[server_id];
 
-	
-	++servers_counters[server_id];
+
+
+	printf("dist pt, rank%d, server_id=%d, idx(with in server buffer)=%lu, idx(global in serverS buff)=%llu\n",
+	       myrank,
+	       server_id,
+	       idx,
+	       server_id*PROCESS_QUOTA*N+ idx*N);
+
 	/* if the server buffer is full send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
+	  printf("rank%d send to %d\n", myrank, server_id);
+	  printf("buffer attached: %p, buffer send %p", bsnd_buf, work_buf);
 	  MPI_Bsend(&work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
 		    N*PROCESS_QUOTA, /* How many characteres will be sent. */
 		    MPI_UNSIGNED_CHAR, 
 		    server_id, /* receiver */
 		    TAG_DICT_SND, /* 0 */
 		    inter_comm);
-
+	  
 	  servers_counters[server_id] = 0;
 	}/* end if */
+
+	
       } /* end for n_dist_points */
     } /* end for hash_n */
   } /* end for global_idx */
@@ -321,6 +336,10 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
   int n_dist_points = 0; /* At the beginning we no dist points
 			  */
   size_t server_id=0, idx=0;
+
+  if (bsnd_buf == NULL)
+    puts("bsnd_buf is NULL");
+
   
   MPI_Buffer_attach(bsnd_buf,
 		    PROCESS_QUOTA*(N+sizeof(CTR_TYPE))*NSERVERS
@@ -413,14 +432,24 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   u8* work_buf = (u8*) malloc(nbytes_per_server * NSERVERS );
 
   /* attach to MPI_BSend, not worked directly on! */
-  u8* bsnd_buf = (u8*) malloc(nbytes_per_server * NSERVERS);
+  u8* bsnd_buf = (u8*) malloc((nbytes_per_server + MPI_BSEND_OVERHEAD)
+			      * NSERVERS);
   /* ith_entry : how many non-sent element stored in server i buffer */
   size_t* server_counters = malloc(sizeof(size_t)*NSERVERS);
+
+
+
+  if (bsnd_buf == NULL)
+    puts("bsnd_buf is NULL");
+
+  if (work_buf == NULL)
+    puts("work_buf is NULL");
+  /* memset(bsnd_buf, 0, (nbytes_per_server + MPI_BSEND_OVERHEAD)* NSERVERS); */
+  memset(work_buf, 0, nbytes_per_server*NSERVERS);
   memset(server_counters, 0, sizeof(size_t)*NSERVERS);
 
 
-
-  
+  printf("sender: N=%d, one pair size = %lu\n", N, one_pair_size);
 
   
   // ----------------------------- PART 1 --------------------------------- //

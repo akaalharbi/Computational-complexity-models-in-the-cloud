@@ -57,8 +57,6 @@
 
 
 
-
-
 // -------------------------------------------------------------------------+
 //                   2- Long message attack main parameters                 |
 // -------------------------------------------------------------------------+
@@ -118,7 +116,7 @@
 
 
 /* edit manually */
-#define NSERVERS 1
+#define NSERVERS 3
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
@@ -132,7 +130,7 @@
 
 
 // 7*4 GiB
-#define TOTAL_RAM 20850444000LL
+#define TOTAL_RAM 3000000000//20850444000LL
 #define NRECEIVERS_PER_NODE 1
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
@@ -163,7 +161,7 @@
 #define ARCHIVE_SERVER NSERVERS
 // WHAT IS BUFF_SIZE? It doesn't seem to be used!
 //#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
-#define PROCESS_QUOTA 1000000LL // i.e. send 10 digests to each server @by_hand
+#define PROCESS_QUOTA 1000LL //1000000LL // i.e. send 10 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
 
