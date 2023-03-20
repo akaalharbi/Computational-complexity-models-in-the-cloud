@@ -22,9 +22,9 @@ MPI_LINK = -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
 INCLUDE = -Iinclude $(MPI_INCLUDE)
 LDLIBS  =  $(MPI_LINK) -lm -L./lib/sha256_intel_avx/ -lsha256_avx 
 
-LDFLAGS = -g -fopenmp -pthread -O0 -march=native  #-fsanitize=address 
+LDFLAGS = -g3 -fopenmp -pthread -O0 -march=native  #-fsanitize=address 
 # note: -fanalyzer doesn't report when -flto is enabled
-CFLAGS =  -g -O0  -fopenmp -Wall -march=native -msha -fopt-info-all -g -fanalyzer #-fsanitize=address 
+CFLAGS =  -g3 -O0  -fopenmp -Wall -march=native -msha -fopt-info-all -fanalyzer #-fsanitize=address 
 #CFLAGS += -DVERBOSE_LEVEL=2 
 
 

@@ -36,7 +36,25 @@ inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
 }
 
 
+void print_m512i_u32(__m512i a, char* text){
+  
+  uint32_t A[16] = {0};
+  _mm512_storeu_si512 ((__m256i*)A, a);
+  printf("%s = ", text);
+  for (int i = 0; i<16; ++i) {
+    printf("%08x, ", A[i]);
+  }
+  puts("");
+}
 
+void print_u32_2d(u32** restrict a, int n, int m){
+  for (int i=0; i<n; ++i) {
+    for (int j=0; j<m; ++j) {
+      printf("08%x, ", a[i][j]);
+    }
+    puts("");
+  }
+}
 
 
 void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
@@ -170,7 +188,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 					    u8  digests[restrict 16 * N],
 					    CTR_TYPE msg_ctrs[restrict 16],
 					    u8* work_buf,
-					    u8* bsnd_buf,
+					    u8* snd_buf,
 					    size_t servers_counters[restrict NSERVERS],
 					    int myrank,
 					    int nsenders,
@@ -185,6 +203,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* except counter, they are all the same */
   /* u8* bsnd_buf = (u8*) malloc((((sizeof(u8)*N + sizeof(CTR_TYPE))* PROCESS_QUOTA) + MPI_BSEND_OVERHEAD) */
   /* 			      * NSERVERS); */
+  MPI_Status status;
+  MPI_Request request;
+  int first_time = 1; /* 1 if we have not sent anything yet, 0 otherwise */
 
   FILE* fp = fopen("data/states", "r");
   int server_id, n_dist_points;
@@ -223,8 +244,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   
   /* Attached buffered memory to MPI process  */
 
-  MPI_Buffer_attach(bsnd_buf,
-		    (N+MPI_BSEND_OVERHEAD)*NSERVERS);
 
   
   /* Hash the long message again, 16 at a time */
@@ -264,7 +283,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 			  msg_ctrs, /* messages are the same except counter */
 			  &n_dist_points); /* how many dist points found? */
 
-      printf("n_dist_points = %d\n", n_dist_points);
+
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
 	server_id = to_which_server(&digests[i*N]);
@@ -281,34 +300,39 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
         ++servers_counters[server_id];
 
 
-
-	printf("dist pt, rank%d, server_id=%d, idx(with in server buffer)=%lu, idx(global in serverS buff)=%llu\n",
-	       myrank,
-	       server_id,
-	       idx,
-	       server_id*PROCESS_QUOTA*N+ idx*N);
-
 	/* if the server buffer is full send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
-	  printf("rank%d send to %d\n", myrank, server_id);
-	  printf("buffer attached: %p, buffer send %p", bsnd_buf, work_buf);
-	  MPI_Bsend(&work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
+	  if (!first_time)
+	    MPI_Wait(&request, &status);
+
+	  
+	  memcpy(snd_buf,
+		 &work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
+		 N*PROCESS_QUOTA);
+	  
+	  MPI_Isend(snd_buf, 
 		    N*PROCESS_QUOTA, /* How many characteres will be sent. */
 		    MPI_UNSIGNED_CHAR, 
 		    server_id, /* receiver */
 		    TAG_DICT_SND, /* 0 */
-		    inter_comm);
+		    inter_comm,
+		    &request);
+
+          /* printf("rank%d send to %d, %f sec\n", myrank, server_id, wtime() - elapsed); */
+	  elapsed = wtime();
+
+	  first_time = 0; /* we have sent a message */
 	  
 	  servers_counters[server_id] = 0;
+	  
 	}/* end if */
 
 	
       } /* end for n_dist_points */
     } /* end for hash_n */
+    printf("sender%d, global_idx=%lu\n", myrank, global_idx);
   } /* end for global_idx */
 
-  int attached_size;
-  MPI_Buffer_detach(&bsnd_buf, &attached_size);
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
 
@@ -333,17 +357,14 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 				    MPI_Comm inter_comm)
 {
   u32* states_avx;
-  int n_dist_points = 0; /* At the beginning we no dist points
-			  */
+  int n_dist_points = 0; /* At the beginning we no dist points */
   size_t server_id=0, idx=0;
 
-  if (bsnd_buf == NULL)
-    puts("bsnd_buf is NULL");
+  MPI_Status status;
+  MPI_Request request;
+  MPI_Request_free(&request); /* in 1st time there is no waiting  */
 
   
-  MPI_Buffer_attach(bsnd_buf,
-		    PROCESS_QUOTA*(N+sizeof(CTR_TYPE))*NSERVERS
-		    + NSERVERS*MPI_BSEND_OVERHEAD);
 
 
   while (1) {
@@ -378,20 +399,19 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
       ++servers_counters[server_id];
       /* if the server buffer is full send immediately */
       if (servers_counters[server_id] == PROCESS_QUOTA){
-	  
-	MPI_Bsend(&work_buf[server_id*PROCESS_QUOTA*(N+sizeof(CTR_TYPE))],
+	MPI_Wait(&request, &status);
+	
+	MPI_Isend(&work_buf[server_id*PROCESS_QUOTA*(N+sizeof(CTR_TYPE))],
 		  (N+sizeof(CTR_TYPE))*PROCESS_QUOTA, /* #chars to be sent */
 		  MPI_UNSIGNED_CHAR, 
 		  server_id, /* receiver */
 		  TAG_DICT_SND, /* 0 */
-		  inter_comm);
+		  inter_comm,
+		  &request);
 	servers_counters[server_id] = 0;
       }
     }
   }
-  
-  
-  
   
 }
 

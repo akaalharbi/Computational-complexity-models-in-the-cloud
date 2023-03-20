@@ -200,7 +200,8 @@ void receiver_process_task(int const myrank,
   
   MPI_Status status;
   MPI_Request request;
-
+  /* MPI_Request_free(&request); /\* in 1st time there is no waiting  *\/ */
+  
   /* How many candidates were stored? and remove partial candidates */
   size_t nfound_cnd = get_file_size(fp) / HASH_INPUT_SIZE ;
   // truncate the candidates file, in case a partial candidate was stored

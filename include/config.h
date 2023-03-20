@@ -66,7 +66,7 @@
 /* bytes i.e n := 8*N bits */
 #define N 12
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<30)
+#define INTERVAL (1LL<<25)
 
  /* store 2^L elements in the dictionary  */
 
@@ -116,7 +116,7 @@
 
 
 /* edit manually */
-#define NSERVERS 3
+#define NSERVERS 1
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
