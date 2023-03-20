@@ -284,6 +284,15 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 			  &n_dist_points); /* how many dist points found? */
 
 
+      for (int i= 0; i < n_dist_points; ++i){
+	if (is_dist_digest(&digests[N*i]))
+	  printf("snd%d: Error at idx_global=%lu, hash_n=%lu, i=%d\n",
+		 myrank,
+		 global_idx,
+		 hash_n,
+		 i);
+      }
+	
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
 	server_id = to_which_server(&digests[i*N]);
@@ -302,7 +311,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
 	/* if the server buffer is full send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
-	  if (!first_time)
+	  if (!first_time) /* only call wait when its not the first message */
 	    MPI_Wait(&request, &status);
 
 	  

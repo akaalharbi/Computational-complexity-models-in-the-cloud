@@ -68,6 +68,16 @@ int is_dist_state(u8 state[HASH_STATE_SIZE]){
   return ( (  last_16bits  & ones) == 0 );
 }
 
+int is_dist_digest(u8 state[N]){
+  static const u16 ones = (1LL<<DIFFICULTY) - 1;
+  u16 last_16bits = ( (u16*) &state[N-2] ) [0];
+    
+  /* For now, we are not going to have difficulyt more than 16 bits. It will  */
+  /* take 330 years using my laptop! The longest recorded life is 122 years!  */
+  return ( (  last_16bits  & ones) == 0 );
+}
+
+
 int is_dist_msg(u8 M[HASH_INPUT_SIZE]){
   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
   hash_single(state, M);

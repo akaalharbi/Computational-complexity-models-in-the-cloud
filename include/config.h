@@ -66,7 +66,7 @@
 /* bytes i.e n := 8*N bits */
 #define N 12
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<25)
+#define INTERVAL (1LL<<20)
 
  /* store 2^L elements in the dictionary  */
 
@@ -75,6 +75,8 @@
 
 
 #define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
+
+
 
 // wlog: we can stick to  power of 2, then dictionary might reject some
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?

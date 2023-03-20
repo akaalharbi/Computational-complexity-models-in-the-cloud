@@ -157,6 +157,13 @@ static void write_digest_to_dict(dict *d,
 	      &status);
 
 
+    /* @todo: test REMOVE ME LATER */
+    for (size_t j=0; j<PROCESS_QUOTA; ++j) 
+      if (!is_dist_digest(&rcv_buf[N*j]))
+	printf("recv: ERROR at %lu\n", j);
+
+
+    
     /* add them to dictionary */
     for (size_t j=0; j<PROCESS_QUOTA; ++j) 
       dict_add_element_to(d, &rcv_buf[N*j]);
