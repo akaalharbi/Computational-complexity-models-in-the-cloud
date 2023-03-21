@@ -47,14 +47,22 @@ void print_m512i_u32(__m512i a, char* text){
   puts("");
 }
 
-void print_u32_2d(u32** restrict a, int n, int m){
+void print_2d_u32(u32** restrict a, int n, int m){
   for (int i=0; i<n; ++i) {
     for (int j=0; j<m; ++j) {
-      printf("08%x, ", a[i][j]);
+      printf("%x, ", a[i][j]);
     }
     puts("");
   }
 }
+
+
+void print_u32(u32* a, size_t l){
+  for (size_t i = 0; i<l; ++i) 
+    printf("%x, ", a[i]);
+  puts("");
+}
+
 
 
 void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
@@ -84,14 +92,20 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 
   /* load the last words of digests, we assume digest is aligned  */
   /* load last significant row in tr_state i.e. last words of each digest */
-  digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1)*16
-					      * HASH_STATE_SIZE]);
+  digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
+
+
+  print_m512i_u32(digests_last_word, "digests_last_words");
+  printf("tr_states_last ");
+  print_u32(&tr_states[(N_NWORDS_CEIL - 1)*16], 16);
+
   /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
+  print_m512i_u32(cmp_vect, "cmp_vect");
   /* cmp_mask will have the ith bit = 1 if the ith element in cmp_vect is -1 */
   // Please the if is in one direction. 
   cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
-
+  printf("cmp_mask = %u\n", cmp_mask);
   if (cmp_mask) { /* found at least a distinguished point? */
     *n_dist_points = __builtin_popcount(cmp_mask);
     int lane = 0;
@@ -285,7 +299,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
 
       for (int i= 0; i < n_dist_points; ++i){
-	if (is_dist_digest(&digests[N*i]))
+	if (!is_dist_digest(&digests[N*i]))
 	  printf("snd%d: Error at idx_global=%lu, hash_n=%lu, i=%d\n",
 		 myrank,
 		 global_idx,
