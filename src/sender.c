@@ -35,7 +35,7 @@ inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
     ((CTR_TYPE*)Mavx[i])[0] += (i+1); /* increase counter part in M by 1 */
 }
 
-
+/* @todo move these function to util_arrays */
 void print_m512i_u32(__m512i a, char* text){
   
   uint32_t A[16] = {0};
@@ -87,25 +87,21 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
   static REG_TYPE cmp_vect;
   static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
-
   // test for distinguishedn point //
 
   /* load the last words of digests, we assume digest is aligned  */
   /* load last significant row in tr_state i.e. last words of each digest */
   digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
 
-
-  print_m512i_u32(digests_last_word, "digests_last_words");
-  printf("tr_states_last ");
-  print_u32(&tr_states[(N_NWORDS_CEIL - 1)*16], 16);
-
   /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
-  print_m512i_u32(cmp_vect, "cmp_vect");
   /* cmp_mask will have the ith bit = 1 if the ith element in cmp_vect is -1 */
   // Please the if is in one direction. 
   cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
-  printf("cmp_mask = %u\n", cmp_mask);
+  /* printf("cmp_mask = %u\n", cmp_mask); */
+
+
+
   if (cmp_mask) { /* found at least a distinguished point? */
     *n_dist_points = __builtin_popcount(cmp_mask);
     int lane = 0;
@@ -125,7 +121,6 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
       copy_transposed_digest(&digests[i*N], tr_states, lane);
     }
   } /* end if (cmp_mask) */
-  
 }
 
 

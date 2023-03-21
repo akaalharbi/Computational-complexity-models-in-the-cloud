@@ -87,9 +87,13 @@
 #define N_NWORDS_CEIL CEILING(N, WORD_SIZE)
 /* since there migh be an empty space on the right side of the word, we shift */
 /* the mask that of the distinguished point test to the left */
-#define SHIFT_AMOUNT (N_NWORDS_CEIL * 32 - N * 8)
-#define DIST_PT_MASK_UNSHIFTED ((1 << DIFFICULTY) - 1)
-#define DIST_PT_MASK (DIST_PT_MASK_UNSHIFTED << SHIFT_AMOUNT)
+/* we would to check that the last `DIFFICULTY` bits are zero */
+/* since the digest is given as w0 w1 w2 as 32-bit words */
+/* as byte, the last bits will be in the largest places of w2 */
+
+#define SHIFT_AMOUNT ((WORD_SIZE_BITS - ((8*N)%WORD_SIZE_BITS)) - DIFFICULTY) 
+#define DIST_PT_MASK_UNSHIFTED ((1LL << DIFFICULTY) - 1)
+#define DIST_PT_MASK ((WORD_TYPE) (DIST_PT_MASK_UNSHIFTED << SHIFT_AMOUNT))
 
 
 /* we are not going to hold more than 32 bits in a dict entry */
