@@ -117,9 +117,10 @@ static inline int lookup_multi_save(dict *d,
 // local function
 // this function should be rewritten @todo 
 static void write_digest_to_dict(dict *d,
-				  u8* restrict rcv_buf,
-				  const int nsenders,
-				  MPI_Comm inter_comm)
+				 u8* restrict rcv_buf,
+				 const int nsenders,
+				 int myrank,
+				 MPI_Comm inter_comm)
 {
   // ==========================================================================+
   // Summary: Listen to senders who regenerates the long messsage digests, and |
@@ -159,7 +160,7 @@ static void write_digest_to_dict(dict *d,
 
     /* @todo: test REMOVE ME LATER */
     for (size_t j=0; j<PROCESS_QUOTA; ++j) 
-      if (!is_dist_digest(&rcv_buf[N*j]))
+      if (to_which_server(&rcv_buf[N*j]) != myrank)
 	printf("recv: ERROR at %lu\n", j);
 
 
@@ -304,7 +305,7 @@ void receiver_process_task(int const myrank,
 }
 
 
-void receiver(int local_rank, 
+void receiver(int local_rank, /* myrank among dictionaries */
 	      int nsenders, /* How many senders in the remote group  */
 	      MPI_Comm inter_comm)
 {
@@ -350,6 +351,7 @@ void receiver(int local_rank,
   write_digest_to_dict(d,
 		       rcv_buf,
 		       nsenders,
+		       local_rank,
 		       inter_comm);
 
 

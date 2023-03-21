@@ -106,9 +106,6 @@ u32 to_which_server(u8 state[HASH_STATE_SIZE])
   // h'     <-- h / nserver """                                                |
   //
   // --------------------------------------------------------------------------+
-  
-
-
   /* 1- convert sttate to a u32 (digest || nserver || dist_pt)  */
   /*  -> (nserver || dist_pt) 32 bits */
   /* 2- remove the distinguished bits by shifting  (nserver ) */
@@ -119,10 +116,7 @@ u32 to_which_server(u8 state[HASH_STATE_SIZE])
   snd_to_server = ( snd_to_server >> DIFFICULTY)  % NSERVERS;
 
   return snd_to_server;
-}
-
-
-
+} 
 
 
 

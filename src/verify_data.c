@@ -50,7 +50,7 @@ int check_hashes_interval_single(const WORD_TYPE state_befoe[NWORDS_STATE],
 
 void verify_region(size_t start, size_t end)
 {
-
+  
   /* this code use sha_ni and only works on a single node */
 
   #pragma omp parallel for
@@ -121,6 +121,9 @@ static void verify_middle_states(int myrank,
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
   size_t begin = (myrank * nstates)/nprocesses;
   size_t end = ((myrank + 1) * nstates)/nprocesses;
+  /* we would like (end - begin) = 1 + 16y to avoid problem with boundary */
+  end = end + ((1 + ((begin-end)%16)) % 16);
+  
   size_t global_idx; /* where are we in the states file */
   size_t local_idx; /* where are we in the buffer copied from states file  */
   int inited = 0; /* 0 if we need to clear the avx register */
@@ -157,7 +160,7 @@ static void verify_middle_states(int myrank,
     inited = 0; /* please clear the avx register */
     
     /* form the state to be accepted to the uint32_t *sha256_multiple_x16_tr */
-    transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
+    transpose_state(tr_states, &states[local_idx*NWORDS_STATE]); // this the important
     /* untranspose_state(current_states, tr_states); */ // no need to it.
     memcpy(state_singe, &states[local_idx*NWORDS_STATE], HASH_STATE_SIZE);
 
@@ -217,6 +220,7 @@ static void verify_middle_states(int myrank,
     
     /* return; /\* just one hash *\/ */
   }
+
   
   free(states);
   fclose(fp);

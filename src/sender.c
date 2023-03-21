@@ -337,7 +337,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 		    &request);
 
           /* printf("rank%d send to %d, %f sec\n", myrank, server_id, wtime() - elapsed); */
-	  elapsed = wtime();
+
 
 	  first_time = 0; /* we have sent a message */
 	  
@@ -348,7 +348,13 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	
       } /* end for n_dist_points */
     } /* end for hash_n */
-    printf("sender%d, global_idx=%lu\n", myrank, global_idx);
+    printf("sender%d, global_idx=%lu, %0.2fsec\n",
+	   myrank,
+	   global_idx,
+	   wtime() - elapsed);
+    
+    elapsed = wtime();
+    
   } /* end for global_idx */
 
   /* أترك المكان كما كان أو أفضل ما كان  */
