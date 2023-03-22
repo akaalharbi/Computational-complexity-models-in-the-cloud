@@ -28,6 +28,7 @@
 #include <sys/mman.h>
 #include "c_sha256_avx.h"
 #include "arch_avx512_type1.h"
+#define N_ACTIVE_LANES 16 /* this should be somewhere else */
 
 inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
 {
@@ -66,7 +67,7 @@ void print_u32(u32* a, size_t l){
 
 
 void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
-			 int max_nlanes, /* in */
+			 int n_active_lanes, /* in */
 			 u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 			 u8 digests[restrict 16 * N], /* out */
 			 CTR_TYPE msg_ctrs_out[restrict 16], /* out */
@@ -91,6 +92,7 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
   static REG_TYPE cmp_vect;
   static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
+  int npotenital_dist_pt = 0;
   // test for distinguishedn point //
 
   /* load the last words of digests, we assume digest is aligned  */
@@ -106,12 +108,12 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 
 
   if (cmp_mask) { /* found at least a distinguished point? */
-    *n_dist_points = __builtin_popcount(cmp_mask);
+    npotenital_dist_pt = __builtin_popcount(cmp_mask);
     int lane = 0;
     int trailing_zeros = 0;
 
     for (int i=0;
-	 (i < (*n_dist_points)) && (lane < max_nlanes);
+	 (i < npotenital_dist_pt) && (lane < n_active_lanes);
 	 ++i)
       {
       /* Basically get the index of the set bit in cmp_mask */
@@ -119,12 +121,16 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
       trailing_zeros = __builtin_ctz(cmp_mask); 
       lane += trailing_zeros;
       cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
-       
-      /* update counter the ith counter */
-      msg_ctrs_out[i] = ((CTR_TYPE*)Mavx[lane])[0];
 
-      /* get the digest to digests vector */
-      copy_transposed_digest(&digests[i*N], tr_states, lane);
+      if (lane < n_active_lanes){
+	/* do usefule work only when we are acting on active lane  */
+	*n_dist_points = i;
+        /* update counter the ith counter */
+	msg_ctrs_out[i] = ((CTR_TYPE*)Mavx[lane])[0];
+	/* get the digest to digests vector */
+	copy_transposed_digest(&digests[i*N], tr_states, lane);
+      }
+      
     }
   } /* end if (cmp_mask) */
 }
@@ -218,6 +224,10 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* except counter, they are all the same */
   /* u8* bsnd_buf = (u8*) malloc((((sizeof(u8)*N + sizeof(CTR_TYPE))* PROCESS_QUOTA) + MPI_BSEND_OVERHEAD) */
   /* 			      * NSERVERS); */
+
+  // -------------------------------- PART 1 ----------------------------------+
+  // VARIABLES DEFINITIONS
+  
   MPI_Status status;
   MPI_Request request;
   int first_time = 1; /* 1 if we have not sent anything yet, 0 otherwise */
@@ -229,6 +239,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* u8 Mavx[16][HASH_INPUT_SIZE] = {0}; */
   /* u32 tr_states[16*8] = {0}; /\* same as current_states but transposed *\/ */
 
+  // -------------------------------- PART 2 ----------------------------------+
+  // Where do I read from the states file? How many states should I work on?
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
   size_t begin = (myrank * nstates)/nsenders;
   size_t end = ((myrank + 1) * nstates)/nsenders;
@@ -267,7 +279,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   
   /* Attached buffered memory to MPI process  */
 
-
+  // -------------------------------- PART 3 ----------------------------------+
+  // Regenrate the long message: quota = (end - begin)
+  // Part a:  quota = 16x + r, treat 16x states now, then work on r states later
   
   /* Hash the long message again, 16 at a time. The remaining will  */
   for (global_idx = begin; global_idx < end; global_idx += 16){
@@ -370,17 +384,39 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     
   } /* end for global_idx */
 
-  /* أترك المكان كما كان أو أفضل ما كان  */
-  memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
+  /* should we wait for the last message to be sent?! */
+  if (!first_time) 
+    MPI_Wait(&request, &status);
 
-  /* Tell every receiver that you are done! */
-  for (int server=0; server<NSERVERS; ++server) 
-    MPI_Send(work_buf,
+
+  /* Tell every receiver that you are done!, and send the remaining digests */
+  for (int server=0; server<NSERVERS; ++server){
+    /* we may have some digests that we have not sent since their number is */
+    /* less than the PROCESS_QUOTA. We send them */
+
+    // Before:
+    /* server i buffer: {dgst1, .., dgstk, random garbage}*/
+    /* lft term: server i buffer begin, right term: nbytes to reach garbage */
+    memset(&work_buf[N*PROCESS_QUOTA*server + N*servers_counters[server]],
+	   0,
+	   N*(PROCESS_QUOTA-servers_counters[server]));
+    // After:
+    /* server i buffer: {dgst1, .., dgstk, 0, ..., 0}, len = PROCESS_QUOTA */
+    /* By default the receiver will ignore zero digests */
+
+    
+    MPI_Send(&work_buf[server*PROCESS_QUOTA*N],
 	     PROCESS_QUOTA*N,
 	     MPI_UNSIGNED_CHAR,
 	     server,
 	     TAG_DONE_HASHING,
 	     inter_comm);
+
+  }
+
+  /* أترك المكان كما كان أو أفضل ما كان  */
+  memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
+  
 }
 
 

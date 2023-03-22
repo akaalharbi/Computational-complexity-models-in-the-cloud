@@ -157,15 +157,9 @@ static void write_digest_to_dict(dict *d,
 	      inter_comm,
 	      &status);
 
-
-    /* @todo: test REMOVE ME LATER */
-    for (size_t j=0; j<PROCESS_QUOTA; ++j) 
-      if (to_which_server(&rcv_buf[N*j]) != myrank)
-	printf("recv: ERROR at %lu\n", j);
-
-
     
-    /* add them to dictionary */
+    /* add them to dictionary:   */
+    /* senders are responsible for checking it's a distinguished point */
     for (size_t j=0; j<PROCESS_QUOTA; ++j) 
       dict_add_element_to(d, &rcv_buf[N*j]);
 
