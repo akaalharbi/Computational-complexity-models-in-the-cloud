@@ -66,7 +66,8 @@ void print_u32(u32* a, size_t l){
 
 
 void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
-			 u8 Mavx[restrict 16][HASH_INPUT_SIZE], 
+			 int max_nlanes, /* in */
+			 u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 			 u8 digests[restrict 16 * N], /* out */
 			 CTR_TYPE msg_ctrs_out[restrict 16], /* out */
 			 int* n_dist_points) /* out */
@@ -77,6 +78,9 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   //          states. Also, return how many disitingusihed points have been    |
   //          found. A point is disitingusihed if it has x bits on the right   |
   //          most that are zero. x = `DIFFICULTY` defined in config.h         |
+  // INPUT:                                                                    |
+  // - tr_states: transposed states of hash (specific  to sha256)              |
+  // - max_nlanes: How many hashes out of 16 we consider. e.g. only first 7    | 
   // --------------------------------------------------------------------------+
 
 
@@ -101,13 +105,15 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   /* printf("cmp_mask = %u\n", cmp_mask); */
 
 
-
   if (cmp_mask) { /* found at least a distinguished point? */
     *n_dist_points = __builtin_popcount(cmp_mask);
     int lane = 0;
     int trailing_zeros = 0;
 
-    for (int i=0; i < (*n_dist_points); ++i){
+    for (int i=0;
+	 (i < (*n_dist_points)) && (lane < max_nlanes);
+	 ++i)
+      {
       /* Basically get the index of the set bit in cmp_mask */
       /* Daniel Lemire has other methods that are found in his blog */
       trailing_zeros = __builtin_ctz(cmp_mask); 
@@ -184,7 +190,7 @@ void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
     #endif
 
     /* Check if tr_states has  distinguished point(s) */
-    extract_dist_points(tr_states, Mavx, digests, msg_ctrs, n_dist_points);
+    extract_dist_points(tr_states, 16, Mavx, digests, msg_ctrs, n_dist_points);
     if (*n_dist_points) {
       return; /* found a distinguished point */
     }
@@ -226,7 +232,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
   size_t begin = (myrank * nstates)/nsenders;
   size_t end = ((myrank + 1) * nstates)/nsenders;
- 
+  /* how many lanes are we using for hasing? sometimes we don't have enough*/
+  int n_active_lanes = 16;  /* hashes to use all lanes */
+  
   size_t global_idx; /* where are we in the states file */
   size_t local_idx; /* where are we in the buffer copied from states file  */
   size_t idx; /* */
@@ -237,12 +245,18 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     end = nstates; /* get the rest of states */
 
 
-  /* get all states that i should work on: */
-  WORD_TYPE* states = (WORD_TYPE*) malloc((end - begin)
-					  * sizeof(WORD_TYPE)
-					  * NWORDS_STATE);
+  /* get all states that i should work on, pad with 0s to get 0 mod 16 */
+  WORD_TYPE* states = (WORD_TYPE*) malloc( ((end - begin) + ((begin - end)%16))
+					   * sizeof(WORD_TYPE)
+					   * NWORDS_STATE);
 
-
+  /* is it important to initialize it with zeros? */
+  memset(states,
+	 0,
+	 ((end - begin) + ((begin - end)%16))
+	 * sizeof(WORD_TYPE)
+	 * NWORDS_STATE);
+  
   /* only load states that i am going to work on */
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
@@ -255,22 +269,28 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
 
   
-  /* Hash the long message again, 16 at a time */
-  for (global_idx = begin; global_idx<end; global_idx += 16){
+  /* Hash the long message again, 16 at a time. The remaining will  */
+  for (global_idx = begin; global_idx < end; global_idx += 16){
     /* local_idx = 0 -> (end-global)/16 */
     local_idx = global_idx - begin ;
+    n_active_lanes = MIN((end - global_idx), 16);
+
+    
     inited = 0; /* tell sha256_x16 to copy the state */
 
     printf("global_idx = %lu, end = %lu\n", global_idx, end);
 
 
     /* Read fresh 16 states, and put them in transposed way  */
+    /* if the n_active_lanes < 16, states has extra padded zeros */
     transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
-    /* set message counters */
+    
+    /* set message counters for all lanes (although not all will be used  ) */
     for (int lane = 0; lane<16; ++lane)
       ((u64*) Mavx[lane])[0] = INTERVAL * (global_idx + lane);
 
-    elapsed = wtime();
+    elapsed = wtime(); /* how long does it take to hash an interval */
+    
     for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
       /* hash 16 messages and copy it to tr_states  */
       // todo fix me please 
@@ -287,20 +307,12 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       /* todo check thish function */
       /* why the number of distinguished points is always 16 */
       extract_dist_points(tr_states, /* transposed states */
+			  n_active_lanes,
 			  Mavx, /* messages used */
 			  digests, /* save the distinguished hashes here */
 			  msg_ctrs, /* messages are the same except counter */
 			  &n_dist_points); /* how many dist points found? */
 
-
-      for (int i= 0; i < n_dist_points; ++i){
-	if (!is_dist_digest(&digests[N*i]))
-	  printf("snd%d: Error at idx_global=%lu, hash_n=%lu, i=%d\n",
-		 myrank,
-		 global_idx,
-		 hash_n,
-		 i);
-      }
 	
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
@@ -317,13 +329,14 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
         ++servers_counters[server_id];
 
-
 	/* if the server buffer is full send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
-	  if (!first_time) /* only call wait when its not the first message */
+	  
+	  /* only call wait when its not the first message */
+	  if (!first_time) 
 	    MPI_Wait(&request, &status);
 
-	  
+	  /* copy the message to be sent to snd_buf */
 	  memcpy(snd_buf,
 		 &work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
 		 N*PROCESS_QUOTA);
@@ -395,7 +408,7 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
     /* 1- hash, 2- increment message counters, 3- extract disit point if any */
     states_avx = sha256_multiple_x16(Mavx);
     increment_message(Mavx);
-    extract_dist_points(states_avx, Mavx, digests, msg_ctrs, &n_dist_points);
+    extract_dist_points(states_avx, 16, Mavx, digests, msg_ctrs, &n_dist_points);
 
     /* put the distinguished points in specific serverss buffer */
     for (int i = 0; i<n_dist_points; ++i){ /* n_dist_points might be 0 */

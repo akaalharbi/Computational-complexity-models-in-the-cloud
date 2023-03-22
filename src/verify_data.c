@@ -101,7 +101,8 @@ static void verify_middle_states(int myrank,
 				 MPI_Comm inter_comm)
 {
   // ==========================================================================+
-  // Summary: Check the middle states found in the file data/states.           |
+  // Summary: Check the middle states found in the file data/states using many |
+  //          nodes.                                                           |
   // --------------------------------------------------------------------------+
   FILE* fp = fopen("data/states", "r");
   int is_corrupt = 0;
@@ -154,7 +155,7 @@ static void verify_middle_states(int myrank,
   
 
   /* Hash the long message again, 16 at a time */
-  for (global_idx = begin; global_idx < end; global_idx += 16){
+  for (global_idx = begin; global_idx < end-1; global_idx += 16){
     /* local_idx = 0 -> (end-global)/16 */
     local_idx = global_idx - begin ;
     inited = 0; /* please clear the avx register */
@@ -200,7 +201,15 @@ static void verify_middle_states(int myrank,
     is_corrupt = (0 != nbytes_non_equal);
 
     if (is_corrupt && myrank==0) {
-      printf("found a curropt state at global_idx=%lu\n", global_idx);
+      printf("rank=%d, global_idx=%lu, corrupt?=%d, end=%lu, quota=%lu elapsed=%0.2fsec, 2^%0.2f\n",
+	     myrank,
+	     global_idx,
+	     is_corrupt,
+	     end,
+	     (end-begin),
+	     elapsed,
+	     log2(INTERVAL/elapsed)+log2(16));
+
       printf("first hash=%d\n",
 	     memcmp(current_states, next_states, 16*HASH_STATE_SIZE));
       
@@ -210,12 +219,6 @@ static void verify_middle_states(int myrank,
       print_byte_txt("next", (u8*)next_states, HASH_STATE_SIZE*16);
     }
     elapsed = wtime() - elapsed;
-    printf("rank=%d, step=%lu, corrupt?=%d, elapsed=%0.2fsec, 2^%0.2f\n",
-	   myrank,
-	   global_idx,
-	   is_corrupt,
-	   elapsed,
-	   log2(INTERVAL/elapsed)+log2(16));
     /* 16*/
     
     /* return; /\* just one hash *\/ */
