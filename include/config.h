@@ -64,7 +64,7 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 12
+#define N 11
 /* record the whole state after each each interval has passed */
 #define INTERVAL (1LL<<30)
 
@@ -82,7 +82,7 @@
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 2
+#define DIFFICULTY 4
 /* How many words are needed to accommedate N */
 #define N_NWORDS_CEIL CEILING(N, WORD_SIZE)
 /* since there migh be an empty space on the right side of the word, we shift */
@@ -122,7 +122,7 @@
 
 
 /* edit manually */
-#define NSERVERS 1
+#define NSERVERS 2
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
@@ -136,7 +136,7 @@
 
 
 // 7*4 GiB
-#define TOTAL_RAM 3000000000//20850444000LL
+#define TOTAL_RAM 8000000000 // 89000000000 //20850444000LL
 #define NRECEIVERS_PER_NODE 1
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
@@ -167,7 +167,7 @@
 #define ARCHIVE_SERVER NSERVERS
 // WHAT IS BUFF_SIZE? It doesn't seem to be used!
 //#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
-#define PROCESS_QUOTA 1000LL //1000000LL // i.e. send 10 digests to each server @by_hand
+#define PROCESS_QUOTA 1000000LL // i.e. send 10^6 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
 
@@ -175,14 +175,6 @@
 /* #if LOG2_NSERVERS > N */
 /*   #error "We have N < DEFINED_BYTES, this program is a bit stupid" */
 /* #endif */
-
-
-
-
-
-
-
-
 
 
 

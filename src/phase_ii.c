@@ -115,6 +115,11 @@ int main(int argc, char* argv[])
 
   else if (myrank < NSERVERS){ /* receiver, repeat infinitely  */
     /* Creat inter-comm from sender point of view:  */
+    char name[80];
+    int resultin;
+    MPI_Get_processor_name(name, &resultin);
+    printf("recv%d name=%s, resultin=%d\n", myrank, name, resultin);
+    
     MPI_Intercomm_create(local_comm, 
 			 0, /* local communicator */
 			 MPI_COMM_WORLD, 
