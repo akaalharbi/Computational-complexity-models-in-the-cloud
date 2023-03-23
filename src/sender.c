@@ -363,8 +363,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 		    inter_comm,
 		    &request);
 
-          /* printf("rank%d send to %d, %f sec\n", myrank, server_id, wtime() - elapsed); */
-
 
 	  first_time = 0; /* we have sent a message */
 	  

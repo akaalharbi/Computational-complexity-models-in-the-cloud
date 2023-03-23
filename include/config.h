@@ -136,7 +136,7 @@
 
 
 // 7*4 GiB
-#define TOTAL_RAM 8000000000 // 89000000000 //20850444000LL
+#define TOTAL_RAM 89000000000 //20850444000LL
 #define NRECEIVERS_PER_NODE 1
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
@@ -167,7 +167,7 @@
 #define ARCHIVE_SERVER NSERVERS
 // WHAT IS BUFF_SIZE? It doesn't seem to be used!
 //#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
-#define PROCESS_QUOTA 1000000LL // i.e. send 10^6 digests to each server @by_hand
+#define PROCESS_QUOTA 100000LL // i.e. send 10^5 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
 
