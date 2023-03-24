@@ -581,7 +581,7 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 		  (N+sizeof(CTR_TYPE))*PROCESS_QUOTA, /* #chars to be sent */
 		  MPI_UNSIGNED_CHAR, 
 		  server_id, /* receiver */
-		  TAG_DICT_SND, /* 0 */
+		  TAG_SND_DGST,
 		  inter_comm,
 		  &request);
 	first_send = 0; /* call mpi wait next time */
