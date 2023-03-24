@@ -15,7 +15,6 @@ obj/*
 .ccls-cache
 .ccls-cache/*
 .cache/*
-data/*
 obj/*
 phase_i
 phase_ii
@@ -68,4 +67,3 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-long_message_attac

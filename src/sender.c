@@ -348,6 +348,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 					   * sizeof(WORD_TYPE)
 					   * NWORDS_STATE);
 
+  printf("pid=%d sender%d before states memset\n", getpid(), myrank);
   /* is it important to initialize it with zeros? */
   memset(states,
 	 0,
@@ -360,7 +361,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
   fclose(fp);
 
-  printf("rank%d, begin=%lu, end=%lu, nstates=%lu\n",
+  printf("sender%d, begin=%lu, end=%lu, nstates=%lu\n",
 	 myrank, begin, end, nstates);
   
   /* Attached buffered memory to MPI process  */
@@ -378,7 +379,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     
     inited = 0; /* tell sha256_x16 to copy the state */
 
-    printf("global_idx = %lu, end = %lu\n", global_idx, end);
 
 
     /* Read fresh 16 states, and put them in transposed way  */
@@ -391,7 +391,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
     elapsed = wtime(); /* how long does it take to hash an interval */
     
-    for (size_t hash_n=0; hash_n < INTERVAL; ++hash_n){
+    for (u64 hash_n=0; hash_n <((u64) INTERVAL); ++hash_n){
       /* hash 16 messages and copy it to tr_states  */
       // todo fix me please 
       memcpy(tr_states,
@@ -403,16 +403,27 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       for (int lane = 0; lane<16; ++lane)
 	((u64*) Mavx[lane])[0] += 1;
 
+
+      
       // up to this point it seems everything is fine
       /* todo check thish function */
       /* why the number of distinguished points is always 16 */
+      if (n_active_lanes == 16){
+	extract_dist_points(tr_states, /* transposed states */
+			    Mavx, /* messages used */
+			    digests, /* save the distinguished hashes here */
+			    msg_ctrs, /* messages are the same except counter */
+			    &n_dist_points); /* how many dist points found? */
 
-      extract_dist_points_dynamic(tr_states, /* transposed states */
-			  n_active_lanes,
-			  Mavx, /* messages used */
-			  digests, /* save the distinguished hashes here */
-			  msg_ctrs, /* messages are the same except counter */
-			  &n_dist_points); /* how many dist points found? */
+      } else{
+	extract_dist_points_dynamic(tr_states, /* transposed states */
+			    n_active_lanes,
+			    Mavx, /* messages used */
+			    digests, /* save the distinguished hashes here */
+			    msg_ctrs, /* messages are the same except counter */
+			    &n_dist_points); /* how many dist points found? */
+      }
+	
 
 	
       /* put the distinguished points in specific serverss buffer */
@@ -432,6 +443,10 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
 	/* if the server buffer is full send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
+	  /* printf("before sender%d, global_idx=%lu, to %d \n", */
+	  /* 	 myrank, */
+	  /* 	 global_idx, */
+	  /* 	 server_id); */
 	  
 	  /* only call wait when its not the first message */
 	  if (!first_time) 
@@ -441,7 +456,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	  memcpy(snd_buf,
 		 &work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
 		 N*PROCESS_QUOTA);
-	  
+
+
+
 	  MPI_Isend(snd_buf, 
 		    N*PROCESS_QUOTA, /* How many characteres will be sent. */
 		    MPI_UNSIGNED_CHAR, 
@@ -449,6 +466,12 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 		    TAG_DICT_SND, /* 0 */
 		    inter_comm,
 		    &request);
+
+	  /* printf("after sender%d, global_idx=%lu, to %d \n", */
+	  /* 	 myrank, */
+	  /* 	 global_idx, */
+	  /* 	 server_id); */
+
 
 
 	  first_time = 0; /* we have sent a message */
@@ -460,10 +483,14 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	
       } /* end for n_dist_points */
     } /* end for hash_n */
-    printf("sender%d, global_idx=%lu, %0.2fsec\n",
+
+    elapsed = wtime() - elapsed;
+    printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %f%%, %0.4fsec\n",
 	   myrank,
 	   global_idx,
-	   wtime() - elapsed);
+	   log2(INTERVAL/elapsed)+log2(16),
+	   (double_t) 1 -  (end - global_idx)/((double_t) end - begin),
+	    elapsed);
     
     elapsed = wtime();
     
@@ -622,12 +649,15 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 
   if (work_buf == NULL)
     puts("work_buf is NULL");
+
+  printf("pid=%d sender%d before memset\n", getpid(), myrank);
   /* memset(bsnd_buf, 0, (nbytes_per_server + MPI_BSEND_OVERHEAD)* NSERVERS); */
   memset(work_buf, 0, nbytes_per_server*NSERVERS);
   memset(server_counters, 0, sizeof(size_t)*NSERVERS);
+  
 
-
-  printf("sender: N=%d, one pair size = %lu\n", N, one_pair_size);
+  printf("sender%d: N=%d, one pair size = %lu\n",
+	 myrank, N, one_pair_size);
 
   
   // ----------------------------- PART 1 --------------------------------- //

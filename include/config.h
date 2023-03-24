@@ -66,7 +66,7 @@
 /* bytes i.e n := 8*N bits */
 #define N 11
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<30)
+#define INTERVAL (1LL<<26)
 
  /* store 2^L elements in the dictionary  */
 
@@ -82,7 +82,7 @@
 #define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 4
+#define DIFFICULTY 3
 /* How many words are needed to accommedate N */
 #define N_NWORDS_CEIL CEILING(N, WORD_SIZE)
 /* since there migh be an empty space on the right side of the word, we shift */
@@ -136,8 +136,8 @@
 
 
 // 7*4 GiB
-#define TOTAL_RAM 89000000000 //20850444000LL
-#define NRECEIVERS_PER_NODE 1
+#define TOTAL_RAM 14000000000//60000000000 //20850444000LL
+#define NRECEIVERS_PER_NODE 2
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
 

@@ -45,6 +45,7 @@
 #include "util_files.h"
 #include <sys/random.h> // getrandom(void *buffer, size_t length, 1)
 #include <mpi.h>
+#include <unistd.h>
 #include "common.h"
 #include "sender.h"
 #include "receiver.h"
@@ -101,6 +102,11 @@ int main(int argc, char* argv[])
   // Who am I? a sender,  or a receiver?
   if (myrank >= NSERVERS){
     /* Creat inter-comm from sender point of view:  */
+    char name[80];
+    int resultin;
+    MPI_Get_processor_name(name, &resultin);
+    printf("sender%d name=%s, pid=%d\n", myrank, name, getpid());
+
     MPI_Intercomm_create(local_comm,
 			 0, /* local leader */
 			 MPI_COMM_WORLD, /*where to find remote leader */

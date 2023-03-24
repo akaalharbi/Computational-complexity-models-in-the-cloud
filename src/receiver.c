@@ -333,7 +333,9 @@ void receiver(int local_rank, /* myrank among dictionaries */
 
 
   char txt[100];
-  snprintf(txt, sizeof(txt), "recv#%d before dict load", local_rank);
+  snprintf(txt, sizeof(txt), "recv#%d before dict expected ram %lu, ",
+	   local_rank,
+	   dict_memory(NSLOTS_MY_NODE));
   print_memory_usage(txt);
 
   dict* d = dict_new(NSLOTS_MY_NODE);
