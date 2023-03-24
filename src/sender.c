@@ -423,8 +423,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
 	/* skip this iteration if it is not a distinguish point */
-	if (is_dist_state( (u8*) &un_tr_states[i*NWORDS_STATE]) )
-	  continue;
 	
 	server_id = to_which_server(&digests[i*N]);
 
@@ -454,9 +452,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	  memcpy(snd_buf,
 		 &work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
 		 N*PROCESS_QUOTA);
-
-
-
+	  
 	  MPI_Isend(snd_buf, 
 		    N*PROCESS_QUOTA, /* How many characteres will be sent. */
 		    MPI_UNSIGNED_CHAR, 

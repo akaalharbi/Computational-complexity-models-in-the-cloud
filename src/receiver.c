@@ -157,7 +157,6 @@ static void write_digest_to_dict(dict *d,
 	      MPI_ANY_TAG,  /* tag = 1 means a sender has done its work */ 
 	      inter_comm,
 	      &status);
-
     
     /* add them to dictionary:   */
     /* senders are responsible for checking it's a distinguished point */
@@ -360,11 +359,13 @@ void receiver(int local_rank, /* myrank among dictionaries */
 	 "recv #%d dict read in %0.2fsec\n"
 	 "It has %lu elms, we tried to insert  %lu elms\n"
 	 "d->nslots = %lu, d->nelements=%lu, filling rate=%f \n"
+	 "nslots/n_asked_to_inserted=%f\n"
 	 "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n",
 	 local_rank, wtime() - time_start,
 	 d->nelements, d->nelements_asked_to_be_inserted,
 	 d->nslots, d->nelements,
-	 ((float) d->nelements)/d->nslots);
+	 ((float) d->nelements)/d->nslots,
+	 d->nelements/((double) d->nelements_asked_to_be_inserted));
 
   snprintf(txt, sizeof(txt), "recv#%d after  dict load", local_rank);
   print_memory_usage(txt);
