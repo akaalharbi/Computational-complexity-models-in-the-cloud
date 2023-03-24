@@ -66,7 +66,7 @@
 /* bytes i.e n := 8*N bits */
 #define N 11
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<26)
+#define INTERVAL (1LL<<20)
 
  /* store 2^L elements in the dictionary  */
 
@@ -136,7 +136,7 @@
 
 
 // 7*4 GiB
-#define TOTAL_RAM 14000000000//60000000000 //20850444000LL
+#define TOTAL_RAM 14000000000LL //60000000000LL //20850444000LL
 #define NRECEIVERS_PER_NODE 2
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 

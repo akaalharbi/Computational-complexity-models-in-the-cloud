@@ -26,8 +26,13 @@
 #include "common.h"
 #include "sender.h"
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include "c_sha256_avx.h"
 #include "arch_avx512_type1.h"
+
+
+
 #define N_ACTIVE_LANES 16 /* this should be somewhere else */
 
 inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
@@ -158,9 +163,9 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   const REG_TYPE zero = SIMD_SETZERO_SI();
   /* use this mask to check if a digest is a distinguished point or not! */
   const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(DIST_PT_MASK);
-  static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
-  static REG_TYPE cmp_vect;
-  static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
+  REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
+  REG_TYPE cmp_vect;
+  u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
 
   // test for distinguishedn point //
 
@@ -275,23 +280,10 @@ void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 
 
 
-void hash_interval_16x()
-{
-  /// Starting from tr_states, hash INTERVAL times and save the distinguished
-  /// points in the buffer according to their last byte. Also, update how many
-  /// disitingusihed point each server's buffer have.
-
-  
-  
-  
-}
-
-
-
-
 
 static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 					    u32 tr_states[restrict 16*8],
+					    u32 un_tr_states[restrict 16*8],
 					    u8  digests[restrict 16 * N],
 					    CTR_TYPE msg_ctrs[restrict 16],
 					    u8* work_buf,
@@ -337,7 +329,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   size_t local_idx; /* where are we in the buffer copied from states file  */
   size_t idx; /* */
   int inited = 0; /* 0 if we need to clear the avx register */
-
+  
 
   if (myrank == (nsenders-1))
     end = nstates; /* get the rest of states */
@@ -397,6 +389,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       memcpy(tr_states,
 	     sha256_multiple_x16_tr(Mavx, tr_states, inited),
 	     16*HASH_STATE_SIZE);
+
       inited = 1; /* sha256_x16 has alread a copy of the state */
       
       /* increment the message counters after hashing */
@@ -404,10 +397,11 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	((u64*) Mavx[lane])[0] += 1;
 
 
-      
-      // up to this point it seems everything is fine
-      /* todo check thish function */
-      /* why the number of distinguished points is always 16 */
+
+
+      /* we can avoid branching here by using extract_dist_points_dynamic */
+      /* however in most cases we are not going to use it unless we are in */
+      /* the boundary. */
       if (n_active_lanes == 16){
 	extract_dist_points(tr_states, /* transposed states */
 			    Mavx, /* messages used */
@@ -415,7 +409,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 			    msg_ctrs, /* messages are the same except counter */
 			    &n_dist_points); /* how many dist points found? */
 
-      } else{
+      }else {
 	extract_dist_points_dynamic(tr_states, /* transposed states */
 			    n_active_lanes,
 			    Mavx, /* messages used */
@@ -423,11 +417,15 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 			    msg_ctrs, /* messages are the same except counter */
 			    &n_dist_points); /* how many dist points found? */
       }
-	
+
 
 	
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
+	/* skip this iteration if it is not a distinguish point */
+	if (is_dist_state( (u8*) &un_tr_states[i*NWORDS_STATE]) )
+	  continue;
+	
 	server_id = to_which_server(&digests[i*N]);
 
 	/* where to put digest in server_id buffer? */
@@ -467,13 +465,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 		    inter_comm,
 		    &request);
 
-	  /* printf("after sender%d, global_idx=%lu, to %d \n", */
-	  /* 	 myrank, */
-	  /* 	 global_idx, */
-	  /* 	 server_id); */
-
-
-
 	  first_time = 0; /* we have sent a message */
 	  
 	  servers_counters[server_id] = 0;
@@ -489,7 +480,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	   myrank,
 	   global_idx,
 	   log2(INTERVAL/elapsed)+log2(16),
-	   (double_t) 1 -  (end - global_idx)/((double_t) end - begin),
+	   100 * ((double_t) 1 -  (end - global_idx)/((double_t) end - begin)),
 	    elapsed);
     
     elapsed = wtime();
@@ -620,7 +611,8 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   /* non-transposed messages */
   u8 Mavx[16][HASH_INPUT_SIZE] = {0};
   /* transoposed states  */
-  u32 tr_states[16*8] __attribute__ ((aligned(64))) = {0};  
+  u32 tr_states[16*8] __attribute__ ((aligned(64))) = {0};
+  u32 un_tr_states[16*8] __attribute__ ((aligned(64))) = {0};  /* non-transoposed */
   u8 digests[16 * N] ; /* save the distinguished digests here (manually) */
   CTR_TYPE msg_ctrs[16]; /* save thde counters of the dist digests (manually) */
 
@@ -664,6 +656,7 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   // Regenrate the long message in parallel!                                //
   regenerate_long_message_digests(Mavx,
 				  tr_states,
+				  un_tr_states,
 				  digests,
 				  msg_ctrs,
 				  work_buf,
@@ -693,7 +686,7 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   
   // ----------------------------- PART 2.b ---------------------------------- //
   // 1-  Sen the initial input to all receiving servers 
-  MPI_Allgather(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, NULL, 0, NULL, inter_comm);
+  MPI_Allgather(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, NULL, 0, MPI_UNSIGNED_CHAR, inter_comm);
 
 
   // ------------------------------ PART 3 ----------------------------------- +

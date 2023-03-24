@@ -369,11 +369,12 @@ void receiver(int local_rank, /* myrank among dictionaries */
   //--------------------------------- PART 2 ----------------------------------+
   // corresponds to part 2.b in senders
   // PART 2: Get templates from all senders
-  MPI_Allgather(NULL, 0, NULL, /* receivers don't send */
+  MPI_Allgather(NULL, 0, MPI_UNSIGNED_CHAR, /* receivers don't send */
 		templates, /* save messages here */
 		HASH_INPUT_SIZE,
 		MPI_UNSIGNED_CHAR,
 		inter_comm);
+
 
 
   //--------------------------------- PART 2 ----------------------------------+
