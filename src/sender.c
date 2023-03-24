@@ -515,6 +515,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	     TAG_DONE_HASHING,
 	     inter_comm);
 
+    printf("sender%d dit au revoir\n", myrank);
+
   }
 
   /* أترك المكان كما كان أو أفضل ما كان  */
@@ -538,7 +540,8 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
   MPI_Status status;
   MPI_Request request;
-  MPI_Request_free(&request); /* in 1st time there is no waiting  */
+
+  int first_send = 1;
 
   
 
@@ -575,7 +578,8 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
       ++servers_counters[server_id];
       /* if the server buffer is full send immediately */
       if (servers_counters[server_id] == PROCESS_QUOTA){
-	MPI_Wait(&request, &status);
+	if (!first_send)
+	  MPI_Wait(&request, &status);
 	
 	MPI_Isend(&work_buf[server_id*PROCESS_QUOTA*(N+sizeof(CTR_TYPE))],
 		  (N+sizeof(CTR_TYPE))*PROCESS_QUOTA, /* #chars to be sent */
@@ -584,6 +588,7 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 		  TAG_DICT_SND, /* 0 */
 		  inter_comm,
 		  &request);
+	first_send = 0; /* call mpi wait next time */
 	servers_counters[server_id] = 0;
       }
     }
@@ -685,9 +690,11 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 
   
   // ----------------------------- PART 2.b ---------------------------------- //
-  // 1-  Sen the initial input to all receiving servers 
+  // 1-  Sen the initial input to all receiving servers
+  MPI_Barrier(MPI_COMM_WORLD);
   MPI_Allgather(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, NULL, 0, MPI_UNSIGNED_CHAR, inter_comm);
 
+  printf("sender%d done sending template\n", myrank);
 
   // ------------------------------ PART 3 ----------------------------------- +
   // 1- generate disitingusihed hashes                                         |

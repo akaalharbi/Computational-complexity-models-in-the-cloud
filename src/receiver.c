@@ -140,9 +140,10 @@ static void write_digest_to_dict(dict *d,
   // contain the distinguished point zeros and the bits.
   MPI_Status status;
   /* A sender will send a 0 tag if it needs to hash more, otherwise it will send tag = 1 */
-  int ncompleted_senders = 0; 
+  int ncompleted_senders = 0;
+  int tmp = 0;
   size_t rcv_size = PROCESS_QUOTA*N;
-
+  
 
   //---------------------------------------------------------------------------+
   // Receive digests and add them to dictionary
@@ -165,7 +166,11 @@ static void write_digest_to_dict(dict *d,
 
     /* If a sender is done hashing, it will make rcv_buf = {0}, and has tag=1 */
     /* The dictionary by design will ignore all zero messages */
+    tmp = ncompleted_senders;
     ncompleted_senders += status.MPI_TAG;
+    if (tmp != ncompleted_senders){
+      printf("recv%d say that %d/%d are done\n", myrank, ncompleted_senders, nsenders);
+    }
   }
 }
 
@@ -287,7 +292,7 @@ void receiver_process_task(int const myrank,
     /* print_attack_information(); */
 
     }
-
+  
   // good job
   free(rcv_buf);
   /* free(indices); */
@@ -353,7 +358,7 @@ void receiver(int local_rank, /* myrank among dictionaries */
 
   printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 	 "recv #%d dict read in %0.2fsec\n"
-	 "It has %lu elms, file has %lu elms\n"
+	 "It has %lu elms, we tried to insert  %lu elms\n"
 	 "d->nslots = %lu, d->nelements=%lu, filling rate=%f \n"
 	 "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n",
 	 local_rank, wtime() - time_start,
@@ -369,14 +374,21 @@ void receiver(int local_rank, /* myrank among dictionaries */
   //--------------------------------- PART 2 ----------------------------------+
   // corresponds to part 2.b in senders
   // PART 2: Get templates from all senders
+  MPI_Barrier(MPI_COMM_WORLD);
   MPI_Allgather(NULL, 0, MPI_UNSIGNED_CHAR, /* receivers don't send */
 		templates, /* save messages here */
 		HASH_INPUT_SIZE,
 		MPI_UNSIGNED_CHAR,
 		inter_comm);
 
+  for (int i = 0; i<nsenders; ++i) {
+    char txt[50];
+    snprintf(txt, sizeof(txt), "rcv%d sender#%d template=", local_rank, i);
+    print_byte_txt(txt, &templates[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
+    puts("\n");
 
-
+  }
+  printf("recv%d is going to do the main task\n", local_rank);
   //--------------------------------- PART 2 ----------------------------------+
   /* listen to senders, probe their digest, in case a candidate is found: */
   /* save the message the generates the cadidate digest. */

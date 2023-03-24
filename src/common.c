@@ -156,6 +156,10 @@ void untranspose_state(u32 dest[restrict 16*8],
 
 
 
+
+
+
+
 void copy_transposed_digest(u8 *digest, u32 *tr_state, int lane)
 {
   for (int i = 0; i<(N/WORD_SIZE); ++i) 
@@ -170,7 +174,6 @@ void copy_transposed_digest(u8 *digest, u32 *tr_state, int lane)
 	 N - (N/WORD_SIZE)*WORD_SIZE );
 
 }
-
 
 
 
