@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
   /* Create a local communicator: */
   /* (senders has a local comm), (receivers has a local comme) */
   MPI_Comm_split(MPI_COMM_WORLD, color, myrank, &local_comm);
-  
+
 
   if (myrank == 0) {
     printf("--------------------------------------------------------------------\n"
@@ -118,7 +118,6 @@ int main(int argc, char* argv[])
 			 &inter_comm);/* new intercomm */
 
     /* It knows the number of receivers from NSERVERS from config.h */
-    printf("I am a sender with rank %d\n", myrank);
     sender(local_comm, inter_comm);
   }
 

@@ -138,7 +138,10 @@ int dict_add_element_to(dict* d, u8* state){
   // issues may aris when VAL_SIZE is larger then what is left in the state   |
   //                                                                          |
   // -------------------------------------------------------------------------+
-  static int idx_size = MIN(L_IN_BYTES, N-DEFINED_BYTES-VAL_SIZE_BYTES);
+  /* how many bytes do we need to index the buckets */
+  const int idx_size =  (int) ceil((L_RECEIVER - log2(d->nslots_per_bucket))
+				   /8.0) ;
+
 
     
   ++(d->nelements_asked_to_be_inserted);
@@ -212,7 +215,10 @@ int dict_has_elm(dict *d, u8 *state)
   // `*state`: element to be looked up  in *d in the form                     |
   //          (L bits) || discard || (VAL_SIZE bits)                          |
   // -------------------------------------------------------------------------+
-  static int idx_size = MIN(L_IN_BYTES, N-DEFINED_BYTES-VAL_SIZE_BYTES);
+  /* how many bytes do we need to index the buckets */
+  const int idx_size =  (int) ceil((L_RECEIVER - log2(d->nslots_per_bucket))
+				   /8.0) ;
+
   u64 idx = 0;
   memcpy(&idx, state, idx_size);
 

@@ -29,19 +29,20 @@
 #include "common.h"
 
 void print_attack_information(){
-  printf("\nL=%d, L_IN_BYTES=%d, N=%d, NHASHES=%llu,\n"
-         "DIFFICULTY=%d, |idx| = %dbytes, NSEERVERS=%d,\n"
+  printf("\nL=%f, L_RECEIVER=%f, N=%d, NHASHES=%llu,\n"
+         "DIFFICULTY=%d, |idx| = %dbytes, NELELEMNTS_BUCKET=%d, NSEERVERS=%d,\n"
          "NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
          "NDEFINED BYTES=%d, NCND_NEEDED=%llu≈2^%0.4f,\n"
 	 "NDISCARDED_BITS=%d\n"
 	 "AVX_SIZE=%dbits, mask_ones=%d\n"
 	 "NPROBES LOOK UP = %d\n",
 	 L,
-	 L_IN_BYTES,
+	 L_RECEIVER,
 	 N,
 	 NHASHES,
 	 DIFFICULTY,
-	 MIN(L_IN_BYTES, N-DEFINED_BYTES-VAL_SIZE_BYTES),
+	 (int) ceil((L_RECEIVER - log2(SIMD_LEN))/8.0),
+	 SIMD_LEN,
 	 NSERVERS,
 	 NSLOTS_MY_NODE,
 	 NPROBES_MAX,

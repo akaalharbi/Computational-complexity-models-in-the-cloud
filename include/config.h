@@ -66,7 +66,7 @@
 /* bytes i.e n := 8*N bits */
 #define N 10
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<25)
+#define INTERVAL (1LL<<23)
 
 
 
@@ -102,31 +102,31 @@
 
 
 /* edit manually */
-#define NSERVERS 2
+#define NSERVERS 4
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
 #define DEFINED_BYTES CEILING(DEFINED_BITS, 8)
 
 
-#define TOTAL_RAM 14000000000LL //60000000000LL //20850444000LL
-#define NRECEIVERS_PER_NODE 2
+#define TOTAL_RAM 64000000000LL //20850444000LL
+#define NRECEIVERS_PER_NODE 1
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
 
  /* store 2^L elements in the dictionary  */
-#define L (LOG2_64BIT(NSLOTS_MY_NODE))
-#define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
-// wlog: we can stick to  power of 2, then dictionary might reject some
+#define L_RECEIVER (log2(NSLOTS_MY_NODE)) /* the value of L per receiver */
+#define L (L_RECEIVER + log2(NSERVERS))
+
 #define NHASHES NSLOTS_MY_NODE // How many hashes we'll send to all dictionaries?
 
-#define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES), 0)
+#define DISCARDED_BITS MAX( (int) ceil(8 * N - L - 8 * VAL_SIZE_BYTES), 0)
 /* #define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES - DEFINED_BITS), 0) */
 
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
 
-#define NNEEDED_CND MAX(( (1LL << (DISCARDED_BITS+1)) ),\
+#define NNEEDED_CND MAX(( (1LL << ( DISCARDED_BITS+1)) ),	\
 			  1)   /* @python  */
 
 
