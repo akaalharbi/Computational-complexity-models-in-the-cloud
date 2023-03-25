@@ -95,17 +95,20 @@ int main(int argc, char* argv[])
   /* (senders has a local comm), (receivers has a local comme) */
   MPI_Comm_split(MPI_COMM_WORLD, color, myrank, &local_comm);
   
-  /* How many procs that are going t send */
+
+  if (myrank == 0) {
+    printf("--------------------------------------------------------------------\n"
+	   "WELCOME TO THE LONG MESSAGE ATTACK\n"
+	   "Before we begin, we know the following information:");
+    
+    print_attack_information();
+    printf("--------------------------------------------------------------------\n");
+  }
 
 
 
   // Who am I? a sender,  or a receiver?
   if (myrank >= NSERVERS){
-    /* Creat inter-comm from sender point of view:  */
-    char name[80];
-    int resultin;
-    MPI_Get_processor_name(name, &resultin);
-    printf("sender%d name=%s, pid=%d\n", myrank, name, getpid());
 
     MPI_Intercomm_create(local_comm,
 			 0, /* local leader */

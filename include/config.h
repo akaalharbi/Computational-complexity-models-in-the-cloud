@@ -64,44 +64,28 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 11
+#define N 10
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<16)
-
- /* store 2^L elements in the dictionary  */
-
-#define L 43
+#define INTERVAL (1LL<<25)
 
 
-
-#define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
-
-
-
-// wlog: we can stick to  power of 2, then dictionary might reject some
-#define NHASHES (1LL<<L) // How many hashes we'll send to all dictionaries?
 
 // nbits are zero, tphis will be defined according to the send latency
 #define DIFFICULTY 3
-/* How many words are needed to accommedate N */
-#define N_NWORDS_CEIL CEILING(N, WORD_SIZE)
 /* since there migh be an empty space on the right side of the word, we shift */
 /* the mask that of the distinguished point test to the left */
 /* we would to check that the last `DIFFICULTY` bits are zero */
 /* since the digest is given as w0 w1 w2 as 32-bit words */
 /* as byte, the last bits will be in the largest places of w2 */
-
 #define SHIFT_AMOUNT ((WORD_SIZE_BITS - ((8*N)%WORD_SIZE_BITS)) - DIFFICULTY) 
 #define DIST_PT_MASK_UNSHIFTED ((1LL << DIFFICULTY) - 1)
 #define DIST_PT_MASK ((WORD_TYPE) (DIST_PT_MASK_UNSHIFTED << SHIFT_AMOUNT))
 
 
-/* we are not going to hold more than 32 bits in a dict entry */
-#define MAX_VAL_SIZE 32 /* in bits */
-#define MAX_VAL_SIZE_BYTES 8 
+/* How many words are needed to accommedate N */
+#define N_NWORDS_CEIL CEILING(N, WORD_SIZE)
 
-/* how big is our counter */
-#define CTR_TYPE u64
+
 
 
 // sanity check
@@ -109,16 +93,12 @@
   #error "you are trying to attack more bits than the hash function provides"
 #endif
 
+/* dictionary one element size */
+#define VAL_SIZE_BYTES 4 /* byte */
+#define VAL_TYPE u32 /* unsigned char */
+/* how big is our counter */
+#define CTR_TYPE u64
 
-// -------------------------------------------------------------------------+
-
-
-
-// -------------------------------------------------------------------------+
-//                     3- Configurations effected by MPI                    |
-// -------------------------------------------------------------------------+
-// lines tagged with @python will be edited by a script                     |
-// -------------------------------------------------------------------------+
 
 
 /* edit manually */
@@ -129,29 +109,36 @@
 #define DEFINED_BYTES CEILING(DEFINED_BITS, 8)
 
 
-
-
-// How large is the dictionary in a server
-/* #define NSLOTS_MY_NODE 8462608000LL */
-
-
-// 7*4 GiB
 #define TOTAL_RAM 14000000000LL //60000000000LL //20850444000LL
 #define NRECEIVERS_PER_NODE 2
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
 
+ /* store 2^L elements in the dictionary  */
+#define L (LOG2_64BIT(NSLOTS_MY_NODE))
+#define L_IN_BYTES CEILING(L, 8) /* How many bytes to accommedate L */
+// wlog: we can stick to  power of 2, then dictionary might reject some
+#define NHASHES NSLOTS_MY_NODE // How many hashes we'll send to all dictionaries?
+
+#define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES), 0)
+/* #define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES - DEFINED_BITS), 0) */
+
+//#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
+// We need 2^#disacrded_bits candidates, we expect each server generate
+
+#define NNEEDED_CND MAX(( (1LL << (DISCARDED_BITS+1)) ),\
+			  1)   /* @python  */
 
 
-/* If each server has a different memory size then their candidates will have */
-/* a different false positive probability since #discarded bits vary.         */
-/* The following define scale the number according to the false positive.     */
-/* The main obstacle in writing a formula as a macro is that I don't know a   */
-/* way to get the ram size  macros. maybe a python script will overwrite the  */
-/* definintion below.                                                         */
 
 
 
+
+// -------------------------------------------------------------------------+
+//                     3- Configurations effected by MPI                    |
+// -------------------------------------------------------------------------+
+// lines tagged with @python will be edited by a script                     |
+// -------------------------------------------------------------------------+
 
 // PLEASE DO NOT EDIT// 
 #ifndef LONG_MESSAGE_MPI_CONFIG
@@ -165,16 +152,12 @@
 #define TAG_SND_DGST 3
 #define TAG_MESSAGES_CANDIDATES 4
 #define ARCHIVE_SERVER NSERVERS
-// WHAT IS BUFF_SIZE? It doesn't seem to be used!
-//#define BUFF_SIZE 1000  // holds `BUFF_SIZE` elements. @by_hand
 #define PROCESS_QUOTA 100000LL // i.e. send 10^5 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
 
 
-/* #if LOG2_NSERVERS > N */
-/*   #error "We have N < DEFINED_BYTES, this program is a bit stupid" */
-/* #endif */
+
 
 
 
@@ -268,87 +251,13 @@
 //                     Part b: Set the best vector type                     |
 // -------------------------------------------------------------------------+
 
-// @todo check if the below comments need to be removed 
-
-// Assumptions that need to be changed manually
-
-// Dictionary Configurations:
-// Recall: input -> store_as_idx, store_as_val
-// we limit |store_as_val| <= 32bit
-
-//  What is the minimum dictionary size we will use?
-//#define L 32 /* i.e. it can hold a dictionary with nslots = 2^L */
-
-
-// because the smallest step is one byte, we will not bother with shifting
-// we will discard these bits. The program will work.
-// e.g. imagine L = 34, then we have
-// B0, B1, ..., B7, B8 mod 2^L will neglect 6 bits
-
-// #define IDX_DISCARDED_BITS (L % 8) /* Values */
-// Define VAL_SIZE_BYTES and decide what is the best type to use
-/* Every thing will be stored as idx */
-// #if N*8 <= L this case
-//
-
-
-
-// define intrinsics based on the the available max register size
-// @todo start here 
-#if N <= L_IN_BYTES
-  #pragma message ("N is smaller than L!")
-  #error "The code is not flexible to store every bit as index!"
-#endif
-
-
-// Having large valtype will make index smaller thus the filling rate
-// will drop significantly
-
-#if L_IN_BYTES <= N - DEFINED_BYTES - 4
-
-#define VAL_SIZE_BYTES 4 /* byte */
-#define VAL_TYPE u32 /* unsigned char */
 // SIMD instructions has to be adapted according to the size
 #define SIMD_SET1_VALTYPE SIMD_SET1_EPI32
 #define SIMD_CMP_VALTYPE(X, Y) SIMD_CMP_EPI32(X, Y)
 
-#else
-#define VAL_SIZE_BYTES 2 /* byte */
-#define VAL_TYPE u16 /* unsigned char */
-// SIMD instructions has to be adapted according to the size
-#define SIMD_SET1_VALTYPE SIMD_SET1_EPI16
-#define SIMD_CMP_VALTYPE(X, Y) SIMD_CMP_EPI16(X, Y)
-
-#endif
 
 
-
-/* [distinguished point bits || nserver || y || idx || val || z ] */
-// The discarded bits are:
-// 1- y since (distinguished points || nserver ) may not be multiple of 8bits
-// 2- z
-
-// @todo this is not satisfactory!
-#define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES), 0)
-/* #define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES - DEFINED_BITS), 0) */
-
-//#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
-// We need 2^#disacrded_bits candidates, we expect each server generate
-
-#define NNEEDED_CND MAX(( (1LL << (DISCARDED_BITS+3)) ),\
-			  1)   /* @python  */
-
-/* #define NNEEDED_CND 5000 */
-		
-
-// (2^#disacrded_bits) / NSERVERS, however, it's not a strict requirement.
-//#define NNEEDED_CND_THIS_SERVER MAX(((1LL << DISCARDED_BITS) >> NSERVERS), 1)
-  
-// a candidate is a hash that was found in the dictionary.
-// since we may have false positive, we need to get generat number of them
-
-
-
+// expected number sends to get a candidate
 
 
 #endif

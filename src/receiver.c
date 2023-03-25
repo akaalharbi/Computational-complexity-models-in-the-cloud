@@ -382,14 +382,7 @@ void receiver(int local_rank, /* myrank among dictionaries */
 		MPI_UNSIGNED_CHAR,
 		inter_comm);
 
-  for (int i = 0; i<nsenders; ++i) {
-    char txt[50];
-    snprintf(txt, sizeof(txt), "rcv%d sender#%d template=", local_rank, i);
-    print_byte_txt(txt, &templates[i*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
-    puts("\n");
-
-  }
-  printf("recv%d is going to do the main task\n", local_rank);
+  printf("recv%d received all messages templates!\n", local_rank);
   //--------------------------------- PART 2 ----------------------------------+
   /* listen to senders, probe their digest, in case a candidate is found: */
   /* save the message the generates the cadidate digest. */
