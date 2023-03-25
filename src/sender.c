@@ -41,6 +41,7 @@ inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
     ((CTR_TYPE*)Mavx[i])[0] += (i+1); /* increase counter part in M by 1 */
 }
 
+#ifdef  __AVX512F__
 /* @todo move these function to util_arrays */
 void print_m512i_u32(__m512i a, char* text){
   
@@ -52,6 +53,7 @@ void print_m512i_u32(__m512i a, char* text){
   }
   puts("");
 }
+#endif
 
 void print_2d_u32(u32** restrict a, int n, int m){
   for (int i=0; i<n; ++i) {
@@ -92,13 +94,14 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
 
   /* Init an AVX512/AVX2 vector */
   const REG_TYPE zero = SIMD_SETZERO_SI();
+
   /* use this mask to check if a digest is a distinguished point or not! */
   const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(DIST_PT_MASK);
   static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
   static REG_TYPE cmp_vect;
   static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
   int npotenital_dist_pt = 0;
-  // test for distinguishedn point //
+
 
   /* load the last words of digests, we assume digest is aligned  */
   /* load last significant row in tr_state i.e. last words of each digest */
@@ -107,7 +110,7 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
   /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
   /* cmp_mask will have the ith bit = 1 if the ith element in cmp_vect is -1 */
-  // Please the if is in one direction. 
+
   cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
   /* printf("cmp_mask = %u\n", cmp_mask); */
 
@@ -176,7 +179,7 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
   /* cmp_mask will have the ith bit = 1 if the ith element in cmp_vect is -1 */
-  // Please the if is in one direction. 
+
   cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
   /* printf("cmp_mask = %u\n", cmp_mask); */
 
@@ -340,8 +343,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 					   * sizeof(WORD_TYPE)
 					   * NWORDS_STATE);
 
-  printf("pid=%d sender%d before states memset\n", getpid(), myrank);
-  /* is it important to initialize it with zeros? */
+  /* is it important to initialize the padding with zeros? */
   memset(states,
 	 0,
 	 ((end - begin) + ((begin - end)%16))
@@ -353,11 +355,11 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
   fclose(fp);
 
-  printf("sender%d, begin=%lu, end=%lu, nstates=%lu\n",
-	 myrank, begin, end, nstates);
+  printf("sender%d, begin=%lu, end=%lu, quotua=%lu, nstates=%lu\n",
+	 myrank, begin, end, (end-begin), nstates);
   
-  /* Attached buffered memory to MPI process  */
 
+  
   // -------------------------------- PART 3 ----------------------------------+
   // Regenrate the long message: quota = (end - begin)
   // Part a:  quota = 16x + r, treat 16x states now, then work on r states later
@@ -367,11 +369,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     /* local_idx = 0 -> (end-global)/16 */
     local_idx = global_idx - begin ;
     n_active_lanes = MIN((end - global_idx), 16);
-
-    
     inited = 0; /* tell sha256_x16 to copy the state */
-
-
 
     /* Read fresh 16 states, and put them in transposed way  */
     /* if the n_active_lanes < 16, states has extra padded zeros */
@@ -409,7 +407,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 			    msg_ctrs, /* messages are the same except counter */
 			    &n_dist_points); /* how many dist points found? */
 
-      }else {
+      }else {/* this function slower than the one above! */
 	extract_dist_points_dynamic(tr_states, /* transposed states */
 			    n_active_lanes,
 			    Mavx, /* messages used */
@@ -418,12 +416,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 			    &n_dist_points); /* how many dist points found? */
       }
 
-
 	
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
-	/* skip this iteration if it is not a distinguish point */
-	
 	server_id = to_which_server(&digests[i*N]);
 
 	/* where to put digest in server_id buffer? */
@@ -439,13 +434,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
 	/* if the server buffer is full send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
-	  /* printf("before sender%d, global_idx=%lu, to %d \n", */
-	  /* 	 myrank, */
-	  /* 	 global_idx, */
-	  /* 	 server_id); */
-	  
+
 	  /* only call wait when its not the first message */
-	  if (!first_time) 
+	  if (!first_time)
 	    MPI_Wait(&request, &status);
 
 	  /* copy the message to be sent to snd_buf */
@@ -465,14 +456,12 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	  
 	  servers_counters[server_id] = 0;
 	  
-	}/* end if */
-
-	
+	}/* end if server_counters */
       } /* end for n_dist_points */
     } /* end for hash_n */
 
     elapsed = wtime() - elapsed;
-    printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %f%%, %0.4fsec\n",
+    printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %0.4f%%, %0.4fsec\n",
 	   myrank,
 	   global_idx,
 	   log2(INTERVAL/elapsed)+log2(16),
@@ -480,7 +469,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	    elapsed);
     
     elapsed = wtime();
-    
   } /* end for global_idx */
 
   /* should we wait for the last message to be sent?! */
@@ -526,19 +514,22 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 				    u8  digests[restrict 16 * N],
 				    CTR_TYPE msg_ctrs[restrict 16],
 				    u8* restrict work_buf,
-				    u8* bsnd_buf,
+				    u8* snd_buf,
 				    size_t servers_counters[restrict NSERVERS],
+				    const size_t nbytes_per_server,
+				    const size_t one_elm_size,
 				    MPI_Comm inter_comm)
 {
   u32* states_avx;
   int n_dist_points = 0; /* At the beginning we no dist points */
-  size_t server_id=0, idx=0;
+  size_t server_id=0, local_idx=0;
 
+  
   MPI_Status status;
   MPI_Request request;
 
   int first_send = 1;
-
+  
   
 
 
@@ -552,38 +543,49 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
     for (int i = 0; i<n_dist_points; ++i){ /* n_dist_points might be 0 */
       server_id = to_which_server(&digests[i*N]);
       /* where to put digest in server_id buffer? (this is a local view) */
-      idx = servers_counters[server_id];
+      local_idx = servers_counters[server_id];
 
 
       /* 1 element = ctr||dgst  */
       /* #elments in  server buffer = PROCESS_QUOTA */
       /* There are NSERVERS in total */
       /* copy the ctr to the server buffer */
-      memcpy(&work_buf[( N + sizeof(CTR_TYPE)  )/* one element size */
-		       *( PROCESS_QUOTA*server_id + idx)],/* #elments skipped */
+      
+      memcpy(&work_buf[nbytes_per_server*server_id
+		       + local_idx*one_elm_size],
 	     &msg_ctrs[i], /* counter of the message i  */
 	     sizeof(CTR_TYPE));
 
       /* copy the digest to the server buffer */
-      memcpy(&work_buf[( N + sizeof(CTR_TYPE)  ) /* one element size */
-		       *( PROCESS_QUOTA*server_id + idx) /* #elments skipped */
+      memcpy(&work_buf[nbytes_per_server*server_id
+		       + local_idx * one_elm_size
 		       + sizeof(CTR_TYPE)], /* write after the counter part */
 	     &digests[N*i],
 	     N);
-
+      /* we have extrac element in server n. server_id buffer */
       ++servers_counters[server_id];
+
       /* if the server buffer is full send immediately */
       if (servers_counters[server_id] == PROCESS_QUOTA){
-	if (!first_send)
+
+	/* if first_send then, there is not mpi_isend to wait for*/
+        if (!first_send) 
 	  MPI_Wait(&request, &status);
+
+	/* copy the message to be sent to snd_buf */
+	memcpy(snd_buf,
+	       &work_buf[server_id*nbytes_per_server], /* idx of server buf */
+	       nbytes_per_server);
+
 	
-	MPI_Isend(&work_buf[server_id*PROCESS_QUOTA*(N+sizeof(CTR_TYPE))],
-		  (N+sizeof(CTR_TYPE))*PROCESS_QUOTA, /* #chars to be sent */
+	MPI_Isend(snd_buf,
+		  nbytes_per_server, /* #chars to be sent */
 		  MPI_UNSIGNED_CHAR, 
 		  server_id, /* receiver */
 		  TAG_SND_DGST,
 		  inter_comm,
 		  &request);
+	
 	first_send = 0; /* call mpi wait next time */
 	servers_counters[server_id] = 0;
       }
@@ -629,29 +631,24 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   /* { (server0 paris..) | (server1 pairs...) | ... | (serverK pairs...) } */
   u8* work_buf = (u8*) malloc(nbytes_per_server * NSERVERS );
 
-  /* attach to MPI_BSend, not worked directly on! */
-  u8* bsnd_buf = (u8*) malloc((nbytes_per_server + MPI_BSEND_OVERHEAD)
-			      * NSERVERS);
+  /* this buffer will hold the message */
+  u8* snd_buf = (u8*) malloc(nbytes_per_server);
   /* ith_entry : how many non-sent element stored in server i buffer */
   size_t* server_counters = malloc(sizeof(size_t)*NSERVERS);
 
 
 
-  if (bsnd_buf == NULL)
+  if (snd_buf == NULL)
     puts("bsnd_buf is NULL");
 
   if (work_buf == NULL)
     puts("work_buf is NULL");
 
-  printf("pid=%d sender%d before memset\n", getpid(), myrank);
+
   /* memset(bsnd_buf, 0, (nbytes_per_server + MPI_BSEND_OVERHEAD)* NSERVERS); */
   memset(work_buf, 0, nbytes_per_server*NSERVERS);
   memset(server_counters, 0, sizeof(size_t)*NSERVERS);
   
-
-  printf("sender%d: N=%d, one pair size = %lu\n",
-	 myrank, N, one_pair_size);
-
   
   // ----------------------------- PART 1 --------------------------------- //
   // Regenrate the long message in parallel!                                //
@@ -661,7 +658,7 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 				  digests,
 				  msg_ctrs,
 				  work_buf,
-				  bsnd_buf,
+				  snd_buf,
 				  server_counters,
 				  myrank,
 				  nsenders,
@@ -687,8 +684,16 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   
   // ----------------------------- PART 2.b ---------------------------------- //
   // 1-  Sen the initial input to all receiving servers
+  /* receivers before this stage are accepting any tag and and any source */
   MPI_Barrier(MPI_COMM_WORLD);
-  MPI_Allgather(M, HASH_INPUT_SIZE, MPI_UNSIGNED_CHAR, NULL, 0, MPI_UNSIGNED_CHAR, inter_comm);
+  
+  MPI_Allgather(M,
+		HASH_INPUT_SIZE,
+		MPI_UNSIGNED_CHAR,
+		NULL,
+		0,
+		MPI_UNSIGNED_CHAR,
+		inter_comm);
 
   printf("sender%d done sending template\n", myrank);
 
@@ -705,14 +710,16 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 			  digests,
 			  msg_ctrs,
 			  work_buf,
-			  bsnd_buf,
+			  snd_buf,
 			  server_counters,
+			  nbytes_per_server,
+			  one_pair_size,
 			  inter_comm);
 
 
 
   free(work_buf);
-  free(bsnd_buf);
+  free(snd_buf);
   free(server_counters);
   free(ctr_pt);
   

@@ -141,7 +141,7 @@ int main(int argc, char* argv[]) /* single machine */
     hash_single(state, &msgs[i*HASH_INPUT_SIZE]);
 
     /* a sanity check  */
-    assert(is_dist_state(state));
+    assert(is_dist_digest((u8*)state));
 
     /* get dgst in dgst */
     memcpy(&dgsts[i*N], state, N);
@@ -227,7 +227,7 @@ int main(int argc, char* argv[]) /* single machine */
 
 
       
-      if(is_dist_state(state_priv)){
+      if(is_dist_digest((u8*) state_priv)){
 	srearch_ptr_priv = bsearch(state_priv, dgsts_orderd, nmsgs, N, cmp_dgst);
 
 	if (srearch_ptr_priv){
