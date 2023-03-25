@@ -68,7 +68,7 @@ static inline int lookup_multi_save(dict *d,
 
 
   /* the stream size is multiple of one_pair size */
-  static int one_pair_size = sizeof(CTR_TYPE) + (N-DEFINED_BYTES)*sizeof(u8);
+  static int one_pair_size = sizeof(CTR_TYPE) + N;
 
 
   

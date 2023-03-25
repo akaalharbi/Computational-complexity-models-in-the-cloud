@@ -120,13 +120,13 @@
 
 #define NHASHES NSLOTS_MY_NODE // How many hashes we'll send to all dictionaries?
 
-#define DISCARDED_BITS MAX( (int) ceil(8 * N - L - 8 * VAL_SIZE_BYTES), 0)
+#define DISCARDED_BITS MAX( (int) ceil( (8*N) -L -(8 * VAL_SIZE_BYTES) -DIFFICULTY ), 0)
 /* #define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES - DEFINED_BITS), 0) */
 
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
 
-#define NNEEDED_CND MAX(( (1LL << ( DISCARDED_BITS+1)) ),	\
+#define NNEEDED_CND MAX( ((1LL << ( DISCARDED_BITS+1))/NSERVERS) ,	\
 			  1)   /* @python  */
 
 
