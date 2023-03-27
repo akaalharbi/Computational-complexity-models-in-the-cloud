@@ -88,7 +88,28 @@ static inline int lookup_multi_save(dict *d,
     is_positive =  dict_has_elm(d, /* it probes the digest */
 			&ctrs_dgsts[i*one_pair_size /* Go 2 the ith pair */
 				    + sizeof(CTR_TYPE)] /* skip ctr part */);
+
     
+    {/* test that the message received is same as the one sent */
+      memcpy(M, template, HASH_INPUT_SIZE);
+
+      /* set the counter part */
+      memcpy(M,
+	     &ctrs_dgsts[i*one_pair_size],
+	     sizeof(CTR_TYPE));
+      u32 mystate[NWORDS_STATE] = {HASH_INIT_STATE};
+      hash_single(mystate, M);
+
+      int is_equal = memcmp(mystate,
+			    &ctrs_dgsts[i*one_pair_size
+					+ sizeof(CTR_TYPE)],
+			    N);
+
+      if (is_equal != 0){
+	printf("Error");
+      }
+      
+    }
     
     if (is_positive){ /* did we find a candidate msg||dgst? */
       /* reconstructing the message: get the template */

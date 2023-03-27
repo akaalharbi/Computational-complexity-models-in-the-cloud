@@ -105,7 +105,7 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
 
   /* load the last words of digests, we assume digest is aligned  */
   /* load last significant row in tr_state i.e. last words of each digest */
-  digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
+  digests_last_word = SIMD_LOADU_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
 
   /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
@@ -174,7 +174,7 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 
   /* load the last words of digests, we assume digest is aligned  */
   /* load last significant row in tr_state i.e. last words of each digest */
-  digests_last_word = SIMD_LOAD_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
+  digests_last_word = SIMD_LOADU_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
 
   /* A distinguished point will have cmp_vect ith entry =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
@@ -286,7 +286,7 @@ void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 
 static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 					    u32 tr_states[restrict 16*8],
-					    u32 un_tr_states[restrict 16*8],
+	    /* for debugging only */	    u32 un_tr_states[restrict 16*8],
 					    u8  digests[restrict 16 * N],
 					    CTR_TYPE msg_ctrs[restrict 16],
 					    u8* work_buf,
@@ -505,7 +505,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
-  
+  memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
 }
 
 
@@ -530,6 +530,8 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
   int first_send = 1;
   
+  memset(work_buf, 0, nbytes_per_server*NSERVERS); 
+  memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
   
 
 

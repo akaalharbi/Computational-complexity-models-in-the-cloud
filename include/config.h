@@ -66,7 +66,7 @@
 /* bytes i.e n := 8*N bits */
 #define N 10
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<23)
+#define INTERVAL (1LL<<10)
 
 
 
@@ -102,14 +102,14 @@
 
 
 /* edit manually */
-#define NSERVERS 4
+#define NSERVERS 1
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
 /* we might ignore few bits due to ceiling  */
 #define DEFINED_BYTES CEILING(DEFINED_BITS, 8)
 
 
-#define TOTAL_RAM 64000000000LL //20850444000LL
+#define TOTAL_RAM 14000000000// 64000000000LL //20850444000LL
 #define NRECEIVERS_PER_NODE 1
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
@@ -180,6 +180,7 @@
 
 
 #define SIMD_LOAD_SI _mm512_load_si512
+#define SIMD_LOADU_SI _mm512_loadu_si512
 /* #define SIMD_TEST _mm512_test_epi64_mask */
 #define SIMD_TEST is_not_zero
 #define SIMD_SET1_EPI32 _mm512_set1_epi32
@@ -206,6 +207,7 @@
 
 
 #define SIMD_LOAD_SI _mm256_load_si256
+#define SIMD_LOADU_SI _mm256_loadu_si256
 #define SIMD_TEST _mm256_testz_si256
 
 
