@@ -216,77 +216,8 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 
 
 
-void find_hash_distinguished(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
-			     u8  digests[restrict 16 * N]/* out*/,
-			     CTR_TYPE msg_ctrs[restrict 16], /* out */
-			     CTR_TYPE* restrict  ctr /* in , out */,
-			     int*  n_dist_points /* out */)
-
-{
-
-  // ==========================================================================+
-  // Summary: Generates hashes till a distinguished point is found. Mutates M  |
-  //          and resests Mstate in the process. Suitable for phase ii use only|
-  // --------------------------------------------------------------------------+
-  // We start with message M, computed hash(M) if it is not a distinguished    |
-  // point then we change M slightly. Increment the first 64 bits of M by 1    |
-  // --------------------------------------------------------------------------+
-  // INPUTS:                                                                   |
-  // - Mavx[lane][HASH_INPUT_SIZE]: place holder for messages to be hashed     |
-  //      using avx. they are copies of M, however counter part  increases by  |
-  //      one for each lane.                                                   |
-  // - digests[16*N]: Record the resulted digest of the distinguished points   |
-  //  Record distinguished points in order. It contains at least 1 dist point  |
-  // - ctr : update the last counter we found
-  // --------------------------------------------------------------------------+
-  // WARNING: this function can't deal with more than 32zeros as dist_test     |
-  // NOTE: |
-  // --------------------------------------------------------------------------+
-  // TODO: use hash_multiple instead                                           |
-  // --------------------------------------------------------------------------+
-
-  /* no need to construct init state with each call of the function */ 
-  static u32* tr_states; /* store the resulted digests here  */
-  
-  /* copy the counter part of M */
-
-  *n_dist_points = 0;
-  
-  while (1) { /* loop till a dist pt found */
-
-    /* */
-    increment_message(Mavx);
-    *ctr += (AVX_SIZE/WORD_SIZE_BITS); /* update counter */
-
-
-    /* Hash multiple messages at once */
-    #ifdef  __AVX512F__
-    /* HASH 16 MESSAGES AT ONCE */
-    tr_states = sha256_multiple_x16(Mavx);  
-    #endif
-
-    #ifndef  __AVX512F__
-    #ifdef    __AVX2__
-    /* HASH 16 MESSAGES AT ONCE */
-    tr_states = sha256_multiple_oct(Mavx);
-    #endif
-    #endif
-
-    /* Check if tr_states has  distinguished point(s) */
-    extract_dist_points(tr_states, Mavx, digests, msg_ctrs, n_dist_points);
-    if (*n_dist_points) {
-      return; /* found a distinguished point */
-    }
-  } /* end while(1) */
-}
-
-
-
-
-
 static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 					    u32 tr_states[restrict 16*8],
-	    /* for debugging only */	    u32 un_tr_states[restrict 16*8],
 					    u8  digests[restrict 16 * N],
 					    CTR_TYPE msg_ctrs[restrict 16],
 					    u8* work_buf,
@@ -419,6 +350,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
+	if (i >= 16)
+	  printf("sender%d illegal number of points %d >= 16\n", myrank, i);
+	
 	server_id = to_which_server(&digests[i*N]);
 
 	/* where to put digest in server_id buffer? */
@@ -537,12 +471,18 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
   while (1) {
     /* 1- hash, 2- increment message counters, 3- extract disit point if any */
+    increment_message(Mavx); // put it down late @todo
     states_avx = sha256_multiple_x16(Mavx);
-    increment_message(Mavx);
+
+    
     extract_dist_points(states_avx, Mavx, digests, msg_ctrs, &n_dist_points);
+
 
     /* put the distinguished points in specific serverss buffer */
     for (int i = 0; i<n_dist_points; ++i){ /* n_dist_points might be 0 */
+
+
+      
       server_id = to_which_server(&digests[i*N]);
       /* where to put digest in server_id buffer? (this is a local view) */
       local_idx = servers_counters[server_id];
@@ -564,6 +504,13 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 		       + sizeof(CTR_TYPE)], /* write after the counter part */
 	     &digests[N*i],
 	     N);
+
+
+
+
+
+      
+
       /* we have extrac element in server n. server_id buffer */
       ++servers_counters[server_id];
 
@@ -578,6 +525,30 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 	memcpy(snd_buf,
 	       &work_buf[server_id*nbytes_per_server], /* idx of server buf */
 	       nbytes_per_server);
+
+
+	/* ///==-=-=-=-=-=-=-=-=-=-=-=-==-=-=- */
+	/* { */
+	/*   u32 mystate[NWORDS_STATE] = {HASH_INIT_STATE}; */
+	/*   u8 my_M[64]; */
+	/*   memcpy(my_M, Mavx[0], 64); */
+
+	/*   ((u64*) my_M)[0] = ( (u64*)snd_buf)[0]; //msg_ctrs[i]; */
+
+	
+	/*   hash_single(mystate, my_M); */
+
+
+	/*   if (0 != memcmp(mystate, */
+	/* 		  &snd_buf[sizeof(CTR_TYPE)], N)){ */
+
+	/*     printf("NOT equal at %d\n", i); */
+	/*     print_char((u8*) mystate, N); */
+	/*     print_char(&snd_buf[sizeof(CTR_TYPE)], N); */
+	/*   } */
+	/* } */
+
+	/* /// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==- */
 
 	
 	MPI_Isend(snd_buf,
@@ -656,7 +627,6 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   // Regenrate the long message in parallel!                                //
   regenerate_long_message_digests(Mavx,
 				  tr_states,
-				  un_tr_states,
 				  digests,
 				  msg_ctrs,
 				  work_buf,
