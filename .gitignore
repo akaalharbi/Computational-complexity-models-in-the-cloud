@@ -16,6 +16,8 @@ obj/*
 .ccls-cache/*
 .cache/*
 obj/*
+data/messages/*
+data/digests/*
 phase_i
 phase_ii
 phase_iii

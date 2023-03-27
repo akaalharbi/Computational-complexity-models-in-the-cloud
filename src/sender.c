@@ -100,6 +100,7 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
   static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
   static REG_TYPE cmp_vect;
   static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
+  *n_dist_points = 0; /* old data should not interfer with new one */
   int npotenital_dist_pt = 0;
 
 
@@ -113,6 +114,7 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
 
   cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
   /* printf("cmp_mask = %u\n", cmp_mask); */
+
 
 
   if (cmp_mask) { /* found at least a distinguished point? */
@@ -169,9 +171,9 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
   REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
   REG_TYPE cmp_vect;
   u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
-
+  *n_dist_points = 0; /* old data should not interfer with the new one */
+  
   // test for distinguishedn point //
-
   /* load the last words of digests, we assume digest is aligned  */
   /* load last significant row in tr_state i.e. last words of each digest */
   digests_last_word = SIMD_LOADU_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
@@ -182,6 +184,7 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 
   cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
   /* printf("cmp_mask = %u\n", cmp_mask); */
+
 
 
   if (cmp_mask) { /* found at least a distinguished point? */
@@ -350,9 +353,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
-	if (i >= 16)
-	  printf("sender%d illegal number of points %d >= 16\n", myrank, i);
-	
+
 	server_id = to_which_server(&digests[i*N]);
 
 	/* where to put digest in server_id buffer? */
