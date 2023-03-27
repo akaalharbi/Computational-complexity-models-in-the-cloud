@@ -268,7 +268,8 @@ void receiver_process_task(int const myrank,
   sender_name = status.MPI_SOURCE; // - NSERVERS; // who sent the message?
 
 
-  while (NNEEDED_CND > nfound_cnd) {    
+  /* while (NNEEDED_CND > nfound_cnd) { */
+  while (1){
     /* printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank); */
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */
