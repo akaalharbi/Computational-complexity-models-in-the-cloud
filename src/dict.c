@@ -139,7 +139,7 @@ int dict_add_element_to(dict* d, u8* state){
   //                                                                          |
   // -------------------------------------------------------------------------+
   /* how many bytes do we need to index the buckets */
-  const int idx_size =  (int) ceil((L_RECEIVER - log2(d->nslots_per_bucket))
+  const int idx_size =   (int) ceil((L_RECEIVER - log2(d->nslots_per_bucket))
 				   /8.0) ;
 
 
@@ -184,6 +184,13 @@ int dict_add_element_to(dict* d, u8* state){
       ++(d->nelements); /* successfully added an element */
       return 1;
     }
+
+    if (d->values[idx] == val) { /* repeated element */
+      /* not a new element */
+      --(d->nelements_asked_to_be_inserted);
+      return 1;
+    }
+    
 
 
     ++idx;

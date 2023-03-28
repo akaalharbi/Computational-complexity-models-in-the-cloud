@@ -213,7 +213,6 @@ int main(int argc, char* argv[]) /* single machine */
 	   &middle_states[ith_state*NWORDS_STATE],
 	   HASH_STATE_SIZE);
 
-    // @todo restore this INTERVAL*(ith_state+1);
     M_ctr_pt_priv[0] = INTERVAL*ith_state; //middle_ctr[ith_state];
 
     printf("ctr=%020llu, ", ((u64*) M_priv)[0]);
