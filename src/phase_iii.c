@@ -55,6 +55,7 @@ static void merge_truncate_messages(){
     merge_file(fp, fp_archive);
     fclose(fp);
   }
+  fclose(fp_archive);
 }
 
 
@@ -196,7 +197,7 @@ int main(int argc, char* argv[]) /* single machine */
 
 
 
-  #pragma omp parallel for
+  /* #pragma omp parallel for */
   for(size_t ith_state=0; ith_state<(nmiddle_states-1); ++ith_state){
     double start = wtime();
     u8 M_priv[HASH_INPUT_SIZE] = {0};
@@ -206,9 +207,6 @@ int main(int argc, char* argv[]) /* single machine */
     // CTR_TYPE next_ctr = middle_ctr[ith_state+1];
     WORD_TYPE state_priv[HASH_STATE_SIZE];
     u8* srearch_ptr_priv = NULL;
-
-    
-
     
 
     memcpy(state_priv,
@@ -216,7 +214,7 @@ int main(int argc, char* argv[]) /* single machine */
 	   HASH_STATE_SIZE);
 
     // @todo restore this INTERVAL*(ith_state+1);
-    M_ctr_pt_priv[0] = (1LL<<30)*ith_state; //middle_ctr[ith_state];
+    M_ctr_pt_priv[0] = INTERVAL*ith_state; //middle_ctr[ith_state];
 
     printf("ctr=%020llu, ", ((u64*) M_priv)[0]);
 
@@ -228,6 +226,7 @@ int main(int argc, char* argv[]) /* single machine */
 
       
       if(is_dist_digest((u8*) state_priv)){
+      /* if(1){ */
 	srearch_ptr_priv = bsearch(state_priv, dgsts_orderd, nmsgs, N, cmp_dgst);
 
 	if (srearch_ptr_priv){

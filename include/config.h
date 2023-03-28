@@ -72,12 +72,14 @@
 
 // nbits are zero, tphis will be defined according to the send latency
 #define DIFFICULTY 3
-/* since there migh be an empty space on the right side of the word, we shift */
-/* the mask that of the distinguished point test to the left */
-/* we would to check that the last `DIFFICULTY` bits are zero */
-/* since the digest is given as w0 w1 w2 as 32-bit words */
-/* as byte, the last bits will be in the largest places of w2 */
-#define SHIFT_AMOUNT ((WORD_SIZE_BITS - ((8*N)%WORD_SIZE_BITS)) - DIFFICULTY) 
+
+
+
+
+/* Last bits determines if its a distinguished point or not. */
+/* we restrict this number, DIFFICULTY  < 8. Since sha avx works on 32bits*/
+/* words, we need to shift on the last bits of the 32bits word */
+#define SHIFT_AMOUNT ((8*N)  - (DIFFICULTY)) % WORD_SIZE_BITS) 
 #define DIST_PT_MASK_UNSHIFTED ((1LL << DIFFICULTY) - 1)
 #define DIST_PT_MASK ((WORD_TYPE) (DIST_PT_MASK_UNSHIFTED << SHIFT_AMOUNT))
 
