@@ -286,15 +286,6 @@ int dict_has_elm(dict *d, u8 *state)
     if (is_key_found)
       return 1; /* we will hash the whole message again */
 
-
-    
-
-
-
-
-    
-
-
     // Linear probing
     // update the index for keys load
     idx += d->nslots_per_bucket; // move to the next bucket
@@ -308,10 +299,7 @@ int dict_has_elm(dict *d, u8 *state)
     #endif
     //printf("inside next: step=%d, h=%lu, nslots=%lu\n", step, h, d->nslots);
   }
-
-
   return 0; // no element is found
-  
 }
 
 

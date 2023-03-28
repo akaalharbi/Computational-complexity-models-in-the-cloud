@@ -66,6 +66,7 @@ static inline int lookup_multi_save(dict *d,
   //   template.                                                              |
   // -------------------------------------------------------------------------+
 
+  
 
   /* the stream size is multiple of one_pair size */
   static int one_pair_size = sizeof(CTR_TYPE) + N;
@@ -119,11 +120,25 @@ static inline int lookup_multi_save(dict *d,
       memcpy(M,
 	     &ctrs_dgsts[i*one_pair_size],
 	     sizeof(CTR_TYPE));
-      
-      /* assert(is_dist_msg(M)); // debugging  */
 
+
+      // debugging  start
+      /* assert(is_dist_msg(M)); */
+
+      char txt[100];
+      snprintf(txt, sizeof(txt), "data/digests/%d", myrank);
+      FILE* fp_dgsts = fopen(txt, "a");
+      fwrite(&ctrs_dgsts[i*one_pair_size+ sizeof(CTR_TYPE)],
+	     N,
+	     1,
+	     fp_dgsts);
+      fflush(fp_dgsts);
+      fclose(fp_dgsts);
+      // debugging  end 
+      
       /* finally write the reconstructed message */
       fwrite(M, sizeof(u8), HASH_INPUT_SIZE, fp);
+      
       fflush(fp); /* ensures it's written */
       ++npositive_dgsts;
     }
