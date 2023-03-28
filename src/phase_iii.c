@@ -169,28 +169,25 @@ int main(int argc, char* argv[]) /* single machine */
   // ----------------------------- PART 3 ------------------------------------
   // First get all states: 
   FILE* fstates = fopen("data/states", "r");
-  FILE* fctrs   = fopen("data/counters", "r");
+  /* FILE* fctrs   = fopen("data/counters", "r"); */ // we have fixed counter
   
   u64 nmiddle_states = get_file_size(fstates)/HASH_STATE_SIZE;
-  /* between each middle state there are: */
-  size_t nhashes_in_interval = NHASHES / nmiddle_states;
   printf("There %llu middle states\n", nmiddle_states);
+  
+  /* between each middle state there are: */
+  size_t nhashes_in_interval = INTERVAL;
+
+
 
   WORD_TYPE* middle_states = (WORD_TYPE*) malloc(nmiddle_states*HASH_STATE_SIZE);
-  CTR_TYPE* middle_ctr = (CTR_TYPE*) malloc(nmiddle_states*sizeof(CTR_TYPE));
-
   fread(middle_states, WORD_SIZE, nmiddle_states*NWORDS_STATE, fstates);
-  fread(middle_ctr,   sizeof(CTR_TYPE), nmiddle_states, fctrs);  
-
   fclose(fstates);
-  fclose(fctrs);
-  
 
   print_byte_txt("init state      ", (u8*) state_init, HASH_STATE_SIZE);
   print_byte_txt("1st middle state", (u8*) middle_states, HASH_STATE_SIZE);
-  printf("1st counter = %llu\n", middle_ctr[0]);
-  printf("nhashes in interval = %lu, nhashes=%llu, mod=%llu\n",
-	 nhashes_in_interval, NHASHES, NHASHES % nmiddle_states);
+  /* printf("1st counter = %llu\n", middle_ctr[0]); */
+  printf("nhashes in interval = %lu,\n",
+	 nhashes_in_interval);
 
 
 
@@ -204,7 +201,9 @@ int main(int argc, char* argv[]) /* single machine */
     double start = wtime();
     u8 M_priv[HASH_INPUT_SIZE] = {0};
     CTR_TYPE* M_ctr_pt_priv = (CTR_TYPE*) M_priv;
-    CTR_TYPE next_ctr = middle_ctr[ith_state+1];
+    /* In the states file we keep the initial st */
+
+    // CTR_TYPE next_ctr = middle_ctr[ith_state+1];
     WORD_TYPE state_priv[HASH_STATE_SIZE];
     u8* srearch_ptr_priv = NULL;
 
@@ -216,11 +215,12 @@ int main(int argc, char* argv[]) /* single machine */
 	   &middle_states[ith_state*NWORDS_STATE],
 	   HASH_STATE_SIZE);
 
-    M_ctr_pt_priv[0] = middle_ctr[ith_state];
+    // @todo restore this INTERVAL*(ith_state+1);
+    M_ctr_pt_priv[0] = (1LL<<30)*ith_state; //middle_ctr[ith_state];
 
-    printf("ctr=%llu, ", ((u64*) M_priv)[0]);
+    printf("ctr=%020llu, ", ((u64*) M_priv)[0]);
 
-    for (; M_ctr_pt_priv[0]<next_ctr; ) {
+    for (u64 ctr=0; ctr<INTERVAL; ++ctr) {
       hash_single(state_priv, M_priv);
       ++M_ctr_pt_priv[0];
 
@@ -254,8 +254,8 @@ int main(int argc, char* argv[]) /* single machine */
       
     }
 
-        printf("ith_state=%lu, next counter=%llu, done in %0.2fsec, thrd%d\n",
-	       ith_state, next_ctr, wtime() - start, omp_get_thread_num());
+        printf("ith_state=%lu, done in %0.2fsec, thrd%d\n",
+	       ith_state, wtime() - start, omp_get_thread_num());
 
     
   }
@@ -266,7 +266,7 @@ int main(int argc, char* argv[]) /* single machine */
   free(dgsts);
   free(dgsts_orderd);
   free(middle_states);
-  free(middle_ctr);
+  /* free(middle_ctr); */
   
 } // quit the function
 

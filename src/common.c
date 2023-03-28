@@ -29,8 +29,8 @@
 #include "common.h"
 
 void print_attack_information(){
-  printf("\nL=%f, L_RECEIVER=%f, N=%d, NHASHES=%llu,\n"
-         "DIFFICULTY=%d, |idx| = %dbytes, NELELEMNTS_BUCKET=%d, NSEERVERS=%d,\n"
+  printf("\nL=%f, L_RECEIVER=%f, N=%d, DIFFICULTY=%d,\n"
+         "|idx| = %dbytes, NELELEMNTS_BUCKET=%d, NSEERVERS=%d,\n"
          "NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
          "NDEFINED BYTES=%d, NCND_NEEDED=%llu≈2^%0.4f,\n"
 	 "NDISCARDED_BITS=%d\n"
@@ -39,7 +39,6 @@ void print_attack_information(){
 	 L,
 	 L_RECEIVER,
 	 N,
-	 NHASHES,
 	 DIFFICULTY,
 	 (int) ceil((L_RECEIVER - log2(SIMD_LEN))/8.0),
 	 SIMD_LEN,

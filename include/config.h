@@ -118,7 +118,7 @@
 #define L_RECEIVER (log2(NSLOTS_MY_NODE)) /* the value of L per receiver */
 #define L (L_RECEIVER + log2(NSERVERS))
 
-#define NHASHES NSLOTS_MY_NODE // How many hashes we'll send to all dictionaries?
+/* #define NHASHES NSLOTS_MY_NODE // How many hashes we'll send to all dictionaries? */
 
 #define DISCARDED_BITS MAX( (int) ceil( (8*N) -L -(8 * VAL_SIZE_BYTES) -DIFFICULTY ), 0)
 /* #define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES - DEFINED_BITS), 0) */
