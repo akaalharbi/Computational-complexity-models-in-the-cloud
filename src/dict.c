@@ -139,7 +139,7 @@ int dict_add_element_to(dict* d, u8* state){
   //                                                                          |
   // -------------------------------------------------------------------------+
   /* how many bytes do we need to index the buckets */
-  const int idx_size =   (int) ceil((L_RECEIVER - log2(d->nslots_per_bucket))
+  const int idx_size =   (int) ceil(log2(NSLOTS_MY_NODE) - log2(d->nslots_per_bucket)
 				   /8.0) ;
 
 
@@ -223,7 +223,7 @@ int dict_has_elm(dict *d, u8 *state)
   //          (L bits) || discard || (VAL_SIZE bits)                          |
   // -------------------------------------------------------------------------+
   /* how many bytes do we need to index the buckets */
-  const int idx_size =  (int) ceil((L_RECEIVER - log2(d->nslots_per_bucket))
+  const int idx_size =  (int) ceil(log2(NSLOTS_MY_NODE) - log2(d->nslots_per_bucket)
 				   /8.0) ;
 
   u64 idx = 0;

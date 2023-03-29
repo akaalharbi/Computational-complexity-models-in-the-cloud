@@ -28,13 +28,30 @@
 
 #include "common.h"
 
+int n_discarded_bits(){
+  int idx_size = (int) ceil((L_RECEIVER - log2(SIMD_LEN)));
+  int ndiscarded_bits = ceil( (8*N) -idx_size*8 -(8 * VAL_SIZE_BYTES ) -DIFFICULTY) ;
+
+  if (ndiscarded_bits < 0)
+    return 0;
+  return ndiscarded_bits;
+}
+
+u64 n_needed_candidates(){
+  u64 nneeded_candidates = (1LL<<n_discarded_bits()) / NSERVERS;
+  if (nneeded_candidates == 0)
+    return 1 ;
+  return nneeded_candidates;
+}
+
+
 void print_attack_information(){
   printf("\nL=%f, L_RECEIVER=%f, N=%d, DIFFICULTY=%d,\n"
          "|idx| = %dbytes, NELELEMNTS_BUCKET=%d, NSEERVERS=%d,\n"
          "NSLOTS_MY_NODE=%llu, NPROBES_MAX=%d, VAL_SIZE=%d\n"
-         "NDEFINED BYTES=%d, NCND_NEEDED=%llu≈2^%0.4f,\n"
+         "NDEFINED BYTES=%d, NCND_NEEDED/receiver=%llu≈2^%0.4f,\n"
 	 "NDISCARDED_BITS=%d\n"
-	 "AVX_SIZE=%dbits, mask_ones=%d\n"
+	 "AVX_SIZE=%dbits, mask_ones=%d, mask_shifted=%u\n"
 	 "NPROBES LOOK UP = %d\n",
 	 L,
 	 L_RECEIVER,
@@ -47,11 +64,12 @@ void print_attack_information(){
 	 NPROBES_MAX,
 	 VAL_SIZE_BYTES,
 	 DEFINED_BYTES,
-	 NNEEDED_CND,
-	 log2(NNEEDED_CND),
-	 DISCARDED_BITS,
+	 n_needed_candidates(),
+	 log2(n_needed_candidates()),
+	 n_discarded_bits(),
 	 AVX_SIZE,
 	 (1<<DIFFICULTY) - 1,
+	 DIST_PT_MASK,
 	 (int) (NPROBES_MAX/SIMD_LEN));
 
   puts("-------------------------------\n");

@@ -18,4 +18,5 @@ void untranspose_state(u32 dest[restrict 16*8],
 
 void copy_transposed_state(u32 *state, u32 *tr_state, int lane);
 void copy_transposed_digest(u8 *digest, u32 *tr_state, int lane);
+u64 n_needed_candidates();
 #endif

@@ -64,14 +64,14 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 10
+#define N 8
 /* record the whole state after each each interval has passed */
 #define INTERVAL (1LL<<20)
 
 
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 3
+#define DIFFICULTY 2
 
 
 
@@ -79,7 +79,7 @@
 /* Last bits determines if its a distinguished point or not. */
 /* we restrict this number, DIFFICULTY  < 8. Since sha avx works on 32bits*/
 /* words, we need to shift on the last bits of the 32bits word */
-#define SHIFT_AMOUNT ((8*N)  - (DIFFICULTY)) % WORD_SIZE_BITS) 
+#define SHIFT_AMOUNT (((8*N)  - (DIFFICULTY)) % WORD_SIZE_BITS)
 #define DIST_PT_MASK_UNSHIFTED ((1LL << DIFFICULTY) - 1)
 #define DIST_PT_MASK ((WORD_TYPE) (DIST_PT_MASK_UNSHIFTED << SHIFT_AMOUNT))
 
@@ -122,14 +122,13 @@
 
 /* #define NHASHES NSLOTS_MY_NODE // How many hashes we'll send to all dictionaries? */
 
-#define DISCARDED_BITS MAX( (int) ceil( (8*N) -L -(8 * VAL_SIZE_BYTES) -DIFFICULTY ), 0)
+/* #define DISCARDED_BITS MAX((int) ceil( (8*N) -L -(8 * VAL_SIZE_BYTES) -DIFFICULTY ), 0) */
 /* #define DISCARDED_BITS MAX((8 * N - L - 8 * VAL_SIZE_BYTES - DEFINED_BITS), 0) */
 
 //#define DISCARDED_BITS (8*N - L - 8 * VAL_SIZE_BYTES)
 // We need 2^#disacrded_bits candidates, we expect each server generate
 
-#define NNEEDED_CND MAX( ((1LL << ( DISCARDED_BITS+1))/NSERVERS) ,	\
-			  1)   /* @python  */
+#define NNEEDED_CND MAX(  ((1LL << ((int) ( DISCARDED_BITS+1))/NSERVERS)) , 1)
 
 
 
