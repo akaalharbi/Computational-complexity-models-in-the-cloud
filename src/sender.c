@@ -35,11 +35,6 @@
 
 #define N_ACTIVE_LANES 16 /* this should be somewhere else */
 
-inline static void increment_message(u8 Mavx[16][HASH_INPUT_SIZE])
-{
-  for (int i=0; i<(AVX_SIZE/WORD_SIZE_BITS); ++i) 
-    ((CTR_TYPE*)Mavx[i])[0] += (i+1); /* increase counter part in M by 1 */
-}
 
 #ifdef  __AVX512F__
 /* @todo move these function to util_arrays */
@@ -472,7 +467,10 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
   while (1) {
     /* 1- hash, 2- increment message counters, 3- extract disit point if any */
-    increment_message(Mavx); // put it down late @todo
+    /* increment the message counters after hashing */
+    for (int lane = 0; lane<16; ++lane)
+      ((u64*) Mavx[lane])[0] += 16;
+
     states_avx = sha256_multiple_x16(Mavx);
 
     
@@ -645,8 +643,11 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   ctr_pt[0] = 0; /* zeroing the first 64bits of M */
 
   // copy the the random message to all avx messages
-  for (int i = 0; i<16; ++i)
-    memcpy(Mavx[i], M, HASH_INPUT_SIZE);
+  /* and set the initial counter */
+  for (int lane = 0; lane<16; ++lane){
+    memcpy(Mavx[lane], M, HASH_INPUT_SIZE);
+    ((u64*) Mavx[lane])[0] += lane;
+  }
 
   // print the template. this is not necessary.
   char txt[50];
