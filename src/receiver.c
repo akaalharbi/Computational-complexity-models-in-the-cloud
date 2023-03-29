@@ -182,13 +182,20 @@ static void write_digest_to_dict(dict *d,
   int ncompleted_senders = 0;
   int tmp = 0;
   size_t rcv_size = PROCESS_QUOTA*N;
-  
-
+  /* how long does it take to add elements to dict */
+  double elapsed_dict = 0;
+  /* how long does it take to receive a message */
+  double elapsed_recv = 0;
+  u64 ctr = 0;
   //---------------------------------------------------------------------------+
   // Receive digests and add them to dictionary
   
   /* Receive one message before */
   while (ncompleted_senders < nsenders) {
+    if ((ctr % INTERVAL) == 0)
+      elapsed_recv = wtime();
+
+    
     MPI_Recv(rcv_buf, /* store in this location */
 	      rcv_size, /* How many bytes to receive  */
 	      MPI_UNSIGNED_CHAR,
@@ -196,12 +203,29 @@ static void write_digest_to_dict(dict *d,
 	      MPI_ANY_TAG,  /* tag = 1 means a sender has done its work */ 
 	      inter_comm,
 	      &status);
+
+    if ((ctr % INTERVAL) == 0){
+      elapsed_recv = wtime() - elapsed_recv;
+      elapsed_dict = wtime();
+    }
+
     
     /* add them to dictionary:   */
     /* senders are responsible for checking it's a distinguished point */
     for (size_t j=0; j<PROCESS_QUOTA; ++j) 
       dict_add_element_to(d, &rcv_buf[N*j]);
 
+    if ((ctr % INTERVAL) == 0){/* timer summary */
+      elapsed_dict = wtime() - elapsed_dict;
+      printf("Receive took %fsec, Adding to dict took %fsec i.e. 2^%f elm/sec, total 2^%f elm/sec",
+	     elapsed_recv,
+	     elapsed_recv,
+	     log2(elapsed_dict/PROCESS_QUOTA),
+	     log2((elapsed_dict+elapsed_recv)/PROCESS_QUOTA));
+    }
+
+    ++ctr; /* counter for printign time */
+    
     /* If a sender is done hashing, it will make rcv_buf = {0}, and has tag=1 */
     /* The dictionary by design will ignore all zero messages */
     tmp = ncompleted_senders;
@@ -252,6 +276,7 @@ void receiver_process_task(int const myrank,
   /* How many candidates were stored? and remove partial candidates */
   const u64 nneded_candidates = n_needed_candidates();
   size_t nfound_cnd = get_file_size(fp) / HASH_INPUT_SIZE ;
+  double elapsed_cnd = wtime();
   // truncate the candidates file, in case a partial candidate was stored
   truncate(file_name, nfound_cnd*HASH_INPUT_SIZE);
   size_t old_nfound_candidates = nfound_cnd;
@@ -288,7 +313,7 @@ void receiver_process_task(int const myrank,
   /* The sender rank in its respective local group  */
   sender_name = status.MPI_SOURCE; // - NSERVERS; // who sent the message?
 
-
+  
   /* while (NNEEDED_CND > nfound_cnd) { */
   while (1){
     /* printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank); */
@@ -315,12 +340,17 @@ void receiver_process_task(int const myrank,
 
 
     if (nfound_cnd - old_nfound_candidates > 0) {
-      printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-	     "receiver #%d has %lu out of %llu candidates from #%d\n"
-	     "++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n",
-	     myrank, nfound_cnd, nneded_candidates, status.MPI_SOURCE);
-      
+      printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
+	     "receiver #%d has %lu out of %llu candidates from #%d\n, in %fsec"
+	     "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n",
+	     myrank,
+	     nfound_cnd,
+	     nneded_candidates,
+	     status.MPI_SOURCE,
+	     wtime() - elapsed_cnd);
+
       old_nfound_candidates = nfound_cnd;
+      elapsed_cnd = wtime();
     }
     MPI_Wait(&request, &status);
 

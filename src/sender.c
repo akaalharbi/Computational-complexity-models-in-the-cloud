@@ -245,6 +245,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   FILE* fp = fopen("data/states", "r");
   int server_id, n_dist_points;
   double elapsed = 0;
+  double total_elapsed = wtime();
   
   /* u8 Mavx[16][HASH_INPUT_SIZE] = {0}; */
   /* u32 tr_states[16*8] = {0}; /\* same as current_states but transposed *\/ */
@@ -391,12 +392,13 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     } /* end for hash_n */
 
     elapsed = wtime() - elapsed;
-    printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %0.4f%%, %0.4fsec\n",
+    printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %0.4f%%, %0.4fsec, ETA %f sec\n",
 	   myrank,
 	   global_idx,
 	   log2(INTERVAL/elapsed)+log2(16),
 	   100 * ((double_t) 1 -  (end - global_idx)/((double_t) end - begin)),
-	    elapsed);
+	   elapsed,
+	   elapsed * ((end - global_idx)/16));
     
     elapsed = wtime();
   } /* end for global_idx */
@@ -433,9 +435,13 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
   }
 
+
+
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
+  printf("sender%d rehashing total elapsed %f\n",
+	 myrank, (wtime() - total_elapsed) );
 }
 
 
@@ -505,10 +511,6 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 	     N);
 
 
-
-
-
-      
 
       /* we have extrac element in server n. server_id buffer */
       ++servers_counters[server_id];
