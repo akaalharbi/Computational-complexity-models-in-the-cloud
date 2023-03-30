@@ -1,3 +1,7 @@
+# core dump
+ulimit -c unlimited
+echo 'core' | sudo-g5k tee /proc/sys/kernel/core_pattern
+# compile
 cd lib/sha256_intel_avx/
 sudo-g5k apt install nasm
 make clean && make all

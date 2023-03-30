@@ -91,26 +91,26 @@ static inline int lookup_multi_save(dict *d,
 				    + sizeof(CTR_TYPE)] /* skip ctr part */);
 
     
-    {/* test that the message received is same as the one sent */
-      memcpy(M, template, HASH_INPUT_SIZE);
+    /* {/\* test that the message received is same as the one sent *\/ */
+    /*   memcpy(M, template, HASH_INPUT_SIZE); */
 
-      /* set the counter part */
-      memcpy(M,
-	     &ctrs_dgsts[i*one_pair_size],
-	     sizeof(CTR_TYPE));
-      u32 mystate[NWORDS_STATE] = {HASH_INIT_STATE};
-      hash_single(mystate, M);
+    /*   /\* set the counter part *\/ */
+    /*   memcpy(M, */
+    /* 	     &ctrs_dgsts[i*one_pair_size], */
+    /* 	     sizeof(CTR_TYPE)); */
+    /*   u32 mystate[NWORDS_STATE] = {HASH_INIT_STATE}; */
+    /*   hash_single(mystate, M); */
 
-      int is_equal = memcmp(mystate,
-			    &ctrs_dgsts[i*one_pair_size
-					+ sizeof(CTR_TYPE)],
-			    N);
+    /*   int is_equal = memcmp(mystate, */
+    /* 			    &ctrs_dgsts[i*one_pair_size */
+    /* 					+ sizeof(CTR_TYPE)], */
+    /* 			    N); */
 
-      if (is_equal != 0){
-	printf("receiver error!");
-      }
+    /*   if (is_equal != 0){ */
+    /* 	printf("receiver error!"); */
+    /*   } */
       
-    }
+    /* } */
     
     if (is_positive){ /* did we find a candidate msg||dgst? */
       /* reconstructing the message: get the template */
@@ -124,8 +124,12 @@ static inline int lookup_multi_save(dict *d,
 
 
       {// debugging  start
+	if(!is_dist_digest(&ctrs_dgsts[i*one_pair_size+sizeof(CTR_TYPE)])){
+	  printf("ERROR: at receiver%d\n", myrank);
+	  print_char(&ctrs_dgsts[i*one_pair_size+sizeof(CTR_TYPE)], N);
+	}
+
       
-      /* assert(is_dist_msg(M)); */
 
       char txt[100];
       snprintf(txt, sizeof(txt), "data/digests/%d", myrank);
