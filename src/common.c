@@ -131,7 +131,11 @@ u32 to_which_server(u8 state[HASH_STATE_SIZE])
   /* 4- Compute server number by taking computing mod nservers */
   u32 snd_to_server  = ((u32*) &state[N-4])[0];
 			
-  snd_to_server = ( snd_to_server >> DIFFICULTY)  % NSERVERS;
+
+  /* since the last bits are the distinguished point and thery are zero */
+  /* and they are the most significant bits in snd_to_server*/
+  /* no shift nor mask is needed */
+  snd_to_server = snd_to_server % NSERVERS;
 
   return snd_to_server;
 } 
