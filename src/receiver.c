@@ -91,7 +91,7 @@ static inline int lookup_multi_save(dict *d,
 				    + sizeof(CTR_TYPE)] /* skip ctr part */);
 
     
-    /* {/\* test that the message received is same as the one sent *\/ */
+    /* { // debugging /\* test that the message received is same as the one sent *\/ */
     /*   memcpy(M, template, HASH_INPUT_SIZE); */
 
     /*   /\* set the counter part *\/ */
@@ -122,26 +122,25 @@ static inline int lookup_multi_save(dict *d,
 	     sizeof(CTR_TYPE));
 
 
+      /* {// debugging  start */
+      /* 	if(!is_dist_digest(&ctrs_dgsts[i*one_pair_size+sizeof(CTR_TYPE)])){ */
+      /* 	  printf("ERROR: at receiver%d\n", myrank); */
+      /* 	  print_char(&ctrs_dgsts[i*one_pair_size+sizeof(CTR_TYPE)], N); */
+      /* 	} */
 
-      {// debugging  start
-	if(!is_dist_digest(&ctrs_dgsts[i*one_pair_size+sizeof(CTR_TYPE)])){
-	  printf("ERROR: at receiver%d\n", myrank);
-	  print_char(&ctrs_dgsts[i*one_pair_size+sizeof(CTR_TYPE)], N);
-	}
+	
 
-      
+      /* char txt[100]; */
+      /* snprintf(txt, sizeof(txt), "data/digests/%d", myrank); */
+      /* FILE* fp_dgsts = fopen(txt, "a"); */
+      /* fwrite(&ctrs_dgsts[i*one_pair_size+ sizeof(CTR_TYPE)], */
+      /* 	     N, */
+      /* 	     1, */
+      /* 	     fp_dgsts); */
+      /* fflush(fp_dgsts); */
+      /* fclose(fp_dgsts); */
 
-      char txt[100];
-      snprintf(txt, sizeof(txt), "data/digests/%d", myrank);
-      FILE* fp_dgsts = fopen(txt, "a");
-      fwrite(&ctrs_dgsts[i*one_pair_size+ sizeof(CTR_TYPE)],
-	     N,
-	     1,
-	     fp_dgsts);
-      fflush(fp_dgsts);
-      fclose(fp_dgsts);
-
-      } // debugging  end 
+      /* } // debugging  end  */
       
       /* finally write the reconstructed message */
       fwrite(M, sizeof(u8), HASH_INPUT_SIZE, fp);

@@ -2,10 +2,10 @@
 
 # break sender.c:extract_dist_points
 
-break receiver.c:103
+break receiver.c:
 
 
-break sender.c:540
+break sender.c:205
 # commands
 #   call printf("idx in word_buf = %lu\n", nbytes_per_server*server_id + local_idx*one_elm_size)
 #   call printf("ctr=%llu while copied ctr=%llu\n", msg_ctrs[i], ((u64*) my_M)[0])

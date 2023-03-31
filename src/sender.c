@@ -213,6 +213,7 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 
       /* get the digest to digests vector */
       copy_transposed_digest(&digests[i*N], tr_states, lane);
+      /* assert(is_dist_digest(&digests[i*N])); */
     }
   } /* end if (cmp_mask) */
 }
@@ -462,8 +463,8 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 				    const size_t one_elm_size,
 				    MPI_Comm inter_comm)
 {
-  /// 1- hash , 2- increment message counters, 3- extract disit point if any.
-  /// repeate.
+  /// 1- increment message counters, 2- hash.  3- extract disit point if any,
+  /// repeate. IMPORTANT: DO NOT CHANGE THE ORDER OF THIS SEQUENCE!
 
   
   u32* states_avx;
@@ -482,13 +483,13 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
 
   while (1) {
-    /* hash 16 messages */
-    states_avx = sha256_multiple_x16(Mavx);
-    
     /* increment the message counters after hashing */
     for (int lane = 0; lane<16; ++lane)
       ((u64*) Mavx[lane])[0] += 16;
 
+    /* hash 16 messages */
+    states_avx = sha256_multiple_x16(Mavx);
+    
     
     extract_dist_points(states_avx, Mavx, digests, msg_ctrs, &n_dist_points);
 
