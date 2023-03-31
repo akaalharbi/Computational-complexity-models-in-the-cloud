@@ -68,6 +68,8 @@ void print_u32(u32* a, size_t l){
 
 
 
+
+
 void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 			 int n_active_lanes, /* in */
 			 u8 Mavx[restrict 16][HASH_INPUT_SIZE],
@@ -80,37 +82,40 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
   // Summary: Find the distinguished digests in tr_state, and save them to     |
   //          states. Also, return how many disitingusihed points have been    |
   //          found. A point is disitingusihed if it has x bits on the right   |
-  //          most that are zero. x = `DIFFICULTY` defined in config.h         |
+  //          most position that are zero. x = `DIFFICULTY` defined in config.h|
   // INPUT:                                                                    |
   // - tr_states: transposed states of hash (specific  to sha256)              |
-  // - max_nlanes: How many hashes out of 16 we consider. e.g. only first 7    | 
+  // - n_active_lanes: How many hashes out of 16 we consider. e.g. only first 7|
+  // - Mavx: Messages that used to generate this tr_states.                    |
+  // - msg_ctrs_out: save the messages counters that when are hashed generate  |
+  //                 distinguished points.                                     |
+  // - n_dist_points: how many distinguished points have been found.           |
   // --------------------------------------------------------------------------+
 
 
-  /* Init an AVX512/AVX2 vector */
+  /* Init an AVX512 vector */
   const REG_TYPE zero = SIMD_SETZERO_SI();
 
   /* use this mask to check if a digest is a distinguished point or not! */
+  /* digest & dist_pt_mask == 0 iff digest is distinguished point */
   const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(DIST_PT_MASK);
-  static REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
-  static REG_TYPE cmp_vect;
-  static u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
-  *n_dist_points = 0; /* old data should not interfer with new one */
+  REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
+  REG_TYPE cmp_vect;
+  u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
+  /* since we restrict our treatment to only n_active_lane */
   int npotenital_dist_pt = 0;
 
-
-  /* load the last words of digests, we assume digest is aligned  */
+  /* INIT */
+  *n_dist_points = 0; /* old data should not interfer with new one */
+  
   /* load last significant row in tr_state i.e. last words of each digest */
   digests_last_word = SIMD_LOADU_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
 
-  /* A distinguished point will have cmp_vect ith entry =  0  */
+  /* A distinguished point will have ith entry in  cmp_vect =  0  */
   cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
+
   /* cmp_mask will have the ith bit = 1 if the ith element in cmp_vect is -1 */
-
   cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
-  /* printf("cmp_mask = %u\n", cmp_mask); */
-
-
 
   if (cmp_mask) { /* found at least a distinguished point? */
     npotenital_dist_pt = __builtin_popcount(cmp_mask);
@@ -125,6 +130,7 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
       /* Daniel Lemire has other methods that are found in his blog */
       trailing_zeros = __builtin_ctz(cmp_mask); 
       lane += trailing_zeros;
+      /* remove all bits up to the found lane  */
       cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
 
       if (lane < n_active_lanes){
@@ -135,7 +141,6 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
 	/* get the digest to digests vector */
 	copy_transposed_digest(&digests[i*N], tr_states, lane);
       }
-      
     }
   } /* end if (cmp_mask) */
 }
@@ -147,20 +152,24 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 			 CTR_TYPE msg_ctrs_out[restrict 16], /* out */
 			 int* n_dist_points) /* out */
 {
-
   // ==========================================================================+
   // Summary: Find the distinguished digests in tr_state, and save them to     |
   //          states. Also, return how many disitingusihed points have been    |
   //          found. A point is disitingusihed if it has x bits on the right   |
-  //          most that are zero. x = `DIFFICULTY` defined in config.h         |
+  //          most position that are zero. x = `DIFFICULTY` defined in config.h|
   // INPUT:                                                                    |
   // - tr_states: transposed states of hash (specific  to sha256)              |
-  // - max_nlanes: How many hashes out of 16 we consider. e.g. only first 7    | 
+  // - n_active_lanes: How many hashes out of 16 we consider. e.g. only first 7|
+  // - Mavx: Messages that used to generate this tr_states.                    |
+  // - msg_ctrs_out: save the messages counters that when are hashed generate  |
+  //                 distinguished points.                                     |
+  // - n_dist_points: how many distinguished points have been found.           |
   // --------------------------------------------------------------------------+
 
 
   /* Init an AVX512/AVX2 vector */
   const REG_TYPE zero = SIMD_SETZERO_SI();
+
   /* use this mask to check if a digest is a distinguished point or not! */
   const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(DIST_PT_MASK);
   REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
@@ -195,17 +204,15 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
       /* Daniel Lemire has other methods that are found in his blog */
       trailing_zeros = __builtin_ctz(cmp_mask); 
       lane += trailing_zeros;
+
+      /* remove all bits up to the found lane  */
       cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
-
-
-      /* do usefule work only when we are acting on active lane  */
 
       /* update counter the ith counter */
       msg_ctrs_out[i] = ((CTR_TYPE*)Mavx[lane])[0];
+
       /* get the digest to digests vector */
       copy_transposed_digest(&digests[i*N], tr_states, lane);
-
-      
     }
   } /* end if (cmp_mask) */
 }
@@ -240,7 +247,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   
   MPI_Status status;
   MPI_Request request;
-  int first_time = 1; /* 1 if we have not sent anything yet, 0 otherwise */
+  int has_sent = 0; /* 0 if we have not sent anything yet. otherwise > 0 */
 
   FILE* fp = fopen("data/states", "r");
   int server_id, n_dist_points;
@@ -281,8 +288,10 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	 * NWORDS_STATE);
   
   /* only load states that i am going to work on */
+
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
   fread(states, HASH_STATE_SIZE, (end - begin), fp);
+  /* CLOSE THE FILE! */
   fclose(fp);
 
   printf("sender%d, begin=%lu, end=%lu, quotua=%lu, nstates=%lu\n",
@@ -325,8 +334,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	((u64*) Mavx[lane])[0] += 1;
 
 
-
-
       /* we can avoid branching here by using extract_dist_points_dynamic */
       /* however in most cases we are not going to use it unless we are in */
       /* the boundary. */
@@ -349,7 +356,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
-
 	server_id = to_which_server(&digests[i*N]);
 
 	/* where to put digest in server_id buffer? */
@@ -363,11 +369,11 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
         ++servers_counters[server_id];
 
-	/* if the server buffer is full send immediately */
+	/* if the server buffer is full, send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
 
 	  /* only call wait when its not the first message */
-	  if (!first_time)
+	  if (has_sent)
 	    MPI_Wait(&request, &status);
 
 	  /* copy the message to be sent to snd_buf */
@@ -383,10 +389,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 		    inter_comm,
 		    &request);
 
-	  first_time = 0; /* we have sent a message */
-	  
+
+	  has_sent = 1; /* we have sent a message */
 	  servers_counters[server_id] = 0;
-	  
 	}/* end if server_counters */
       } /* end for n_dist_points */
     } /* end for hash_n */
@@ -398,32 +403,36 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	   log2(INTERVAL/elapsed)+log2(16),
 	   100 * ((double_t) 1 -  (end - global_idx)/((double_t) end - begin)),
 	   elapsed,
-	   elapsed * ((end - global_idx)/16));
-    
+	   elapsed * ( (end - global_idx)/16));
     elapsed = wtime();
   } /* end for global_idx */
 
-  /* should we wait for the last message to be sent?! */
-  if (!first_time) 
+  // -------------------------------- PART 4 ----------------------------------+
+  // Send the digests that remained in the buffer and tell the receivers that
+  // I finished hashing.
+
+  /* we have a hanging MPI_Isend, make sure it has been sent */
+  if (has_sent) 
     MPI_Wait(&request, &status);
 
 
   /* Tell every receiver that you are done!, and send the remaining digests */
   for (int server=0; server<NSERVERS; ++server){
     /* we may have some digests that we have not sent since their number is */
-    /* less than the PROCESS_QUOTA. We send them */
+    /* less than the PROCESS_QUOTA. We have to send them!.  */
 
-    // Before:
+    /* set all the empty digests places in work_buffer as zero since they will  */
+    /* be ignored by the receiver by default. */
+    // Before: 
     /* server i buffer: {dgst1, .., dgstk, random garbage}*/
     /* lft term: server i buffer begin, right term: nbytes to reach garbage */
     memset(&work_buf[N*PROCESS_QUOTA*server + N*servers_counters[server]],
 	   0,
 	   N*(PROCESS_QUOTA-servers_counters[server]));
+
     // After:
     /* server i buffer: {dgst1, .., dgstk, 0, ..., 0}, len = PROCESS_QUOTA */
     /* By default the receiver will ignore zero digests */
-
-    
     MPI_Send(&work_buf[server*PROCESS_QUOTA*N],
 	     PROCESS_QUOTA*N,
 	     MPI_UNSIGNED_CHAR,
@@ -434,9 +443,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     printf("sender%d dit au revoir\n", myrank);
 
   }
-
-
-
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
@@ -456,6 +462,10 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 				    const size_t one_elm_size,
 				    MPI_Comm inter_comm)
 {
+  /// 1- hash , 2- increment message counters, 3- extract disit point if any.
+  /// repeate.
+
+  
   u32* states_avx;
   int n_dist_points = 0; /* At the beginning we no dist points */
   size_t server_id=0, local_idx=0;
@@ -464,7 +474,7 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
   MPI_Status status;
   MPI_Request request;
 
-  int first_send = 1;
+  int has_sent = 0;
   
   memset(work_buf, 0, nbytes_per_server*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
@@ -472,12 +482,12 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
 
   while (1) {
-    /* 1- hash, 2- increment message counters, 3- extract disit point if any */
+    /* hash 16 messages */
+    states_avx = sha256_multiple_x16(Mavx);
+    
     /* increment the message counters after hashing */
     for (int lane = 0; lane<16; ++lane)
       ((u64*) Mavx[lane])[0] += 16;
-
-    states_avx = sha256_multiple_x16(Mavx);
 
     
     extract_dist_points(states_avx, Mavx, digests, msg_ctrs, &n_dist_points);
@@ -485,19 +495,16 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
     /* put the distinguished points in specific serverss buffer */
     for (int i = 0; i<n_dist_points; ++i){ /* n_dist_points might be 0 */
-
-
       
       server_id = to_which_server(&digests[i*N]);
+
       /* where to put digest in server_id buffer? (this is a local view) */
       local_idx = servers_counters[server_id];
-
 
       /* 1 element = ctr||dgst  */
       /* #elments in  server buffer = PROCESS_QUOTA */
       /* There are NSERVERS in total */
       /* copy the ctr to the server buffer */
-      
       memcpy(&work_buf[nbytes_per_server*server_id
 		       + local_idx*one_elm_size],
 	     &msg_ctrs[i], /* counter of the message i  */
@@ -511,15 +518,14 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 	     N);
 
 
-
-      /* we have extrac element in server n. server_id buffer */
+      /* we added an element in server n. server_id buffer */
       ++servers_counters[server_id];
 
       /* if the server buffer is full send immediately */
       if (servers_counters[server_id] == PROCESS_QUOTA){
 
 	/* if first_send then, there is not mpi_isend to wait for*/
-        if (!first_send) 
+        if (has_sent) 
 	  MPI_Wait(&request, &status);
 
 	/* copy the message to be sent to snd_buf */
@@ -560,7 +566,7 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 		  inter_comm,
 		  &request);
 	
-	first_send = 0; /* call mpi wait next time */
+	has_sent = 1; /* call mpi wait next time */
 	servers_counters[server_id] = 0;
       }
     }
@@ -589,7 +595,6 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   u8 Mavx[16][HASH_INPUT_SIZE] = {0};
   /* transoposed states  */
   u32 tr_states[16*8] __attribute__ ((aligned(64))) = {0};
-  u32 un_tr_states[16*8] __attribute__ ((aligned(64))) = {0};  /* non-transoposed */
   u8 digests[16 * N] ; /* save the distinguished digests here (manually) */
   CTR_TYPE msg_ctrs[16]; /* save thde counters of the dist digests (manually) */
 
@@ -609,7 +614,6 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   u8* snd_buf = (u8*) malloc(nbytes_per_server);
   /* ith_entry : how many non-sent element stored in server i buffer */
   size_t* server_counters = malloc(sizeof(size_t)*NSERVERS);
-
 
 
   if (snd_buf == NULL)

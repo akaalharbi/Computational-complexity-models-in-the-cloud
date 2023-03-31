@@ -345,7 +345,7 @@ void receiver_process_task(int const myrank,
 
     if (nfound_cnd - old_nfound_candidates > 0) {
       printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-	     "receiver #%d has %lu out of %llu candidates from #%d\n, in %fsec"
+	     "receiver #%d has %lu out of %llu candidates from #%d\n, in %fsec\n"
 	     "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n",
 	     myrank,
 	     nfound_cnd,
