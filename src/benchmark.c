@@ -401,38 +401,58 @@ int main(int argc, char *argv[])
   puts("==============================================\n");
 
 
-  return 0;
-  printf("sizeof(dict)=%lu bytes\n", sizeof(dict));
+
+
 
   /* Benchmark dictionary query  */
   // init load dictionary
-  print_memory_usage("Memory before dictionary load");
+
 
   dict* d = dict_new(NSLOTS_MY_NODE);
-  double timer = wtime();
-  FILE* fp = fopen("data/digests/0", "r");
-  load_file_to_dict(d, fp);
-  timer = wtime() - timer;
+  u32 message[PROCESS_QUOTA*N] = {0};
 
-  double nMB = get_file_size(fp) / ((double) 1000000);
-  double nelm_sec = d->nelements_asked_to_be_inserted /  timer;
+  getrandom(message, PROCESS_QUOTA*N, 1);
 
-  printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
-	 "dict read in %0.2fsec\n"
-	 "It has %lu elms, file has %lu elms\n"
-	 "d->nslots = %lu, d->nelements=%lu, filling rate=%f \n"
-	 "i.e. it reads %0.4f MB/sec, and %0.4f elm /sec\n"
-	 "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n",
-	 timer,
-	 d->nelements, d->nelements_asked_to_be_inserted,
-	 d->nslots, d->nelements,
-	 ((float) d->nelements)/d->nslots,
-	 nMB/timer,
-	 nelm_sec);
+  double timer = 0;
+  double elapsed_dict = 0;
+
+  for (size_t j = 0; j < NSLOTS_MY_NODE/PROCESS_QUOTA; ++j){
+    timer = wtime();
+    for (size_t i=0; i<PROCESS_QUOTA; ++i) {
+      dict_add_element_to(d, (u8*) &message[N*i]);
+    }
+    elapsed_dict += wtime() - timer;
+    getrandom(message, PROCESS_QUOTA*N, 0);
+  }
+
+  printf("Dictionary addtion took %0.2f i.e. 2^%0.4felm/sec\n",
+	 elapsed_dict,
+	 log2(NSLOTS_MY_NODE/elapsed_dict));
 
 
-  print_memory_usage("After loadin dict");
-  fclose(fp);
+  /* FILE* fp = fopen("data/digests/0", "r"); */
+  /* load_file_to_dict(d, fp); */
+  /* timer = wtime() - timer; */
+
+  /* double nMB = get_file_size(fp) / ((double) 1000000); */
+  /* double nelm_sec = d->nelements_asked_to_be_inserted /  timer; */
+
+  /* printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n" */
+  /* 	 "dict read in %0.2fsec\n" */
+  /* 	 "It has %lu elms, file has %lu elms\n" */
+  /* 	 "d->nslots = %lu, d->nelements=%lu, filling rate=%f \n" */
+  /* 	 "i.e. it reads %0.4f MB/sec, and %0.4f elm /sec\n" */
+  /* 	 "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n", */
+  /* 	 timer, */
+  /* 	 d->nelements, d->nelements_asked_to_be_inserted, */
+  /* 	 d->nslots, d->nelements, */
+  /* 	 ((float) d->nelements)/d->nslots, */
+  /* 	 nMB/timer, */
+  /* 	 nelm_sec); */
+
+
+  /* print_memory_usage("After loadin dict"); */
+  /* fclose(fp); */
   
 
   // query large buffer
