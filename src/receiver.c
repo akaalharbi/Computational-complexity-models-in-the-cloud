@@ -185,20 +185,19 @@ static void write_digest_to_dict(dict *d,
   int ncompleted_senders = 0;
   int tmp = 0;
   size_t rcv_size = PROCESS_QUOTA*N;
-  /* how long does it take to add elements to dict */
+  double timer = 0;
   double elapsed_dict = 0;
-  /* how long does it take to receive a message */
   double elapsed_recv = 0;
-  u64 ctr = 0;
+  double elapsed_total = wtime();
+  /* counter for how many messages have been received  */
+  u64 ctr_msg = 0;
   //---------------------------------------------------------------------------+
   // Receive digests and add them to dictionary
   
   /* Receive one message before */
   while (ncompleted_senders < nsenders) {
-    if ((ctr % INTERVAL) == 0)
-      elapsed_recv = wtime();
 
-    
+    timer = wtime();
     MPI_Recv(rcv_buf, /* store in this location */
 	      rcv_size, /* How many bytes to receive  */
 	      MPI_UNSIGNED_CHAR,
@@ -206,28 +205,16 @@ static void write_digest_to_dict(dict *d,
 	      MPI_ANY_TAG,  /* tag = 1 means a sender has done its work */ 
 	      inter_comm,
 	      &status);
-
-    if ((ctr % INTERVAL) == 0){
-      elapsed_recv = wtime() - elapsed_recv;
-      elapsed_dict = wtime();
-    }
-
+    elapsed_recv += wtime() - timer;
     
     /* add them to dictionary:   */
     /* senders are responsible for checking it's a distinguished point */
+    timer = wtime();
     for (size_t j=0; j<PROCESS_QUOTA; ++j) 
       dict_add_element_to(d, &rcv_buf[N*j]);
-
-    if ((ctr % INTERVAL) == 0){/* timer summary */
-      elapsed_dict = wtime() - elapsed_dict;
-      printf("Receive took %fsec, Adding to dict took %fsec i.e. 2^%f elm/sec, total 2^%f elm/sec",
-	     elapsed_recv,
-	     elapsed_recv,
-	     log2(elapsed_dict/PROCESS_QUOTA),
-	     log2((elapsed_dict+elapsed_recv)/PROCESS_QUOTA));
-    }
-
-    ++ctr; /* counter for printign time */
+    elapsed_dict += wtime() - timer;
+    
+    ++ctr_msg;
     
     /* If a sender is done hashing, it will make rcv_buf = {0}, and has tag=1 */
     /* The dictionary by design will ignore all zero messages */
@@ -237,6 +224,14 @@ static void write_digest_to_dict(dict *d,
       printf("recv%d say that %d/%d are done\n", myrank, ncompleted_senders, nsenders);
     }
   }
+  elapsed_total = wtime() - elapsed_total;
+  printf("<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
+	 "total=%0.2fsec, mpi_recv=%0.2f, dict_add=%0.2f≈2^%0.2f\n"
+	 "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n",
+	 elapsed_total,
+	 elapsed_recv,
+	 elapsed_dict,
+	 log2(PROCESS_QUOTA*ctr_msg/elapsed_dict));
 }
 
 

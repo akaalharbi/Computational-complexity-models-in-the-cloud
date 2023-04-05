@@ -252,8 +252,15 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
   FILE* fp = fopen("data/states", "r");
   int server_id, n_dist_points;
+  
+  /* timing variables for profiliing sending, hashing, and extracting dist pt */
   double elapsed = 0;
-  double total_elapsed = wtime();
+  double total_elapsed = 0;
+  double timer = 0; /* general timer start */
+  double elapsed_hash = 0;
+  double elapsed_extract_dist = 0;
+  double elapsed_mpi_wait = 0;
+
   
   /* u8 Mavx[16][HASH_INPUT_SIZE] = {0}; */
   /* u32 tr_states[16*8] = {0}; /\* same as current_states but transposed *\/ */
@@ -271,7 +278,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   size_t idx; /* */
   int inited = 0; /* 0 if we need to clear the avx register */
   
-
   if (myrank == (nsenders-1))
     end = nstates; /* get the rest of states */
 
@@ -303,7 +309,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   // -------------------------------- PART 3 ----------------------------------+
   // Regenrate the long message: quota = (end - begin)
   // Part a:  quota = 16x + r, treat 16x states now, then work on r states later
-  
+  total_elapsed = wtime();
   /* Hash the long message again, 16 at a time. The remaining will  */
   for (global_idx = begin; global_idx < end; global_idx += 16){
     /* local_idx = 0 -> (end-global)/16 */
@@ -322,12 +328,13 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     elapsed = wtime(); /* how long does it take to hash an interval */
     
     for (u64 hash_n=0; hash_n <((u64) INTERVAL); ++hash_n){
-      /* hash 16 messages and copy it to tr_states  */
-      // todo fix me please 
+      
+      timer = wtime();
       memcpy(tr_states,
 	     sha256_multiple_x16_tr(Mavx, tr_states, inited),
 	     16*HASH_STATE_SIZE);
-
+      elapsed_hash += (wtime() - timer);
+      
       inited = 1; /* sha256_x16 has alread a copy of the state */
       
       /* increment the message counters after hashing */
@@ -338,6 +345,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       /* we can avoid branching here by using extract_dist_points_dynamic */
       /* however in most cases we are not going to use it unless we are in */
       /* the boundary. */
+      timer = wtime();
       if (n_active_lanes == 16){
 	extract_dist_points(tr_states, /* transposed states */
 			    Mavx, /* messages used */
@@ -353,8 +361,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 			    msg_ctrs, /* messages are the same except counter */
 			    &n_dist_points); /* how many dist points found? */
       }
+      elapsed_extract_dist += wtime() - timer;
 
-	
+      
       /* put the distinguished points in specific serverss buffer */
       for (int i = 0; i<n_dist_points; ++i){
 	server_id = to_which_server(&digests[i*N]);
@@ -374,9 +383,11 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	if (servers_counters[server_id] == PROCESS_QUOTA){
 
 	  /* only call wait when its not the first message */
-	  if (has_sent)
+	  if (has_sent){
+	    timer = wtime();
 	    MPI_Wait(&request, &status);
-
+	    elapsed_mpi_wait += wtime() - timer;
+	  }
 	  /* copy the message to be sent to snd_buf */
 	  memcpy(snd_buf,
 		 &work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
@@ -407,6 +418,17 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	   elapsed * ( (end - global_idx)/16));
     elapsed = wtime();
   } /* end for global_idx */
+
+  total_elapsed = wtime() - total_elapsed;
+  printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
+	 "total=%0.2fsec, mpi_wait=%0.2fsec, hash=%0.2fsec≈2^%0.2fhash/sec, find dist=%0.2fsec\n"
+	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
+	 total_elapsed,
+	 elapsed_mpi_wait,
+	 elapsed_hash,
+	 log2((end - begin)*INTERVAL / elapsed_hash),
+	 elapsed_extract_dist);
+  
 
   // -------------------------------- PART 4 ----------------------------------+
   // Send the digests that remained in the buffer and tell the receivers that
@@ -447,8 +469,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
-  printf("sender%d rehashing total elapsed %f\n",
-	 myrank, (wtime() - total_elapsed) );
+  /* printf("sender%d rehashing total elapsed %f\n", */
+  /* 	 myrank, (wtime() - total_elapsed) ); */
 }
 
 
