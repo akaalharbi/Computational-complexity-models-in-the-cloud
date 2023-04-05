@@ -226,12 +226,15 @@ static void write_digest_to_dict(dict *d,
   }
   elapsed_total = wtime() - elapsed_total;
   printf("<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
-	 "total=%0.2fsec, mpi_recv=%0.2f, dict_add=%0.2f≈2^%0.2f\n"
+	 "total=%0.2fsec, mpi_recv=%0.2fsec, dict_add=%0.2fsec≈2^%0.2f\n"
+	 "mpi_recv=%0.2f%%, dict_add=%0.2f%%\n"
 	 "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n",
 	 elapsed_total,
 	 elapsed_recv,
 	 elapsed_dict,
-	 log2(PROCESS_QUOTA*ctr_msg/elapsed_dict));
+	 log2(PROCESS_QUOTA*ctr_msg/elapsed_dict),
+	 100*elapsed_recv/elapsed_total,
+	 100*elapsed_dict/elapsed_total);
 }
 
 

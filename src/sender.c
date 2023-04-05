@@ -287,13 +287,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 					   * sizeof(WORD_TYPE)
 					   * NWORDS_STATE);
 
-  /* is it important to initialize the padding with zeros? */
-  memset(states,
-	 0,
-	 ((end - begin) + ((begin - end)%16))
-	 * sizeof(WORD_TYPE)
-	 * NWORDS_STATE);
-  
+   
   /* only load states that i am going to work on */
 
   fseek(fp, begin*HASH_STATE_SIZE, SEEK_SET);
@@ -408,26 +402,30 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       } /* end for n_dist_points */
     } /* end for hash_n */
 
-    elapsed = wtime() - elapsed;
-    printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %0.4f%%, %0.4fsec, ETA %f sec\n",
-	   myrank,
-	   global_idx,
-	   log2(INTERVAL/elapsed)+log2(16),
-	   100 * ((double_t) 1 -  (end - global_idx)/((double_t) end - begin)),
-	   elapsed,
-	   elapsed * ( (end - global_idx)/16));
-    elapsed = wtime();
+    /* elapsed = wtime() - elapsed; */
+    /* printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %0.4f%%, %0.4fsec, ETA %f sec\n", */
+    /* 	   myrank, */
+    /* 	   global_idx, */
+    /* 	   log2(INTERVAL/elapsed)+log2(16), */
+    /* 	   100 * ((double_t) 1 -  (end - global_idx)/((double_t) end - begin)), */
+    /* 	   elapsed, */
+    /* 	   elapsed * ( (end - global_idx)/16)); */
+    /* elapsed = wtime(); */
   } /* end for global_idx */
 
   total_elapsed = wtime() - total_elapsed;
   printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
 	 "total=%0.2fsec, mpi_wait=%0.2fsec, hash=%0.2fsec≈2^%0.2fhash/sec, find dist=%0.2fsec\n"
+	 "mpi_wait=%0.2f%%, hash=%0.2f%%, find dist=%0.2f%%\n"
 	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
 	 total_elapsed,
 	 elapsed_mpi_wait,
 	 elapsed_hash,
 	 log2((end - begin)*INTERVAL / elapsed_hash),
-	 elapsed_extract_dist);
+	 elapsed_extract_dist,
+	 100*elapsed_mpi_wait/total_elapsed,
+	 100*elapsed_hash/total_elapsed,
+	 100*elapsed_extract_dist/total_elapsed);
   
 
   // -------------------------------- PART 4 ----------------------------------+
