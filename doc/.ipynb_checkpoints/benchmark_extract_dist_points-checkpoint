@@ -1,0 +1,38 @@
+;; This buffer is for text that is not saved, and for Lisp evaluation.
+;; To create a file, visit it with C-x c C-x C-f and enter text in its buffer.
+
+sender0, global_idx=336, 2^23.417349 hashes/sec, done 0.018493%, 5.9904sec
+sender1, global_idx=18489, 2^23.318570 hashes/sec, done 0.017612%, 6.4149sec
+sender0, global_idx=352, 2^23.443400 hashes/sec, done 0.019374%, 5.8832sec
+sender0, global_idx=368, 2^23.444630 hashes/sec, done 0.020254%, 5.8782sec
+
+
+// server 
+sender8, global_idx=17148, 2^19.397143 hashes/sec, done 0.022461%, 48.5991sec                 
+sender12, global_idx=25698, 2^19.397142 hashes/sec, done 0.022461%, 48.5991sec                 
+sender16, global_idx=34264, 2^19.696773 hashes/sec, done 0.029935%, 39.4849sec
+sender4, global_idx=8630, 2^19.937716 hashes/sec, done 0.037436%, 33.4118sec
+
+;; -flto 
+sender6, global_idx=12857, 2^20.168905 hashes/sec, done 0.014974%, 28.4646sec                 
+sender8, global_idx=17132, 2^20.168906 hashes/sec, done 0.014974%, 28.4645sec
+sender12, global_idx=25682, 2^20.168906 hashes/sec, done 0.014974%, 28.4645sec
+sender16, global_idx=34248, 2^20.464854 hashes/sec, done 0.022451%, 23.1854sec 
+
+
+
+// desktop new transpose using avx512
+sender0, global_idx=112, 2^24.159777 hashes/sec, done 0.006164%, 3.5807sec
+sender1, global_idx=18281, 2^24.156813 hashes/sec, done 0.006164%, 3.5880sec
+sender0, global_idx=128, 2^24.166472 hashes/sec, done 0.007045%, 3.5641sec
+sender1, global_idx=18297, 2^24.162839 hashes/sec, done 0.007045%, 3.5731sec
+
+
+
+/// sha extract dist points
+// desktop 
+sender1, global_idx=18185, 2^25.602388 hashes/sec, done 0.000881%, 1.3173sec
+sender0, global_idx=32, 2^25.515501 hashes/sec, done 0.001761%, 1.3991sec
+sender1, global_idx=18201, 2^25.596299 hashes/sec, done 0.001761%, 1.3229sec
+sender0, global_idx=48, 2^25.513772 hashes/sec, done 0.002642%, 1.4008sec
+sender1, global_idx=18217, 2^25.595106 hashes/sec, done 0.002642%, 1.3240sec
