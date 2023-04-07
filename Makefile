@@ -50,6 +50,7 @@ OBJECTS := $(FILENAMES:$(SRC)/%.c=$(OBJDIR)/%.o)
 
 
 
+
 # Part 3: Compiling and Linking
 
 
@@ -103,7 +104,7 @@ phase_ii: $(OBJDIR)/phase_ii.o $(COMMON_OBJECTS)
 	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 phase_iii: $(OBJDIR)/phase_iii.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
+p	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 
 .PHONY: clean
@@ -113,4 +114,8 @@ clean:
 purge:
 	rm -f $(OBJECTS)
 	rm -f $(TARGETS)
-	rm -rf data
+	rm -rf data/digests
+	rm -rf data/messages
+	rm -rf data/stats
+	rm -rf data/verify
+

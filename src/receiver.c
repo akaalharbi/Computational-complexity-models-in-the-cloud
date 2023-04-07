@@ -189,6 +189,15 @@ static void write_digest_to_dict(dict *d,
   double elapsed_dict = 0;
   double elapsed_recv = 0;
   double elapsed_total = wtime();
+
+
+  char timing_file_name[FILE_NAME_MAX_LENGTH];
+  snprintf(timing_file_name, sizeof(timing_file_name),
+	   "data/receiver_dict_%d",
+	   myrank);
+  FILE* fp_timing = fopen(timing_file_name, "w");
+
+  
   /* counter for how many messages have been received  */
   u64 ctr_msg = 0;
   //---------------------------------------------------------------------------+
@@ -235,6 +244,17 @@ static void write_digest_to_dict(dict *d,
 	 log2(PROCESS_QUOTA*ctr_msg/elapsed_dict),
 	 100*elapsed_recv/elapsed_total,
 	 100*elapsed_dict/elapsed_total);
+
+  fprintf(fp_timing, "total=%0.2fsec, mpi_recv=%0.2fsec, dict_add=%0.2fsec≈2^%0.2f, "
+	  "mpi_recv=%0.2f%%, dict_add=%0.2f%%\n",
+	  elapsed_total,
+	  elapsed_recv,
+	  elapsed_dict,
+	  log2(PROCESS_QUOTA*ctr_msg/elapsed_dict),
+	  100*elapsed_recv/elapsed_total,
+	  100*elapsed_dict/elapsed_total);
+
+  fclose(fp_timing);
 }
 
 
@@ -267,6 +287,13 @@ void receiver_process_task(int const myrank,
   char file_name[FILE_NAME_MAX_LENGTH]; /* "data/messages/%d" */
   snprintf(file_name, sizeof(file_name), "data/messages/%d", myrank );
   FILE* fp = fopen(file_name, "a"); /* register message candidates here */
+
+  char timing_file_name[FILE_NAME_MAX_LENGTH];
+  snprintf(timing_file_name, sizeof(timing_file_name),
+	   "data/receiver_cnd_%d",
+	   myrank);
+  FILE* fp_timing = fopen(timing_file_name, "a");
+
   
   MPI_Status status;
   MPI_Request request;
@@ -341,6 +368,7 @@ void receiver_process_task(int const myrank,
 
 
     if (nfound_cnd - old_nfound_candidates > 0) {
+      elapsed_cnd = wtime() - elapsed_cnd;
       printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 	     "receiver #%d has %lu out of %llu candidates from #%d\n, in %fsec\n"
 	     "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n\n",
@@ -348,7 +376,12 @@ void receiver_process_task(int const myrank,
 	     nfound_cnd,
 	     nneded_candidates,
 	     status.MPI_SOURCE,
-	     wtime() - elapsed_cnd);
+	     elapsed_cnd);
+
+      fprintf(fp_timing, "nfound_cnd=%lu, new_cnd=%lu, t=%fsec\n",
+	     nfound_cnd,
+	     nfound_cnd-old_nfound_candidates,
+	     elapsed_cnd);
 
       old_nfound_candidates = nfound_cnd;
       elapsed_cnd = wtime();
@@ -370,7 +403,7 @@ void receiver_process_task(int const myrank,
   free(rcv_buf);
   /* free(indices); */
   fclose(fp);
-
+  fclose(fp_timing);
   printf("recv #%d done a good job\n", myrank);
 
   exit(EXIT_SUCCESS);

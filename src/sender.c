@@ -251,6 +251,12 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   int has_sent = 0; /* 0 if we have not sent anything yet. otherwise > 0 */
 
   FILE* fp = fopen("data/states", "r");
+
+  char file_name[FILE_NAME_MAX_LENGTH];
+  snprintf(file_name, sizeof(file_name), "data/stats/sender_%d", myrank);
+  FILE* fp_timing = fopen(file_name, "w");
+
+  
   int server_id, n_dist_points;
   
   /* timing variables for profiliing sending, hashing, and extracting dist pt */
@@ -297,7 +303,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
   printf("sender%d, begin=%lu, end=%lu, quotua=%lu, nstates=%lu\n",
 	 myrank, begin, end, (end-begin), nstates);
-  
 
   
   // -------------------------------- PART 3 ----------------------------------+
@@ -426,7 +431,20 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	 100*elapsed_mpi_wait/total_elapsed,
 	 100*elapsed_hash/total_elapsed,
 	 100*elapsed_extract_dist/total_elapsed);
-  
+
+
+  fprintf(fp_timing,
+	  "total=%0.2fsec, mpi_wait=%0.2fsec, hash=%0.2fsec≈2^%0.2fhash/sec, find dist=%0.2fsec,"
+	  "mpi_wait=%0.2f%%, hash=%0.2f%%, find dist=%0.2f%%\n",
+	  total_elapsed,
+	  elapsed_mpi_wait,
+	  elapsed_hash,
+	  log2((end - begin)*INTERVAL / elapsed_hash),
+	  elapsed_extract_dist,
+	  100*elapsed_mpi_wait/total_elapsed,
+	  100*elapsed_hash/total_elapsed,
+	  100*elapsed_extract_dist/total_elapsed);
+
 
   // -------------------------------- PART 4 ----------------------------------+
   // Send the digests that remained in the buffer and tell the receivers that
@@ -467,8 +485,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
-  /* printf("sender%d rehashing total elapsed %f\n", */
-  /* 	 myrank, (wtime() - total_elapsed) ); */
+  fclose(fp_timing);
 }
 
 
@@ -495,10 +512,13 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
   MPI_Status status;
   MPI_Request request;
 
+  
+  
   int has_sent = 0;
   
   memset(work_buf, 0, nbytes_per_server*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
+
   
 
 
