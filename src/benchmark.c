@@ -409,27 +409,48 @@ int main(int argc, char *argv[])
 
 
   dict* d = dict_new(NSLOTS_MY_NODE);
-  u32 message[PROCESS_QUOTA*N] = {0};
+  dict* d_simd = dict_new(NSLOTS_MY_NODE);
+  u64 ndigests = PROCESS_QUOTA*10;
+  u64 size_digests = ndigests*N;
+  u8* message = malloc(size_digests);
 
-  getrandom(message, PROCESS_QUOTA*N, 1);
+  getrandom(message, size_digests, 1);
 
   double timer = 0;
   double elapsed_dict = 0;
 
-  for (size_t j = 0; j < NSLOTS_MY_NODE/PROCESS_QUOTA; ++j){
-    timer = wtime();
-    for (size_t i=0; i<PROCESS_QUOTA; ++i) {
-      dict_add_element_to(d, (u8*) &message[N*i]);
-    }
-    elapsed_dict += wtime() - timer;
-    getrandom(message, PROCESS_QUOTA*N, 0);
+
+  timer = wtime();
+  for (size_t i=0; i<PROCESS_QUOTA; ++i) {
+    dict_add_element_to(d, (u8*) &message[N*i]);
   }
+  elapsed_dict += wtime() - timer;
+  getrandom(message, PROCESS_QUOTA*N, 0);
+
 
   printf("Dictionary addtion took %0.2f i.e. 2^%0.4felm/sec\n",
 	 elapsed_dict,
 	 log2(NSLOTS_MY_NODE/elapsed_dict));
 
 
+  /* let's check add SIMD */
+  timer = wtime();
+  for (size_t i=0; i<PROCESS_QUOTA; ++i) {
+    dict_add_element_simd(d_simd, &message[N*i]);
+  }
+  elapsed_dict += wtime() - timer;
+  getrandom(message, PROCESS_QUOTA*N, 0);
+
+
+  printf("Dictionary addtion SIMD took %0.2f i.e. 2^%0.4felm/sec\n",
+	 elapsed_dict,
+	 log2(NSLOTS_MY_NODE/elapsed_dict));
+
+
+  puts("------------");
+  printf("ARE THEY EQUAL?%d\n",
+	 memcmp(d->values, d_simd->values, size_digests));
+  
   /* FILE* fp = fopen("data/digests/0", "r"); */
   /* load_file_to_dict(d, fp); */
   /* timer = wtime() - timer; */

@@ -62,7 +62,7 @@ size_t  dict_memory(size_t nelements);
 int dict_add_element_to(dict *d, u8 *state);
 int dict_has_elm(dict *d, u8* state);
 void dict_print(dict *d);
-
+int dict_add_element_simd(dict* d, u8* state);
 
 
 

@@ -407,15 +407,15 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       } /* end for n_dist_points */
     } /* end for hash_n */
 
-    /* elapsed = wtime() - elapsed; */
-    /* printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %0.4f%%, %0.4fsec, ETA %f sec\n", */
-    /* 	   myrank, */
-    /* 	   global_idx, */
-    /* 	   log2(INTERVAL/elapsed)+log2(16), */
-    /* 	   100 * ((double_t) 1 -  (end - global_idx)/((double_t) end - begin)), */
-    /* 	   elapsed, */
-    /* 	   elapsed * ( (end - global_idx)/16)); */
-    /* elapsed = wtime(); */
+    elapsed = wtime() - elapsed;
+    printf("sender%d, global_idx=%lu, 2^%f hashes/sec, done %0.4f%%, %0.4fsec, ETA %f sec\n",
+	   myrank,
+	   global_idx,
+	   log2(INTERVAL/elapsed)+log2(16),
+	   100 * ((double_t) 1 -  (end - global_idx)/((double_t) end - begin)),
+	   elapsed,
+	   elapsed * ( (end - global_idx)/16));
+    elapsed = wtime();
   } /* end for global_idx */
 
   total_elapsed = wtime() - total_elapsed;
