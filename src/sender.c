@@ -266,7 +266,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   double elapsed_hash = 0;
   double elapsed_extract_dist = 0;
   double elapsed_mpi_wait = 0;
-
+  size_t nmsgs_sent = 0;
   
   /* u8 Mavx[16][HASH_INPUT_SIZE] = {0}; */
   /* u32 tr_states[16*8] = {0}; /\* same as current_states but transposed *\/ */
@@ -399,7 +399,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 		    TAG_DICT_SND, /* 0 */
 		    inter_comm,
 		    &request);
-
+	  ++nmsgs_sent;
+	  
 
 	  has_sent = 1; /* we have sent a message */
 	  servers_counters[server_id] = 0;
@@ -417,11 +418,17 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	   elapsed * ( (end - global_idx)/16));
     elapsed = wtime();
   } /* end for global_idx */
+  /* we have a hanging MPI_Isend, make sure it has been sent */
+  if (has_sent) 
+    MPI_Wait(&request, &status);
 
+  
   total_elapsed = wtime() - total_elapsed;
   printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
 	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
-	 "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n"
+	 "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n" 
+	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
+	 "DIFFICULTY=%d, INTERVAL=%d\n"
 	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
 	 total_elapsed,
 	 elapsed_mpi_wait,
@@ -430,29 +437,36 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	 elapsed_extract_dist,
 	 100*elapsed_mpi_wait/total_elapsed,
 	 100*elapsed_hash/total_elapsed,
-	 100*elapsed_extract_dist/total_elapsed);
+	 100*elapsed_extract_dist/total_elapsed,
+	 nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
+	 nsenders*nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
+	 nsenders,
+	 NSERVERS,
+	 DIFFICULTY,
+	 (int) log2(INTERVAL));
 
 
-  fprintf(fp_timing,
-	  "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec,"
-	  "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n",
-	  total_elapsed,
-	  elapsed_mpi_wait,
-	  elapsed_hash,
-	  log2((end - begin)*INTERVAL / elapsed_hash),
-	  elapsed_extract_dist,
-	  100*elapsed_mpi_wait/total_elapsed,
-	  100*elapsed_hash/total_elapsed,
-	  100*elapsed_extract_dist/total_elapsed);
+  fprintf(fp_timing, "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
+	 "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n" 
+	  "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n",
+	 total_elapsed,
+	 elapsed_mpi_wait,
+	 elapsed_hash,
+	 log2((end - begin)*INTERVAL / elapsed_hash),
+	 elapsed_extract_dist,
+	 100*elapsed_mpi_wait/total_elapsed,
+	 100*elapsed_hash/total_elapsed,
+	 100*elapsed_extract_dist/total_elapsed,
+	 nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
+	 nsenders*nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
+	 nsenders,
+	 NSERVERS);
 
 
   // -------------------------------- PART 4 ----------------------------------+
   // Send the digests that remained in the buffer and tell the receivers that
   // I finished hashing.
 
-  /* we have a hanging MPI_Isend, make sure it has been sent */
-  if (has_sent) 
-    MPI_Wait(&request, &status);
 
 
   /* Tell every receiver that you are done!, and send the remaining digests */

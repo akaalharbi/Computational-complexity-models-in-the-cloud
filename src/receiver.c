@@ -189,7 +189,7 @@ static void write_digest_to_dict(dict *d,
   double elapsed_dict = 0;
   double elapsed_recv = 0;
   double elapsed_total = wtime();
-
+  size_t nmsgs_recv = 0;
 
   char timing_file_name[FILE_NAME_MAX_LENGTH];
   snprintf(timing_file_name, sizeof(timing_file_name),
@@ -214,6 +214,7 @@ static void write_digest_to_dict(dict *d,
 	      MPI_ANY_TAG,  /* tag = 1 means a sender has done its work */ 
 	      inter_comm,
 	      &status);
+    ++nmsgs_recv;
     elapsed_recv += wtime() - timer;
     
     /* add them to dictionary:   */
@@ -237,22 +238,34 @@ static void write_digest_to_dict(dict *d,
   printf("<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
 	 "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f\n"
 	 "mpi_recv=%f%%, dict_add=%f%%\n"
+	 "RECV %fMB/sec, exp[all receivers] = %f MB/sec, nsenders=%d, nservers=%d\n"
+	 "DIFFICULTY=%d, INTERVAL=%d\n"
 	 "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n",
 	 elapsed_total,
 	 elapsed_recv,
 	 elapsed_dict,
 	 log2(PROCESS_QUOTA*ctr_msg/elapsed_dict),
 	 100*elapsed_recv/elapsed_total,
-	 100*elapsed_dict/elapsed_total);
+	 100*elapsed_dict/elapsed_total,
+	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
+	 nmsgs_recv*NSERVERS*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
+	 nsenders,
+	 NSERVERS,
+	 DIFFICULTY,
+	 (int) log2(INTERVAL));
 
-  fprintf(fp_timing, "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f, "
-	  "mpi_recv=%f%%, dict_add=%f%%\n",
-	  elapsed_total,
-	  elapsed_recv,
-	  elapsed_dict,
-	  log2(PROCESS_QUOTA*ctr_msg/elapsed_dict),
-	  100*elapsed_recv/elapsed_total,
-	  100*elapsed_dict/elapsed_total);
+  fprintf(fp_timing, "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f\n"
+	 "mpi_recv=%f%%, dict_add=%f%%\n"
+	  "RECV %fMB/sec, exp[all receivers] = %f MB/sec\n",
+	 elapsed_total,
+	 elapsed_recv,
+	 elapsed_dict,
+	 log2(PROCESS_QUOTA*ctr_msg/elapsed_dict),
+	 100*elapsed_recv/elapsed_total,
+	 100*elapsed_dict/elapsed_total,
+	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
+	 nmsgs_recv*NSERVERS*((N*PROCESS_QUOTA)/elapsed_total)/1000000);
+
 
   fclose(fp_timing);
 }
