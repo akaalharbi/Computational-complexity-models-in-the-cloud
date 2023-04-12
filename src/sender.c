@@ -420,8 +420,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
   total_elapsed = wtime() - total_elapsed;
   printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
-	 "total=%0.2fsec, mpi_wait=%0.2fsec, hash=%0.2fsec≈2^%0.2fhash/sec, find dist=%0.2fsec\n"
-	 "mpi_wait=%0.2f%%, hash=%0.2f%%, find dist=%0.2f%%\n"
+	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
+	 "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n"
 	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
 	 total_elapsed,
 	 elapsed_mpi_wait,
@@ -434,8 +434,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
 
   fprintf(fp_timing,
-	  "total=%0.2fsec, mpi_wait=%0.2fsec, hash=%0.2fsec≈2^%0.2fhash/sec, find dist=%0.2fsec,"
-	  "mpi_wait=%0.2f%%, hash=%0.2f%%, find dist=%0.2f%%\n",
+	  "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec,"
+	  "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n",
 	  total_elapsed,
 	  elapsed_mpi_wait,
 	  elapsed_hash,
