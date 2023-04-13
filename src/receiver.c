@@ -239,7 +239,7 @@ static void write_digest_to_dict(dict *d,
 	 "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f\n"
 	 "mpi_recv=%f%%, dict_add=%f%%\n"
 	 "RECV %fMB/sec, exp[all receivers] = %f MB/sec, nsenders=%d, nservers=%d\n"
-	 "DIFFICULTY=%d, INTERVAL=%d\n"
+	 "DIFFICULTY=%d, INTERVAL=%d, nmsgs_recv=%lu\n"
 	 "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n",
 	 elapsed_total,
 	 elapsed_recv,
@@ -252,7 +252,8 @@ static void write_digest_to_dict(dict *d,
 	 nsenders,
 	 NSERVERS,
 	 DIFFICULTY,
-	 (int) log2(INTERVAL));
+	 (int) log2(INTERVAL),
+	 nmsgs_recv);
 
   fprintf(fp_timing, "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f\n"
 	 "mpi_recv=%f%%, dict_add=%f%%\n"
