@@ -1,3 +1,41 @@
+
+32 nodes (2 receivers/nod2, 16 senders/node )
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+total=8653.095699sec, mpi_wait=8025.898762sec, hash=501.251974sec≈2^25.030608hash/sec, find dist=40.623268sec
+mpi_wait=92.751762%, hash=5.792747%, find dist=0.469465%
+send 1.482198 MB/sec, exp[all senders] = 758.885309 MB/sec, nsenders=512, nservers=64
+DIFFICULTY=4, INTERVAL=30, nsends=10688
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+total=8755.770852sec, mpi_recv=7532.107233sec, dict_add=1223.619152sec≈2^22.745019
+mpi_recv=86.024490%, dict_add=13.975002%
+RECV 11.788705MB/sec, exp[all receivers] = 754.477123 MB/sec, nsenders=512, nservers=64
+DIFFICULTY=4, INTERVAL=30, nmsgs_recv=86016
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+
+
+
+
+
+_____
+3 nodes (2 receivers/nod2, 16 senders/node )
+
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+total=1271.443090sec, mpi_wait=647.621209sec, hash=498.155063sec≈2^25.039549hash/sec, find dist=40.065620sec
+mpi_wait=50.935918%, hash=39.180288%, find dist=3.151193%
+send 10.130851 MB/sec, exp[all senders] = 486.280829 MB/sec, nsenders=48, nservers=6
+DIFFICULTY=4, INTERVAL=30, nsends=10734
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+total=1277.274604sec, mpi_recv=53.280320sec, dict_add=1223.983612sec≈2^22.742978
+mpi_recv=4.171407%, dict_add=95.827758%
+RECV 80.721874MB/sec, exp[all receivers] = 484.331246 MB/sec, nsenders=48, nservers=6
+DIFFICULTY=4, INTERVAL=30, nmsgs_recv=85920
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+
+________________
 12-13 Avril 2023
 
 

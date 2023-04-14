@@ -27,26 +27,43 @@
 int main(int argc, char* argv[]){
   const size_t hash_state_size = 32;
   size_t old_interval = (1<<30);
-  size_t new_interval = (1<<25);
+  size_t new_interval = (1<<25); 
   size_t enlargen_factor = old_interval/new_interval;
   
   
-  FILE* fp = fopen(argv[1], "r");
+  FILE* fp = fopen(argv[1], "r"); /* states file is given as an argument */
   size_t fp_size = get_file_size(fp);
   size_t nstates = fp_size / (hash_state_size);
   u8* new_states = malloc(fp_size*enlargen_factor);
+  u8* old_states = malloc(fp_size);
+  fread(old_states, fp_size, 1, fp);
   fclose(fp);
 
+
+  /* start regenerating the long message again */
   for (size_t i=0; i<nstates; ++i) {
     u32  state_priv[8];
-    FILE* fp_priv = fopen(argv[1], "r"); /*private to a thread */
-    size_t ctr_priv = i*old_interval;
+    u8 M_priv[HASH_INPUT_SIZE] = {0};
+    /* register counter in M */
+    ((u64*)M_priv)[0] = i*old_interval;
 
-    fseek(fp_priv, (hash_state_size)*(i), SEEK_CUR);
-    fread(state_priv, 1, hash_state_size,  fp);
-    
-    
-    
+    memcpy(state_priv,
+	   &old_states[hash_state_size*i],
+	   hash_state_size);
+
+    for (size_t j = 0; j<old_interval; j++){
+      hash_single(state_priv, M_priv);
+      ++( ((u64*)M_priv)[0]) ;
+
+      if (j % new_interval == 0){
+	memcpy(state_priv,
+	       &new_states[i*enlargen_factor*hash_state_size
+			   + j*hash_state_size],
+	       hash_state_size);
+	
+      }
+    }
+
   }
   
   
