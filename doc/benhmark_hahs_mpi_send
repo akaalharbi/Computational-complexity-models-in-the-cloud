@@ -1,6 +1,9 @@
 12-13 Avril 2023
 
 
+hahshing fluctutates between a and b because in b each sender hashes exactly 16 states 2^30 times. In a the load is 16.x thus a sender will hash 32 states 2^30 times. This should be negligible when the number of states is high.
+
+a) 
 ->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
 total=1576.827215sec, mpi_wait=336.091721sec, hash=996.118001sec≈2^24.127290hash/sec, find dist=78.441580sec
 mpi_wait=21.314429%, hash=63.172299%, find dist=4.974647%
@@ -10,7 +13,7 @@ DIFFICULTY=4, INTERVAL=30
 
 
 
-
+b)
 ->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
 total=2717.826264sec, mpi_wait=2093.811662sec, hash=498.568312sec≈2^25.038353hash/sec, find dist=40.041556sec
 mpi_wait=77.039938%, hash=18.344378%, find dist=1.473293%

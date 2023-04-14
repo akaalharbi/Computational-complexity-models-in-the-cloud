@@ -447,9 +447,10 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	 nmsgs_sent);
 
 
-  fprintf(fp_timing, "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
+  fprintf(fp_timing,	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
 	 "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n" 
-	  "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n",
+	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
+	  "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n",
 	 total_elapsed,
 	 elapsed_mpi_wait,
 	 elapsed_hash,
@@ -461,7 +462,10 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	 nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
 	 nsenders*nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
 	 nsenders,
-	 NSERVERS);
+	 NSERVERS,
+	 DIFFICULTY,
+	 (int) log2(INTERVAL),
+	 nmsgs_sent);
 
 
   // -------------------------------- PART 4 ----------------------------------+
