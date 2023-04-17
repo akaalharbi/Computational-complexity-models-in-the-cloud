@@ -57,19 +57,24 @@ def parse_config(N=None,
 
         if lines[i][:17] == "#define NSERVERS " and NSERVERS is not None:
             lines[i] = f"#define NSERVERS {NRECEIVERS}\n"
-            print(f"Assumed there are {NSERVERS} receivers!")
+            print(f"Assumed there are {NSERVERS} servers!")
 
-        if lines[i][:17] == "#define NSERVERS " and NSERVERS is not None:
+        if lines[i][:17] == "#define NSERVERS " and NRECEIVERS is not None:
             # we are using a stupid convention that the number of receivers
             # as the number of servers!
             lines[i] = f"#define NSERVERS {NRECEIVERS}\n"
             print(f"Assumed there are {NRECEIVERS} receivers!")
 
-        if lines[i][:28] == "#define NRECEIVERS_PER_NODE "\
-           and NRECEIVERS is not None:
-            nrecv_per_node = 1
-            if NSERVERS is not None:
+        if lines[i][:28] == "#define NRECEIVERS_PER_NODE ":
+            if NRECEIVERS is None:
+                nrecv_per_node = 1 # nservers = nreceivers
+
+            if NSERVERS is not None and NRECEIVERS is not None:
                 nrecv_per_node = int(NRECEIVERS//NSERVERS)
+
+            if NSERVERS is None and NRECEIVERS is not None:
+                raise ValueError("You need to defien --nservers if you are going to use --receivers")
+
             lines[i] = f"#define NRECEIVERS_PER_NODE {nrecv_per_node}\n"
             print(f"Assumed there are {nrecv_per_node} receivers/node!")
 
@@ -130,10 +135,19 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+
+# def parse_config(N=None,
+#                  NSERVERS=None,
+#                  NRECEIVERS=None,
+#                  RAM=None,
+#                  DIFFICULTY=None,
+#                  INTERVAL=None):
     parse_config(N=args.N,
-                 L=args.L,
-                 NSERVERS=args.NSERVERS,
-                 DIFFOICULTY=args.DIFFICULTY)
+                 NSERVERS=args.nservers,
+                 NRECEIVERS=args.receivers,
+                 RAM=args.ram,
+                 DIFFICULTY=args.difficulty,
+                 INTERVAL=args.interval)
 
     # run phase_iii
     run_phase_ii()

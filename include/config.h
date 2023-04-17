@@ -64,9 +64,9 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 11
+#define N 7
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1LL<<29)
+#define INTERVAL (1<<40LL)
 
 
 
@@ -104,8 +104,8 @@
 
 
 /* edit manually */
-#define NSERVERS 1
-#define NRECEIVERS_PER_NODE 1
+#define NSERVERS 30
+#define NRECEIVERS_PER_NODE 3
 
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
@@ -113,7 +113,7 @@
 #define DEFINED_BYTES CEILING(DEFINED_BITS, 8)
 
 
-#define TOTAL_RAM 64000000000LL
+#define TOTAL_RAM 94000000000LL
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
 
