@@ -47,6 +47,7 @@ int main(int argc, char* argv[]){
     /* register counter in M */
     ((u64*)M_priv)[0] = i*old_interval;
 
+    /* get the middle state we should start from */
     memcpy(state_priv,
 	   &old_states[hash_state_size*i],
 	   hash_state_size);

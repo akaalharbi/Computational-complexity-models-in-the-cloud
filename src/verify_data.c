@@ -28,7 +28,7 @@ int check_hashes_interval_single(const WORD_TYPE state_befoe[NWORDS_STATE],
   memcpy(state, state_befoe, HASH_STATE_SIZE);
   
   /* register counter in M */
-  ((u64*)M)[0] = ctr;
+
 
   for (size_t i=0; i<INTERVAL; ++i) {
 
