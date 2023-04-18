@@ -66,7 +66,7 @@
 /* bytes i.e n := 8*N bits */
 #define N 7
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1<<40LL)
+#define INTERVAL (1<<30LL)
 
 
 

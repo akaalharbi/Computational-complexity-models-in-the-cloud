@@ -23,6 +23,9 @@ int check_hashes_interval_single(const WORD_TYPE state_befoe[NWORDS_STATE],
 
 
   u8 M[HASH_INPUT_SIZE] = {0};
+  /* register counter in M */
+  ((u64*)M)[0] = ctr;
+  
   /* We don't want to modify arguments */
   WORD_TYPE state[NWORDS_STATE];
   memcpy(state, state_befoe, HASH_STATE_SIZE);
@@ -35,12 +38,12 @@ int check_hashes_interval_single(const WORD_TYPE state_befoe[NWORDS_STATE],
     hash_single(state, M);
     ++( ((u64*)M)[0]) ;
 
-    if (memcmp(state, state_after, HASH_STATE_SIZE) == 0){
-      printf("i=%lu\n",i );
-      print_char((u8*) state, HASH_STATE_SIZE);
-      print_char((u8*) state_after, HASH_STATE_SIZE);
+    /* if (memcmp(state, state_after, HASH_STATE_SIZE) == 0){ */
+    /*   printf("i=%lu\n",i ); */
+    /*   print_char((u8*) state, HASH_STATE_SIZE); */
+    /*   print_char((u8*) state_after, HASH_STATE_SIZE); */
 
-    }
+    /* } */
   }
 
   
@@ -55,7 +58,7 @@ void verify_region(size_t start, size_t end)
 
   #pragma omp parallel for
   for (size_t state_number=start; state_number<end; ++state_number) {
-    u64 state_number = 5101;
+    /* u64 state_number = 5101; */
 
     u64 ctr = state_number*INTERVAL;
   
@@ -63,8 +66,7 @@ void verify_region(size_t start, size_t end)
     WORD_TYPE state_after[NWORDS_STATE];
   
     FILE* fp = fopen("data/states", "r");
-    size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
-    printf("There are %lu middle states\n", nstates);
+
   
     fseek(fp, (HASH_STATE_SIZE)*(state_number), SEEK_CUR);
 
@@ -73,11 +75,6 @@ void verify_region(size_t start, size_t end)
     fread(state_after, 1,  HASH_STATE_SIZE, fp);
     fclose(fp);
     
-    print_char((u8*) state_before, HASH_STATE_SIZE);
-    print_char((u8*) state_after, HASH_STATE_SIZE);
-    printf("ctr=%llu, INTERVAL=%llu\n", ctr, INTERVAL);
-    puts("Going to check...");
-
 
   
 
@@ -86,9 +83,13 @@ void verify_region(size_t start, size_t end)
 							ctr);
 
     int is_corrupt = (0 != nbytes_non_equal);
+    if (is_corrupt){
+      printf("nbytes_non_equal=%d\n", nbytes_non_equal);
+      printf("state %lu is corrupt, ctr=%llu\n", state_number, ctr);
+      print_char((u8*) state_before, HASH_STATE_SIZE);
+      print_char((u8*) state_after, HASH_STATE_SIZE);
 
-    printf("nbytes_non_equal=%d\n", nbytes_non_equal);
-    printf("Found a corrupt state? %d\n", is_corrupt);
+    }
 
   }
 
@@ -238,11 +239,11 @@ static void verify_middle_states(int myrank,
 int main(int argc, char *argv[])
 {
 
-  MPI_Init(&argc, &argv);
-  int rank, size;  
+  /* MPI_Init(&argc, &argv); */
+  /* int rank, size;   */
 
-  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  /* MPI_Comm_rank(MPI_COMM_WORLD, &rank); */
+  /* MPI_Comm_size(MPI_COMM_WORLD, &size); */
 
   FILE* fp = fopen("data/states", "r");
   size_t nstates = get_file_size(fp) / HASH_STATE_SIZE;
@@ -250,11 +251,11 @@ int main(int argc, char *argv[])
   printf("There are %lu middle states\n", nstates);
 
   puts("Going to check...");
-  verify_middle_states(rank, size, MPI_COMM_WORLD);  
+  /* verify_middle_states(rank, size, MPI_COMM_WORLD);   */
 
+  verify_region(0, nstates - 1);
 
-
-  MPI_Finalize();
+  /* MPI_Finalize(); */
   return 0;
   
 }
