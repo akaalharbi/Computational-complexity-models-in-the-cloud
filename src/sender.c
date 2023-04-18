@@ -36,39 +36,85 @@
 #define N_ACTIVE_LANES 16 /* this should be somewhere else */
 
 
-#ifdef  __AVX512F__
-/* @todo move these function to util_arrays */
-void print_m512i_u32(__m512i a, char* text){
+/* #ifdef  __AVX512F__ */
+/* /\* @todo move these function to util_arrays *\/ */
+/* void print_m512i_u32(__m512i a, char* text){ */
   
-  uint32_t A[16] = {0};
-  _mm512_storeu_si512 ((__m256i*)A, a);
-  printf("%s = ", text);
-  for (int i = 0; i<16; ++i) {
-    printf("%08x, ", A[i]);
-  }
-  puts("");
-}
-#endif
+/*   uint32_t A[16] = {0}; */
+/*   _mm512_storeu_si512 ((__m256i*)A, a); */
+/*   printf("%s = ", text); */
+/*   for (int i = 0; i<16; ++i) { */
+/*     printf("%08x, ", A[i]); */
+/*   } */
+/*   puts(""); */
+/* } */
+/* #endif */
 
-void print_2d_u32(u32** restrict a, int n, int m){
-  for (int i=0; i<n; ++i) {
-    for (int j=0; j<m; ++j) {
-      printf("%x, ", a[i][j]);
+/* void print_2d_u32(u32** restrict a, int n, int m){ */
+/*   for (int i=0; i<n; ++i) { */
+/*     for (int j=0; j<m; ++j) { */
+/*       printf("%x, ", a[i][j]); */
+/*     } */
+/*     puts(""); */
+/*   } */
+/* } */
+
+
+/* void print_u32(u32* a, size_t l){ */
+/*   for (size_t i = 0; i<l; ++i)  */
+/*     printf("%x, ", a[i]); */
+/*   puts(""); */
+/* } */
+
+
+
+void buffered_isend(u8 *snd_bufs, /* all send bufs */
+		    MPI_Request requests[],
+		    MPI_Status statuses[],
+		    int nbufs, /* how many asynchrous send at the same time */    
+		    u8* msg, /* msg to be sent */
+		    int msg_length, /* length in bytes */
+		    int to,
+		    int TAG,
+		    MPI_Comm comm)
+{
+  /* a simple implementation of personal view of how a buffered send work */
+  // we have nbufs buffers that will be used to send asynchrously.
+  // We will find the first one whose sending job has been completed
+  // then we initiate a new send.
+  
+  int is_free = 0;
+  int idx = -1;
+
+  /* find a buffer with a completed sending job  */
+  while (!is_free) {
+    for (int i = 0; i<nbufs; ++i){
+      /* Check without blocking that a message has been sent */
+      MPI_Test(&requests[i], &is_free, &statuses[i]);
+      if (is_free){
+	idx = i;
+	break; /* the for loop */
+      } 
     }
-    puts("");
+    /* they are all busy */
+    // should we sleep for a second?
   }
+
+  /* copy the message to be sent to the free send buffer */
+  memcpy(&snd_bufs[idx*msg_length], msg, msg_length);
+
+  MPI_Isend(&snd_bufs[idx*msg_length],
+	    msg_length,
+	    MPI_UNSIGNED_CHAR,
+	    to,
+	    TAG,
+	    comm,
+	    &requests[idx]);
+  
+
+  
+    
 }
-
-
-void print_u32(u32* a, size_t l){
-  for (size_t i = 0; i<l; ++i) 
-    printf("%x, ", a[i]);
-  puts("");
-}
-
-
-
-
 
 void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 			 int n_active_lanes, /* in */
@@ -146,7 +192,7 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
 }
 
 
-void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
+void extract_dist_points_16(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 			 u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 			 u8 digests[restrict 16 * N], /* out */
 			 CTR_TYPE msg_ctrs_out[restrict 16], /* out */
@@ -221,13 +267,15 @@ void extract_dist_points(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 
 
 
-
 static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 					    u32 tr_states[restrict 16*8],
 					    u8  digests[restrict 16 * N],
 					    CTR_TYPE msg_ctrs[restrict 16],
 					    u8* work_buf,
-					    u8* snd_buf,
+					    u8* snd_bufs,
+					    MPI_Request requests[],
+					    MPI_Status statuses[],
+					    int nbufs, /* #async sends */
 					    size_t servers_counters[restrict NSERVERS],
 					    int myrank,
 					    int nsenders,
@@ -245,10 +293,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
   // -------------------------------- PART 1 ----------------------------------+
   // VARIABLES DEFINITIONS
-  
-  MPI_Status status;
-  MPI_Request request;
-  int has_sent = 0; /* 0 if we have not sent anything yet. otherwise > 0 */
+
 
   FILE* fp = fopen("data/states", "r");
 
@@ -260,12 +305,12 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   int server_id, n_dist_points;
   
   /* timing variables for profiliing sending, hashing, and extracting dist pt */
-  double elapsed = 0;
+  double elapsed = 0; 
   double total_elapsed = 0;
   double timer = 0; /* general timer start */
   double elapsed_hash = 0;
   double elapsed_extract_dist = 0;
-  double elapsed_mpi_wait = 0;
+  double elapsed_mpi_send = 0;
   size_t nmsgs_sent = 0;
   
   /* u8 Mavx[16][HASH_INPUT_SIZE] = {0}; */
@@ -346,7 +391,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       /* the boundary. */
       timer = wtime();
       if (n_active_lanes == 16){
-	extract_dist_points(tr_states, /* transposed states */
+	extract_dist_points_16(tr_states, /* transposed states */
 			    Mavx, /* messages used */
 			    digests, /* save the distinguished hashes here */
 			    msg_ctrs, /* messages are the same except counter */
@@ -381,28 +426,23 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	/* if the server buffer is full, send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
 
-	  /* only call wait when its not the first message */
-	  if (has_sent){
-	    timer = wtime();
-	    MPI_Wait(&request, &status);
-	    elapsed_mpi_wait += wtime() - timer;
-	  }
-	  /* copy the message to be sent to snd_buf */
-	  memcpy(snd_buf,
-		 &work_buf[server_id*PROCESS_QUOTA*N], /* idx of server buf */
-		 N*PROCESS_QUOTA);
+	  timer = wtime();
+	  /* send  &work_buf[server_id*PROCESS_QUOTA*N] -> server[server_id] */
+	  buffered_isend(snd_bufs,
+			 requests,
+			 statuses,
+			 nbufs,
+			 &work_buf[server_id*PROCESS_QUOTA*N],
+			 N*PROCESS_QUOTA,
+			 server_id,
+			 TAG_DICT_SND,
+			 inter_comm);
 	  
-	  MPI_Isend(snd_buf, 
-		    N*PROCESS_QUOTA, /* How many characteres will be sent. */
-		    MPI_UNSIGNED_CHAR, 
-		    server_id, /* receiver */
-		    TAG_DICT_SND, /* 0 */
-		    inter_comm,
-		    &request);
-	  ++nmsgs_sent;
-	  
+	  /* it should be called elapsed_mpi_send */
+	  elapsed_mpi_send += wtime() - timer;
 
-	  has_sent = 1; /* we have sent a message */
+	  ++nmsgs_sent;
+	  /* consider it as empty buffer without the overhead of erasing it */
 	  servers_counters[server_id] = 0;
 	}/* end if server_counters */
       } /* end for n_dist_points */
@@ -419,23 +459,21 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     elapsed = wtime();
   } /* end for global_idx */
   /* we have a hanging MPI_Isend, make sure it has been sent */
-  if (has_sent) 
-    MPI_Wait(&request, &status);
 
   
   total_elapsed = wtime() - total_elapsed;
   printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
 	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
-	 "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n" 
+	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
 	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
 	 "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n"
 	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
 	 total_elapsed,
-	 elapsed_mpi_wait,
+	 elapsed_mpi_send,
 	 elapsed_hash,
 	 log2((end - begin)*INTERVAL / elapsed_hash),
 	 elapsed_extract_dist,
-	 100*elapsed_mpi_wait/total_elapsed,
+	 100*elapsed_mpi_send/total_elapsed,
 	 100*elapsed_hash/total_elapsed,
 	 100*elapsed_extract_dist/total_elapsed,
 	 nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
@@ -448,15 +486,15 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
 
   fprintf(fp_timing,	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
-	 "mpi_wait=%f%%, hash=%f%%, find dist=%f%%\n" 
+	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
 	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
 	  "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n",
 	 total_elapsed,
-	 elapsed_mpi_wait,
+	 elapsed_mpi_send,
 	 elapsed_hash,
 	 log2((end - begin)*INTERVAL / elapsed_hash),
 	 elapsed_extract_dist,
-	 100*elapsed_mpi_wait/total_elapsed,
+	 100*elapsed_mpi_send/total_elapsed,
 	 100*elapsed_hash/total_elapsed,
 	 100*elapsed_extract_dist/total_elapsed,
 	 nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
@@ -472,6 +510,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   // Send the digests that remained in the buffer and tell the receivers that
   // I finished hashing.
 
+  /* check there are no more mpi_isend hanging */
+  for (int k = 0; k<nbufs; ++k)
+    MPI_Wait(&requests[k], &statuses[k]);
 
 
   /* Tell every receiver that you are done!, and send the remaining digests */
@@ -513,7 +554,10 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 				    u8  digests[restrict 16 * N],
 				    CTR_TYPE msg_ctrs[restrict 16],
 				    u8* restrict work_buf,
-				    u8* snd_buf,
+				    u8* snd_bufs,
+				    MPI_Request requests[],
+				    MPI_Status statuses[],
+				    int nbufs,
 				    size_t servers_counters[restrict NSERVERS],
 				    const size_t nbytes_per_server,
 				    const size_t one_elm_size,
@@ -527,18 +571,9 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
   int n_dist_points = 0; /* At the beginning we no dist points */
   size_t server_id=0, local_idx=0;
 
-  
-  MPI_Status status;
-  MPI_Request request;
-
-  
-  
-  int has_sent = 0;
-  
+  /* clean the buffers using them! */
   memset(work_buf, 0, nbytes_per_server*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
-
-  
 
 
   while (1) {
@@ -549,13 +584,15 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
     /* hash 16 messages */
     states_avx = sha256_multiple_x16(Mavx);
     
-    
-    extract_dist_points(states_avx, Mavx, digests, msg_ctrs, &n_dist_points);
+    extract_dist_points_16(states_avx,
+			   Mavx,
+			   digests,
+			   msg_ctrs,
+			   &n_dist_points);
 
 
     /* put the distinguished points in specific serverss buffer */
     for (int i = 0; i<n_dist_points; ++i){ /* n_dist_points might be 0 */
-      
       server_id = to_which_server(&digests[i*N]);
 
       /* where to put digest in server_id buffer? (this is a local view) */
@@ -583,17 +620,17 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
       /* if the server buffer is full send immediately */
       if (servers_counters[server_id] == PROCESS_QUOTA){
+	buffered_isend(snd_bufs,
+		       requests,
+		       statuses,
+		       nbufs,
+		       &work_buf[server_id*nbytes_per_server],
+		       nbytes_per_server,
+		       server_id,
+		       TAG_SND_DGST,
+		       inter_comm);
 
-	/* if first_send then, there is not mpi_isend to wait for*/
-        if (has_sent) 
-	  MPI_Wait(&request, &status);
-
-	/* copy the message to be sent to snd_buf */
-	memcpy(snd_buf,
-	       &work_buf[server_id*nbytes_per_server], /* idx of server buf */
-	       nbytes_per_server);
-
-
+	servers_counters[server_id] = 0;
 	/* ///==-=-=-=-=-=-=-=-=-=-=-=-==-=-=- */
 	/* { */
 	/*   u32 mystate[NWORDS_STATE] = {HASH_INIT_STATE}; */
@@ -616,18 +653,8 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 	/* } */
 
 	/* /// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==- */
+	
 
-	
-	MPI_Isend(snd_buf,
-		  nbytes_per_server, /* #chars to be sent */
-		  MPI_UNSIGNED_CHAR, 
-		  server_id, /* receiver */
-		  TAG_SND_DGST,
-		  inter_comm,
-		  &request);
-	
-	has_sent = 1; /* call mpi wait next time */
-	servers_counters[server_id] = 0;
       }
     }
   }
@@ -668,10 +695,20 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 
   /* pair = (ctr||dgst) */
   /* { (server0 paris..) | (server1 pairs...) | ... | (serverK pairs...) } */
+  /* this where we put results */
   u8* work_buf = (u8*) malloc(nbytes_per_server * NSERVERS );
 
-  /* this buffer will hold the message */
-  u8* snd_buf = (u8*) malloc(nbytes_per_server);
+  
+  /* this buffer will hold the message to be sent  */
+  const int nbufs = 10;
+  u8* snd_buf = (u8*) malloc(nbufs*nbytes_per_server);
+  MPI_Status statuses[nbufs];
+  MPI_Request* requests = (MPI_Request*) malloc(sizeof(MPI_Request)*nbufs);
+  /* init requests */
+  for (int i = 0; i<nbufs; ++i)
+    requests[i] = MPI_REQUEST_NULL;
+
+  
   /* ith_entry : how many non-sent element stored in server i buffer */
   size_t* server_counters = malloc(sizeof(size_t)*NSERVERS);
 
@@ -696,6 +733,9 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 				  msg_ctrs,
 				  work_buf,
 				  snd_buf,
+				  requests,
+				  statuses,
+				  nbufs,
 				  server_counters,
 				  myrank,
 				  nsenders,
@@ -751,6 +791,9 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 			  msg_ctrs,
 			  work_buf,
 			  snd_buf,
+			  requests,
+			  statuses,
+			  nbufs,
 			  server_counters,
 			  nbytes_per_server,
 			  one_pair_size,
