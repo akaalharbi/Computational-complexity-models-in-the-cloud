@@ -1,6 +1,5 @@
-
 # Configure the arguments of the attack in config.h
-
+# python run.py  --nservers 32 --receivers 32 -N 12 --ram 64000000000 --interval 30
 import argparse
 
 

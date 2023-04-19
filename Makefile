@@ -65,7 +65,7 @@ $(OBJDIR)/%.o: $(SRC)/%.c
 
 
 
-TARGETS = verify_data benchmark phase_i phase_ii phase_iii
+TARGETS = split_states verify_data benchmark phase_i phase_ii phase_iii
 
 # REMOVE TARGETS FROM $(OBJECTS)
 TARGET_OBJECTS = $(addprefix $(OBJDIR)/,  $(addsuffix .o, $(TARGETS)) )
@@ -92,6 +92,10 @@ all: $(TARGETS) lib
 
 verify_data: $(OBJDIR)/verify_data.o $(COMMON_OBJECTS)
 	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
+
+split_states: $(OBJDIR)/split_states.o $(COMMON_OBJECTS)
+	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
+
 
 benchmark: $(OBJDIR)/benchmark.o $(COMMON_OBJECTS)
 	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
