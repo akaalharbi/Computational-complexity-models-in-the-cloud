@@ -27,7 +27,59 @@
 #include "common.h"
 #include "sender.h"
 
+static inline void show_and_save_benchmark(double elapsed_total,
+					   double elapsed_recv,
+					   double elapsed_dict,
+					   size_t msg_size,
+					   size_t nmsgs_recv,
+					   size_t interval,
+					   int nsenders,
+					   FILE* fp)
+{
+  printf("<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
+	 "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f≈%fMB/sec\n"
+	 "mpi_recv=%f%%, dict_add=%f%%\n"
+	 "RECV %fMB/sec, exp[all receivers] = %f MB/sec, nsenders=%d, nservers=%d\n"
+	 "DIFFICULTY=%d, INTERVAL=%d, nmsgs_recv=%lu\n"
+	 "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n",
+	 elapsed_total,
+	 elapsed_recv,
+	 elapsed_dict,
+	 log2(PROCESS_QUOTA*nmsgs_recv/elapsed_dict),
+	 msg_size/elapsed_dict,
+	 100*elapsed_recv/elapsed_total,
+	 100*elapsed_dict/elapsed_total,
+	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
+	 nmsgs_recv*NSERVERS*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
+	 nsenders,
+	 NSERVERS,
+	 DIFFICULTY,
+	 (int) log2(INTERVAL),
+	 nmsgs_recv);
 
+  fprintf(fp, "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
+	 "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f≈%fMB/sec\n"
+	 "mpi_recv=%f%%, dict_add=%f%%\n"
+	 "RECV %fMB/sec, exp[all receivers] = %f MB/sec, nsenders=%d, nservers=%d\n"
+	 "DIFFICULTY=%d, INTERVAL=%d, nmsgs_recv=%lu\n"
+	 "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n",
+	 elapsed_total,
+	 elapsed_recv,
+	 elapsed_dict,
+	 log2(PROCESS_QUOTA*nmsgs_recv/elapsed_dict),
+	 msg_size/elapsed_dict,
+	 100*elapsed_recv/elapsed_total,
+	 100*elapsed_dict/elapsed_total,
+	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
+	 nmsgs_recv*NSERVERS*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
+	 nsenders,
+	 NSERVERS,
+	 DIFFICULTY,
+	 (int) log2(INTERVAL),
+	 nmsgs_recv);
+
+  
+}
 
 
 //---------------------------- UTILITY FUNCTIONS -------------------------------
@@ -190,16 +242,13 @@ static void write_digest_to_dict(dict *d,
   double elapsed_recv = 0;
   double elapsed_total = wtime();
   size_t nmsgs_recv = 0;
-
   char timing_file_name[FILE_NAME_MAX_LENGTH];
   snprintf(timing_file_name, sizeof(timing_file_name),
-	   "data/receiver_dict_%d",
+	   "data/stats/receiver_dict_%d",
 	   myrank);
   FILE* fp_timing = fopen(timing_file_name, "w");
 
-  
-  /* counter for how many messages have been received  */
-  u64 ctr_msg = 0;
+
   //---------------------------------------------------------------------------+
   // Receive digests and add them to dictionary
   
@@ -215,8 +264,8 @@ static void write_digest_to_dict(dict *d,
 	      inter_comm,
 	      &status);
     ++nmsgs_recv;
-    elapsed_recv += wtime() - timer;
     
+    elapsed_recv += wtime() - timer;
     /* add them to dictionary:   */
     /* senders are responsible for checking it's a distinguished point */
     timer = wtime();
@@ -224,7 +273,7 @@ static void write_digest_to_dict(dict *d,
       dict_add_element_to(d, &rcv_buf[N*j]);
     elapsed_dict += wtime() - timer;
     
-    ++ctr_msg;
+
     
     /* If a sender is done hashing, it will make rcv_buf = {0}, and has tag=1 */
     /* The dictionary by design will ignore all zero messages */
@@ -235,38 +284,16 @@ static void write_digest_to_dict(dict *d,
     }
   }
   elapsed_total = wtime() - elapsed_total;
-  printf("<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
-	 "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f\n"
-	 "mpi_recv=%f%%, dict_add=%f%%\n"
-	 "RECV %fMB/sec, exp[all receivers] = %f MB/sec, nsenders=%d, nservers=%d\n"
-	 "DIFFICULTY=%d, INTERVAL=%d, nmsgs_recv=%lu\n"
-	 "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n",
-	 elapsed_total,
-	 elapsed_recv,
-	 elapsed_dict,
-	 log2(PROCESS_QUOTA*ctr_msg/elapsed_dict),
-	 100*elapsed_recv/elapsed_total,
-	 100*elapsed_dict/elapsed_total,
-	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
-	 nmsgs_recv*NSERVERS*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
-	 nsenders,
-	 NSERVERS,
-	 DIFFICULTY,
-	 (int) log2(INTERVAL),
-	 nmsgs_recv);
 
-  fprintf(fp_timing, "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f\n"
-	 "mpi_recv=%f%%, dict_add=%f%%\n"
-	  "RECV %fMB/sec, exp[all receivers] = %f MB/sec\n",
-	 elapsed_total,
-	 elapsed_recv,
-	 elapsed_dict,
-	 log2(PROCESS_QUOTA*ctr_msg/elapsed_dict),
-	 100*elapsed_recv/elapsed_total,
-	 100*elapsed_dict/elapsed_total,
-	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
-	 nmsgs_recv*NSERVERS*((N*PROCESS_QUOTA)/elapsed_total)/1000000);
-
+  show_and_save_benchmark(elapsed_total,
+			  elapsed_recv,
+			  elapsed_dict,
+			  (N*PROCESS_QUOTA),
+			  nmsgs_recv,
+			  INTERVAL,
+			  nsenders,
+			  fp_timing);
+  
 
   fclose(fp_timing);
 }
@@ -281,6 +308,7 @@ void receiver_process_task(int const myrank,
 			   u8* restrict templates,
 			   u8* restrict rcv_buf,
 			   u8* restrict lookup_buf,
+			   int nsenders,
 			   MPI_Comm inter_comm)
 {
   // todo check the loops, currently they are errornous!
@@ -297,21 +325,30 @@ void receiver_process_task(int const myrank,
   //---------------------------------------------------------------------------+
   /* create file: data/messages/myrank that will hold messages whose hashes */
   /* gives a postivie response when probing the dictionary */
+
   
   char file_name[FILE_NAME_MAX_LENGTH]; /* "data/messages/%d" */
   snprintf(file_name, sizeof(file_name), "data/messages/%d", myrank );
   FILE* fp = fopen(file_name, "a"); /* register message candidates here */
 
-  char timing_file_name[FILE_NAME_MAX_LENGTH];
-  snprintf(timing_file_name, sizeof(timing_file_name),
-	   "data/receiver_cnd_%d",
-	   myrank);
-  FILE* fp_timing = fopen(timing_file_name, "a");
-
-  
   MPI_Status status;
   MPI_Request request;
+
+  double timer = 0;
+  double elapsed_dict = 0;
+  double elapsed_recv = 0;
+  double elapsed_total = wtime();
+  size_t nmsgs_recv = 0;
+  u64 while_ctr = 0;
+  const u64 print_interval = 1LL<<25;
   
+  char timing_file_name[FILE_NAME_MAX_LENGTH];
+  snprintf(timing_file_name, sizeof(timing_file_name),
+	   "data/stats/receiver_dict_%d",
+	   myrank);
+  FILE* fp_timing = fopen(timing_file_name, "w");
+
+
   /* MPI_Request_free(&request); /\* in 1st time there is no waiting  *\/ */
   
 
@@ -334,6 +371,8 @@ void receiver_process_task(int const myrank,
   // listen the first time
 
   printf("recv #%d will be posted \n", myrank);
+
+  timer = wtime();
   MPI_Recv(rcv_buf,
 	   rcv_array_size,
 	   MPI_UNSIGNED_CHAR,
@@ -341,7 +380,7 @@ void receiver_process_task(int const myrank,
 	   TAG_SND_DGST,
 	   inter_comm,
 	   &status);
-
+  elapsed_recv += wtime() - timer;
 
   printf("recv #%d got its 1st message from %d\n",
 	 myrank,
@@ -358,6 +397,7 @@ void receiver_process_task(int const myrank,
   
   /* while (NNEEDED_CND > nfound_cnd) { */
   while (1){
+    ++while_ctr;
     /* printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank); */
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */
@@ -372,6 +412,7 @@ void receiver_process_task(int const myrank,
     /* 	   myrank, sender_name_scaled); */
 
     /* probe these messages and update the founded candidates */
+    timer = wtime();
     nfound_cnd += lookup_multi_save(d, /* dictionary to look inside */
 				    lookup_buf, /* messages to search in d */
 				    &templates[sender_name * HASH_INPUT_SIZE],
@@ -379,7 +420,7 @@ void receiver_process_task(int const myrank,
 				    fp, /* file to record cadidates */
 				    myrank, /* was-this only for debugging? */ // @todo
 				    sender_name); /* why do we need sender name here? */
-
+    elapsed_dict += wtime() - timer;
 
     if (nfound_cnd - old_nfound_candidates > 0) {
       elapsed_cnd = wtime() - elapsed_cnd;
@@ -400,16 +441,28 @@ void receiver_process_task(int const myrank,
       old_nfound_candidates = nfound_cnd;
       elapsed_cnd = wtime();
     }
+    timer = wtime();
     MPI_Wait(&request, &status);
-
+    elapsed_recv += wtime() - timer;
 
     /* update buffers according to the new message */
     sender_name = status.MPI_SOURCE; // get the name of the new sender
     memcpy(lookup_buf, rcv_buf, rcv_array_size);
 
-    /* printf("from %d:\n", status.MPI_SOURCE); */
-    /* print_char(lookup_buf, rcv_array_size); */
-    /* print_attack_information(); */
+    if ((while_ctr&print_interval) == 0) {
+      show_and_save_benchmark(elapsed_total,
+			      elapsed_recv,
+			      elapsed_dict,
+			      (N+sizeof(CTR_TYPE))*PROCESS_QUOTA,
+			      nmsgs_recv,
+			      print_interval,
+			      nsenders,
+			      fp_timing);
+
+      elapsed_dict = 0;
+      elapsed_recv = 0;
+      elapsed_total = wtime();
+    }
 
     }
   
@@ -514,6 +567,7 @@ void receiver(int local_rank, /* myrank among dictionaries */
 			templates,
 			rcv_buf,
 			lookup_buf,
+			nsenders,
 			inter_comm);
 
 

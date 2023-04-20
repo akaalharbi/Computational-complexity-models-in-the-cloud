@@ -36,36 +36,65 @@
 #define N_ACTIVE_LANES 16 /* this should be somewhere else */
 
 
-/* #ifdef  __AVX512F__ */
-/* /\* @todo move these function to util_arrays *\/ */
-/* void print_m512i_u32(__m512i a, char* text){ */
+static inline void show_and_save_benchmark
+    (double total_elapsed,
+     double elapsed_mpi_send,
+     double elapsed_hash,
+     double elapsed_extract_dist,
+     size_t nmsgs_sent,
+     size_t nbytes_per_server,
+     size_t nhashes,
+     size_t interval,
+     int nsenders,
+     FILE* fp)
+{
+  printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
+	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
+	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
+	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
+	 "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n"
+	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
+	 total_elapsed,
+	 elapsed_mpi_send,
+	 elapsed_hash,
+	 (nhashes) / elapsed_hash,
+	 elapsed_extract_dist,
+	 100*elapsed_mpi_send/total_elapsed,
+	 100*elapsed_hash/total_elapsed,
+	 100*elapsed_extract_dist/total_elapsed,
+	 nmsgs_sent*((nbytes_per_server)/total_elapsed)/1000000,
+	 nsenders*nmsgs_sent*((nbytes_per_server)/total_elapsed)/1000000,
+	 nsenders,
+	 NSERVERS,
+	 DIFFICULTY,
+	 (int) log2(interval),
+	 nmsgs_sent);
+
+
+  fprintf(fp, "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
+	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
+	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
+	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
+	 "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n"
+	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
+	 total_elapsed,
+	 elapsed_mpi_send,
+	 elapsed_hash,
+	 (nhashes) / elapsed_hash,
+	 elapsed_extract_dist,
+	 100*elapsed_mpi_send/total_elapsed,
+	 100*elapsed_hash/total_elapsed,
+	 100*elapsed_extract_dist/total_elapsed,
+	 nmsgs_sent*((nbytes_per_server)/total_elapsed)/1000000,
+	 nsenders*nmsgs_sent*((nbytes_per_server)/total_elapsed)/1000000,
+	 nsenders,
+	 NSERVERS,
+	 DIFFICULTY,
+	 (int) log2(interval),
+	 nmsgs_sent);
+
   
-/*   uint32_t A[16] = {0}; */
-/*   _mm512_storeu_si512 ((__m256i*)A, a); */
-/*   printf("%s = ", text); */
-/*   for (int i = 0; i<16; ++i) { */
-/*     printf("%08x, ", A[i]); */
-/*   } */
-/*   puts(""); */
-/* } */
-/* #endif */
-
-/* void print_2d_u32(u32** restrict a, int n, int m){ */
-/*   for (int i=0; i<n; ++i) { */
-/*     for (int j=0; j<m; ++j) { */
-/*       printf("%x, ", a[i][j]); */
-/*     } */
-/*     puts(""); */
-/*   } */
-/* } */
-
-
-/* void print_u32(u32* a, size_t l){ */
-/*   for (size_t i = 0; i<l; ++i)  */
-/*     printf("%x, ", a[i]); */
-/*   puts(""); */
-/* } */
-
+}    
 
 
 void buffered_isend(u8 *snd_bufs, /* all send bufs */
@@ -459,51 +488,20 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     elapsed = wtime();
   } /* end for global_idx */
   /* we have a hanging MPI_Isend, make sure it has been sent */
-
   
   total_elapsed = wtime() - total_elapsed;
-  printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
-	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
-	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
-	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
-	 "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n"
-	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
-	 total_elapsed,
-	 elapsed_mpi_send,
-	 elapsed_hash,
-	 log2((end - begin)*INTERVAL / elapsed_hash),
-	 elapsed_extract_dist,
-	 100*elapsed_mpi_send/total_elapsed,
-	 100*elapsed_hash/total_elapsed,
-	 100*elapsed_extract_dist/total_elapsed,
-	 nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
-	 nsenders*nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
-	 nsenders,
-	 NSERVERS,
-	 DIFFICULTY,
-	 (int) log2(INTERVAL),
-	 nmsgs_sent);
 
-
-  fprintf(fp_timing,	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
-	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
-	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
-	  "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n",
-	 total_elapsed,
-	 elapsed_mpi_send,
-	 elapsed_hash,
-	 log2((end - begin)*INTERVAL / elapsed_hash),
-	 elapsed_extract_dist,
-	 100*elapsed_mpi_send/total_elapsed,
-	 100*elapsed_hash/total_elapsed,
-	 100*elapsed_extract_dist/total_elapsed,
-	 nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
-	 nsenders*nmsgs_sent*((N*PROCESS_QUOTA)/total_elapsed)/1000000,
-	 nsenders,
-	 NSERVERS,
-	 DIFFICULTY,
-	 (int) log2(INTERVAL),
-	 nmsgs_sent);
+  show_and_save_benchmark(total_elapsed,
+			  elapsed_mpi_send,
+			  elapsed_hash,
+			  elapsed_extract_dist,
+			  nmsgs_sent,
+			  (N*PROCESS_QUOTA),
+			  (end-begin)*INTERVAL,
+			  INTERVAL,
+			  nsenders,
+			  fp_timing);
+  
 
 
   // -------------------------------- PART 4 ----------------------------------+
@@ -561,11 +559,27 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 				    size_t servers_counters[restrict NSERVERS],
 				    const size_t nbytes_per_server,
 				    const size_t one_elm_size,
+				    int myrank,
+				    int nsenders,
 				    MPI_Comm inter_comm)
 {
   /// 1- increment message counters, 2- hash.  3- extract disit point if any,
   /// repeate. IMPORTANT: DO NOT CHANGE THE ORDER OF THIS SEQUENCE!
 
+  /* timing variables for profiliing sending, hashing, and extracting dist pt */
+  double total_elapsed = wtime(); /* save the current time */
+  double timer = 0; /* general timer start */
+  double elapsed_hash = 0;
+  double elapsed_extract_dist = 0;
+  double elapsed_mpi_send = 0;
+  size_t nmsgs_sent = 0;
+  u64 while_ctr = 0;
+  char file_name[FILE_NAME_MAX_LENGTH];
+  snprintf(file_name, sizeof(file_name), "data/stats/sender_%d", myrank);
+  FILE* fp_timing = fopen(file_name, "a");
+
+  /* this has to be a power of 2 please! */
+  const size_t print_interval = (1LL<<25);
   
   u32* states_avx;
   int n_dist_points = 0; /* At the beginning we no dist points */
@@ -582,15 +596,19 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
       ((u64*) Mavx[lane])[0] += 16;
 
     /* hash 16 messages */
+    timer = wtime();
     states_avx = sha256_multiple_x16(Mavx);
+    elapsed_hash += wtime() - timer;
     
+    timer = wtime();
     extract_dist_points_16(states_avx,
 			   Mavx,
 			   digests,
 			   msg_ctrs,
 			   &n_dist_points);
-
-
+    elapsed_extract_dist += wtime() - timer;
+    
+    
     /* put the distinguished points in specific serverss buffer */
     for (int i = 0; i<n_dist_points; ++i){ /* n_dist_points might be 0 */
       server_id = to_which_server(&digests[i*N]);
@@ -620,6 +638,7 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 
       /* if the server buffer is full send immediately */
       if (servers_counters[server_id] == PROCESS_QUOTA){
+	timer = wtime();
 	buffered_isend(snd_bufs,
 		       requests,
 		       statuses,
@@ -629,35 +648,38 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 		       server_id,
 		       TAG_SND_DGST,
 		       inter_comm);
-
+	elapsed_mpi_send += wtime() - timer;
+	++nmsgs_sent;
+	
 	servers_counters[server_id] = 0;
-	/* ///==-=-=-=-=-=-=-=-=-=-=-=-==-=-=- */
-	/* { */
-	/*   u32 mystate[NWORDS_STATE] = {HASH_INIT_STATE}; */
-	/*   u8 my_M[64]; */
-	/*   memcpy(my_M, Mavx[0], 64); */
-
-	/*   ((u64*) my_M)[0] = ( (u64*)snd_buf)[0]; //msg_ctrs[i]; */
-
-	
-	/*   hash_single(mystate, my_M); */
-
-
-	/*   if (0 != memcmp(mystate, */
-	/* 		  &snd_buf[sizeof(CTR_TYPE)], N)){ */
-
-	/*     printf("NOT equal at %d\n", i); */
-	/*     print_char((u8*) mystate, N); */
-	/*     print_char(&snd_buf[sizeof(CTR_TYPE)], N); */
-	/*   } */
-	/* } */
-
-	/* /// =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-==- */
-	
-
       }
+    } /* end for*/
+    ++while_ctr;
+    
+    if ( (while_ctr&print_interval) == 0){ /* while_ctr = 0 mod 2^25 */
+      total_elapsed = wtime() - total_elapsed;
+      
+      show_and_save_benchmark(total_elapsed,
+			      elapsed_mpi_send,
+			      elapsed_hash,
+			      elapsed_extract_dist,
+			      nmsgs_sent,
+			      nbytes_per_server,
+			      16*while_ctr,
+			      print_interval,
+			      nsenders,
+			      fp_timing);
+      
+      
+      /* reset all counters */
+      total_elapsed = wtime();
+      elapsed_extract_dist = 0;
+      elapsed_hash = 0;
+      elapsed_mpi_send = 0;
+      nmsgs_sent = 0;
+      while_ctr = 0;
     }
-  }
+  } /* end while */
   
 }
 
@@ -797,6 +819,8 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
 			  server_counters,
 			  nbytes_per_server,
 			  one_pair_size,
+			  myrank,
+			  nsenders,
 			  inter_comm);
 
 
