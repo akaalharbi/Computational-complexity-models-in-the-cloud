@@ -1,157 +1,91 @@
+# Long message second pre-image attack on SHA2-256 truncated to at most 96-bits
 
 
+## Overview
 
-# Long message attack
-This repository is still a work in progress that should implement long message attack on parallel using multiple computers. The goal is to attack 96-bits (or higher!) of `sha-256` output. 
+An implementation of long message attack on a truncated SHA2-256 in parallel using message passing interface (MPI) and AVX512, the user can choose the truncation amount.
 
-## How to run:
-`make purge` deletes all old datat
-`make`
-`./phase_i`
-`cp data/send/digests/* data/receive/digests/` copy digests to the receive folder
 
-`mpirun --oversubscribe -np 20` nothing special about 20, any number n > NSERVERS is enough
+The goal of this project is to estimate the cost of the attack according to various benchmarks( cpu hours, energy, ...) and comparing them with the theoritical cost model. Based in our experience with [Grid5000](https://grid5000.fr), the booked RAM expands with the number of requested node however this doesn't apply to hard-disk
 
-wait till an error message (this is because one processor exited while others are working )
+### Attack description 
 
-`cat data/send/messages/* data/receive/messages/archive `
-`./phase_iii`
+ 
+This is a generic attack on any hash function based on Merkle-Damgard construction without strengthening with a compression function $f:\{0, 1\}^{m+k} -> \{0, 1\}^n$
 
+If we have $M = M_0 \| M_1 \| \dots \| M_L $ where $|M_i| = m $, i.e. the message M is broken into blocks of the same length, $m$ bits. Then, $h(M) = S_l$ where $S_i = f(M_i, S_{i-1})$ where $S_{-1} = IV$  for a fixed $IV$.
 
 
+**Warning** Since it's a proof of concept, we got lazy and trucated only the last state. If we truncate all the middle states while hashing the long message, i.e. edit `hash_single` and wrap the `sha256_multiple_x16_tr` to truncate their output states then the program would work as the same.
 
 
+We hash a long enough message $M$ and store all the middle states $S_i$, denote the number of blocks in $M$ as $L = 2^{l}$. Then, hash a random message $h(R) = sha2-256\left(R, IV\right) $. If $h(R) = S_i$ then $R\| M_i \| \dots \| M_l$ is a second preimage of $M$.
 
-## Attack Overview
-For a better description see (find somone explains lma)[]. The attack can be parametrized by $n, l$ where denote $n=nbits$ to be attacked and $2^l$ is the number of elements stored in `Phase I` (number of blocks in the long message)
+In our case the compression function: $sha2-256: \{0, 1\}^{512 + 256} -> \{0, 1\}^{256}$.
 
+### Best Theoritical Attack Parameters
+If the digest lenght is $n$-bits then choosing $l := 2^{\frac{n}{2}}$ minimizes the required number of expected random hashing to $2^{\frac{n}{2}}$
 
-- Phase I  : Constructs a long message
-- Phase II : Finds sufficient number of potentiall collisions. 
-- Phase III: Filter all false positives, record messages the produces collisions.
+### Best Attack Parameters in the Real World
+todo!
 
-## Project milestones
-1. Mounting the attack on a single core on local machine, find highest $n$ and $l$
-2. Mounting the attack on a single using all cores, find highest $n$ and $l$
-  - Estimate the resources needed to attack $n:=96$, in our case it seemed to be 1024 servers!
-3. Optimize the attack on single machine. Use the largest possible memory, and the fastest sha256 evaluation.
-   - Estimate again the needed number of servers (assuming that all servers are like the tall maching cluster.lip6.fr)
-4. Mounting the attack on multiple devices 
 
+## How does the program work?
 
-We are in ** step 3.**
 
+### phase i: hash a long message
+The long message $M := M_0 \| ... \| M_i \| \dots $ is defined as $M_i := i \| 0 \dots 0$, this avoids being trapped into repeated cycle if we always hash the same message although it's unlikely event.
 
-## Message structure
-sha256 has a 
-uint32_t state[8] =  {A, B, C, D, E, F, G, H};
+Storing all middle states require a large hard-disk, more than a petabyte, thus we store the middle state after $2^{30}$ hashes in the file `data/states`. We can recover all the middle states in parallel.
 
+This phase requires a cpu that support Intel SHA extensions.
 
-Casting state to uint64_t:
 
-(uint64_t*) state; //= { (B<<32|A), (D<<32|C), (F<<32|E), (H<<32)|G } 
+### phase ii (under construction): 
+This is the main working horse. It will reconstruct the long message in parallel, adding the middle states to a dictionary, then generates many random message and collects those that match partially an entry in the dictionary.
 
+todo: what is stored as index and as a value in the dictionry, dictionary probing method, probabilities of false negative, false positive, cache misses, huge pages and tlb misses
 
-uint32_t digest[3] = {A, B, C}; // 96 bits
+todo: breaking processes into senders and receivers, sha2-256-16way, MPI message structure, overview of the main steps in phase ii, adjusting speed of senders, 
 
-### Distinguished point and server number
-A = rest||server_number||bits for distinguished point
+todo: estimating the needed number of positive probes, explain why an increase number of needed positive probes doesn't mean necessairly higher number of hashing, squeezing all memory bits
 
-### What to store in the dictionary
 
-the index is 
-Let m:= nbits dedicated for distinguished points + nbits dedicated for server_number
+### phase iii (under construction)
 
-idx= (B<<32|A) >> m // remove truncate distinguished points and server number
-idx = idx mod (nbuckets)
-Store whole word C (or state[2]) as a value in the dictionary 
 
+## Getting started
 
+### perquisites
 
+- nasm assembler
+- GCC (probably >= 7.3.1, tested on 10.2.1-6)
+- CPU supports AVX-512 needed by `phase_ii`
+- CPU has Intel SHA extensions for `phase_i` & `phase_iii` (the latter might require `avx512`
 
+### Run
+We assume all nodes have same amount of RAM. 
 
-# Usage
+A typical run example:
 
+```
+python run.py  --nservers 8 --receivers 8 -N 12 --ram 64000000000 --interval 30 --difficulty 2
+```
 
-`make clean && make`
+> todo: remove the lines (they are specific to [Grid5000.fr](https://www.grid5000.fr/w/Grid5000:Home)
+```
+os.system("echo 'core' | sudo-g5k tee /proc/sys/kernel/core_pattern")
+os.system("sudo-g5k apt install nasm")
+```
+> todo: more instruction on how to define the mpi's machinefile (currently we're using $OAR_NODEFILE as machinefile)
 
-Then run it
-`./long_message_attack n l` where $n$ and $l$ are the attack parameters.
+- `nservers`: how many nodes will be used?
+- `receivers`: The total number of receivers, there should be at least one receiver per node. 
+- `N`: How many bytes of digest we are going to consider.
+- `ram`: How much RAM in one node should be allocated for receivers in that node.
+- `interval`: laissez tomber
+- `difficulty`: How many bits in the digest should be zero. This mean the sender will only send hashes that have exactly `difficulty` zeros at the end.
 
 
 
-# Work to be done:
-
-## bugs: 
-- 
-
-## todo (Techincally not bugs):
-- think about parallel insert in a list
-- change the counter in `void find_hash_distinguished` to 128bits
-  i.e. In phase II, start with random message then increment 128 bit by one each time
-- move hard coded choices to config.h, e.g. nbits to be stored as an index
-- Due to optimizations introduced, the current code is not flexible with the choice of n!
--- Restore the flexibility, so that we can test it on small n.
-- Stick to 80 characters per line. 
-- Draw communication model
-
-
-
-
-# Performance Evolution
-In these measurements, we used a predictable prng in order to test the same numbers on all variants. Also, all parameters below have no cycle in Phase I. We believe this is realistic model. These tests have been conducted on the same machine with the same OS.
-
-## sha256 performance:
-- sha256-x86 elapsed=1.046995sec, 32048322.000000 hash/sec≈2^24.933745 
-- parallel sha256-x86 elapsed=1.737093sec, 386328576.000000 hash/sec≈2^28.525253 
-- vsha256 elapsed=1.057237sec, 31737852.000000 hash/sec≈2^24.919701 
-- vsha256 parallel eapsed=3.001098sec, 223614368.000000 hash/sec≈2^27.736438 
-
-
-## to gather or not to gather:
-Benchmarking dictionary lookup where 4-elements simultaneously using gather instruction, the look up are slower than linear lookup of a single element. On the other hand, when benchmarking `long\_message\_attack 52 25` the gather version seems to be 20% faster. 
-
-These conflicting measures can be resolved by observing the two facts:
-1. The old code has a dictionary size almost 2x larger than dictionary used in gather version. This is because, we decided to remove values array. 
-2. Counting the number of trials, due to to the prng, gather version was lucky when it found the collision after ~30M trials. The linear version had to go through ~70M trials and was around ~20% slower!
-
-## Verdict:
-Gather instruction is not worth using in our case. 
-
-### Addendum:
-
-I found claims that:
-	- Gather is 8x faster on new amd threadripper (see https://twitter.com/ChrisGr93091552/status/1562583460992397317 )
-	- Gather can be as fast as linear scan (see to use or not to use the simd gather https://dl.acm.org/doi/abs/10.1145/3533737.3535089 )
-
-
-## Long message attack on a single machine:
-### n=52, l=25
-- 13 oct 2022(updated):  5,9917 +- 0,0192 seconds time elapsed  ( +-  0,32%) (ɑ=0.90, sha256-x86, simd(single element search), openmp, 64bit key store)
-- (not-accurate) 27 sep 2022: 976.07 sec (ɑ=0.50, sha256, openmp)
-- (Warning: This result is faster due to incorrect behavior! when 3/4 decides to end the probe, ) 03 nov 2022: 3,9475 +- 0,0131 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
-
-
-
-
-### n=51, l=25
-
-- 02 nov 2022:  5,0265 +- 0,0145 sec (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
-- 13 oct 2022(updated):  5,611 +- 0,0292 sec  (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
-- 27 sep 2022(not-accurate): 322.98 sec (ɑ=0.50, sha256, openmp)
-- (Warning: This result is faster due to incorrect behavior!) 03 nov 2022: 3,9668 +- 0,0143 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
-### n=50, l=25
-(c rand_r, seed is the thread number)
-- 02 nov 2022: 4,0711 +- 0,0105 secc (ɑ=0.9, sha256-x86, simd(multiple elements search), openmp, 64bit key store)
-- 13 oct 2022:   5,6730 +- 0,0871 sec (ɑ=0.90, sha256-x86, simd, openmp, 64bit key store max)
-(random numbers)
-- (Warning: This result is faster due to incorrect behavior!) 03 nov 2022: 3,95056 +- 0,00790 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
-- 27 sep 2022(not-accurate): 51.15 sec (ɑ=0.50, sha256, openmp)
-
-
-### n=44, l=18
-(todo restore old data)
-- 03 nov 2022: 0,01836 +- 0,00231 sec (ɑ=0.9, sha256-x86, simd(multiple search, stop if 3/4 found empty slot), openmp, 64bit key store) 
-
-
-
+todo: add benchmarks section

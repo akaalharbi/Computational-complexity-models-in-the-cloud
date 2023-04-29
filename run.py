@@ -97,9 +97,10 @@ def run_phase_ii():
     import os
 
     os.system("ulimit -c unlimited")
+    # @todo: remove the following two lines 
     os.system("echo 'core' | sudo-g5k tee /proc/sys/kernel/core_pattern")
-
-    os.system("cd lib/sha256_intel_avx/ && sudo-g5k apt install nasm && make clean && make all && cd ../../")
+    os.system("sudo-g5k apt install nasm")
+    os.system("cd lib/sha256_intel_avx/ && make clean && make all && cd ../../")
 
     os.system("make clean && make all")
     os.system("mpirun -machinefile $OAR_NODEFILE  -map-by node:PE=1 ./phase_ii")

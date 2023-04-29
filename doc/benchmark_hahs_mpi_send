@@ -1,4 +1,53 @@
 
+124 nodes (1 receiver/node, 17sender/node ) (10bsends at a time )
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+total=40130.549067sec, mpi_send=38837.383804sec, hash=1012.241935sec≈2^24.874643hash/sec≈369.143128MB/sec, find dist=96.723139sec
+mpi_send=96.777604%, hash=2.522373%, find dist=0.241021%
+send 2.013389 MB/sec, exp[all senders] = 4244.223694 MB/sec, nsenders=2108, nservers=124
+DIFFICULTY=2, INTERVAL=30, nsends=67332
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->  
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+total=40404.700851sec, mpi_recv=22906.280394sec, dict_add=17498.269480sec≈2^22.644259
+mpi_recv=56.692117%, dict_add=43.307509%
+RECV 34.067927MB/sec, exp[all receivers] = 4224.422951 MB/sec, nsenders=2108, nservers=124
+DIFFICULTY=2, INTERVAL=30, nmsgs_recv=1147087
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<- 
+
+
+32 nodes (1 receiver/node, 17 senders/node ), 10 bsends at a time
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+total=1281.850971sec, mpi_send=1259.808942sec, hash=15.756088sec≈2^25.022163hash/sec≈408.886459MB/sec, find dist=2.465971sec
+mpi_send=98.280453%, hash=1.229167%, find dist=0.192376%
+send 5.002766 MB/sec, exp[all senders] = 2721.504511 MB/sec, nsenders=544, nservers=32
+DIFFICULTY=0, INTERVAL=25, nsends=5344
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+
+
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+total=1284.156010sec, mpi_recv=116.775678sec, dict_add=1167.364883sec≈2^22.900381
+mpi_recv=9.093574%, dict_add=90.905223%
+RECV 85.402707MB/sec, exp[all receivers] = 2732.886637 MB/sec, nsenders=544, nservers=32
+DIFFICULTY=0, INTERVAL=25, nmsgs_recv=91392
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+
+
+32 nodes (1 receiver/node, 17 senders/node ), 10 bsends at a time
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+total=439.314012sec, mpi_wait=419.304390sec, hash=15.654815sec≈2^25.031465hash/sec, find dist=1.496365sec
+mpi_send=95.445257%, hash=3.563468%, find dist=0.340614%
+send 3.583769 MB/sec, exp[all senders] = 1949.570413 MB/sec, nsenders=544, nservers=32
+DIFFICULTY=2, INTERVAL=25, nsends=1312
+->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->
+
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+total=443.757987sec, mpi_recv=159.798096sec, dict_add=283.953313sec≈2^22.939974
+mpi_recv=36.010190%, dict_add=63.988327%
+RECV 61.787733MB/sec, exp[all receivers] = 1977.207455 MB/sec, nsenders=544, nservers=32
+DIFFICULTY=2, INTERVAL=25, nmsgs_recv=22849
+<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-
+
+
+
 53 nodes (2 receivers/nod2, 16 senders/node )
 NOTE: DOUBLE SEND BUFFERS!
 
