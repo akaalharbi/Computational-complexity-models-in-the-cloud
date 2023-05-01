@@ -46,7 +46,7 @@ static inline void show_and_save_benchmark(double elapsed_total,
 	 elapsed_recv,
 	 elapsed_dict,
 	 log2(PROCESS_QUOTA*nmsgs_recv/elapsed_dict),
-	 msg_size/elapsed_dict,
+	 msg_size/(elapsed_dict*1000000),
 	 100*elapsed_recv/elapsed_total,
 	 100*elapsed_dict/elapsed_total,
 	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
@@ -67,7 +67,7 @@ static inline void show_and_save_benchmark(double elapsed_total,
 	 elapsed_recv,
 	 elapsed_dict,
 	 log2(PROCESS_QUOTA*nmsgs_recv/elapsed_dict),
-	 msg_size/elapsed_dict,
+	 msg_size/(elapsed_dict*1000000),
 	 100*elapsed_recv/elapsed_total,
 	 100*elapsed_dict/elapsed_total,
 	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
@@ -340,7 +340,7 @@ void receiver_process_task(int const myrank,
   double elapsed_total = wtime();
   size_t nmsgs_recv = 0;
   u64 while_ctr = 0;
-  const u64 print_interval = 1LL<<25;
+  const u64 print_interval = (1LL<<25) - 1;
   
   char timing_file_name[FILE_NAME_MAX_LENGTH];
   snprintf(timing_file_name, sizeof(timing_file_name),

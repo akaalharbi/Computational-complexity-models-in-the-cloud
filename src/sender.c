@@ -49,7 +49,7 @@ static inline void show_and_save_benchmark
      FILE* fp)
 {
   printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
-	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
+	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈%fhash/sec≈%fMB/sec, find dist=%fsec\n"
 	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
 	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
 	 "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n"
@@ -58,6 +58,7 @@ static inline void show_and_save_benchmark
 	 elapsed_mpi_send,
 	 elapsed_hash,
 	 (nhashes) / elapsed_hash,
+	 (nhashes*N) / (elapsed_hash*1000000),
 	 elapsed_extract_dist,
 	 100*elapsed_mpi_send/total_elapsed,
 	 100*elapsed_hash/total_elapsed,
@@ -71,8 +72,8 @@ static inline void show_and_save_benchmark
 	 nmsgs_sent);
 
 
-  fprintf(fp, "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
-	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈2^%fhash/sec, find dist=%fsec\n"
+  fprintf(fp,"->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
+	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈%fhash/sec≈%fMB/sec, find dist=%fsec\n"
 	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
 	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
 	 "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n"
@@ -81,6 +82,7 @@ static inline void show_and_save_benchmark
 	 elapsed_mpi_send,
 	 elapsed_hash,
 	 (nhashes) / elapsed_hash,
+	 (nhashes*N) / (elapsed_hash*1000000),
 	 elapsed_extract_dist,
 	 100*elapsed_mpi_send/total_elapsed,
 	 100*elapsed_hash/total_elapsed,
@@ -579,7 +581,7 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
   FILE* fp_timing = fopen(file_name, "a");
 
   /* this has to be a power of 2 please! */
-  const size_t print_interval = (1LL<<25);
+  const size_t print_interval = (1LL<<25) - 1;
   
   u32* states_avx;
   int n_dist_points = 0; /* At the beginning we no dist points */

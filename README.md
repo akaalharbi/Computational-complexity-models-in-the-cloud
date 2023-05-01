@@ -13,13 +13,13 @@ The goal of this project is to estimate the cost of the attack according to vari
  
 This is a generic attack on any hash function based on Merkle-Damgard construction without strengthening with a compression function $f:\{0, 1\}^{m+k} -> \{0, 1\}^n$
 
-If we have $M = M_0 \| M_1 \| \dots \| M_L $ where $|M_i| = m $, i.e. the message M is broken into blocks of the same length, $m$ bits. Then, $h(M) = S_l$ where $S_i = f(M_i, S_{i-1})$ where $S_{-1} = IV$  for a fixed $IV$.
+If we have `M = M0 | M1 | \dots | M_L ` where `|M_i| = m `, i.e. the message M is broken into blocks of the same length, $m$ bits. Then, $h(M) = S_l$ where $S_i = f(M_i, S_{i-1})$ where $S_{-1} = IV$  for a fixed $IV$.
 
 
 **Warning** Since it's a proof of concept, we got lazy and trucated only the last state. If we truncate all the middle states while hashing the long message, i.e. edit `hash_single` and wrap the `sha256_multiple_x16_tr` to truncate their output states then the program would work as the same.
 
 
-We hash a long enough message $M$ and store all the middle states $S_i$, denote the number of blocks in $M$ as $L = 2^{l}$. Then, hash a random message $h(R) = sha2-256\left(R, IV\right) $. If $h(R) = S_i$ then $R\| M_i \| \dots \| M_l$ is a second preimage of $M$.
+We hash a long enough message $M$ and store all the middle states $S_i$, denote the number of blocks in $M$ as $L = 2^{l}$. Then, hash a random message $h(R) = sha2-256\left(R, IV\right) $. If $h(R) = S_i$ then `R| M_i | \dots | M_l` is a second preimage of $M$.
 
 In our case the compression function: $sha2-256: \{0, 1\}^{512 + 256} -> \{0, 1\}^{256}$.
 
@@ -34,7 +34,7 @@ todo!
 
 
 ### phase i: hash a long message
-The long message $M := M_0 \| ... \| M_i \| \dots $ is defined as $M_i := i \| 0 \dots 0$, this avoids being trapped into repeated cycle if we always hash the same message although it's unlikely event.
+The long message `M := M0 | ... | M_i | \dots ` is defined as `M_i := i | 0 \dots 0`, this avoids being trapped into repeated cycle if we always hash the same message although it's unlikely event.
 
 Storing all middle states require a large hard-disk, more than a petabyte, thus we store the middle state after $2^{30}$ hashes in the file `data/states`. We can recover all the middle states in parallel.
 
