@@ -46,7 +46,7 @@ static inline void show_and_save_benchmark(double elapsed_total,
 	 elapsed_recv,
 	 elapsed_dict,
 	 log2(PROCESS_QUOTA*nmsgs_recv/elapsed_dict),
-	 msg_size/(elapsed_dict*1000000),
+	 nmsgs_recv*N*PROCESS_QUOTA/(elapsed_dict*1000000),
 	 100*elapsed_recv/elapsed_total,
 	 100*elapsed_dict/elapsed_total,
 	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
@@ -67,7 +67,7 @@ static inline void show_and_save_benchmark(double elapsed_total,
 	 elapsed_recv,
 	 elapsed_dict,
 	 log2(PROCESS_QUOTA*nmsgs_recv/elapsed_dict),
-	 msg_size/(elapsed_dict*1000000),
+	 nmsgs_recv*N*PROCESS_QUOTA/(elapsed_dict*1000000),
 	 100*elapsed_recv/elapsed_total,
 	 100*elapsed_dict/elapsed_total,
 	 nmsgs_recv*((N*PROCESS_QUOTA)/elapsed_total)/1000000,
@@ -337,10 +337,8 @@ void receiver_process_task(int const myrank,
   double timer = 0;
   double elapsed_dict = 0;
   double elapsed_recv = 0;
-  double elapsed_total = wtime();
   size_t nmsgs_recv = 0;
-  u64 while_ctr = 0;
-  const u64 print_interval = (1LL<<25) - 1;
+  const u64 print_interval = (1LL<<20) - 1;
   
   char timing_file_name[FILE_NAME_MAX_LENGTH];
   snprintf(timing_file_name, sizeof(timing_file_name),
@@ -397,7 +395,6 @@ void receiver_process_task(int const myrank,
   
   /* while (NNEEDED_CND > nfound_cnd) { */
   while (1){
-    ++while_ctr;
     /* printf("nfound_cnd = %lu, myrank=%d\n", nfound_cnd, myrank); */
     //+ receive messages from different processors
     MPI_Irecv(rcv_buf, /* store in this location */
@@ -433,24 +430,7 @@ void receiver_process_task(int const myrank,
 	     status.MPI_SOURCE,
 	     elapsed_cnd);
 
-      fprintf(fp_timing, "nfound_cnd=%lu, new_cnd=%lu, t=%fsec\n",
-	     nfound_cnd,
-	     nfound_cnd-old_nfound_candidates,
-	     elapsed_cnd);
-
-      old_nfound_candidates = nfound_cnd;
-      elapsed_cnd = wtime();
-    }
-    timer = wtime();
-    MPI_Wait(&request, &status);
-    elapsed_recv += wtime() - timer;
-
-    /* update buffers according to the new message */
-    sender_name = status.MPI_SOURCE; // get the name of the new sender
-    memcpy(lookup_buf, rcv_buf, rcv_array_size);
-
-    if ((while_ctr&print_interval) == 0) {
-      show_and_save_benchmark(elapsed_total,
+      show_and_save_benchmark(elapsed_cnd,
 			      elapsed_recv,
 			      elapsed_dict,
 			      (N+sizeof(CTR_TYPE))*PROCESS_QUOTA,
@@ -458,12 +438,27 @@ void receiver_process_task(int const myrank,
 			      print_interval,
 			      nsenders,
 			      fp_timing);
+      
+      fprintf(fp_timing, "nfound_cnd=%lu, new_cnd=%lu, t=%fsec\n",
+	     nfound_cnd,
+	     nfound_cnd-old_nfound_candidates,
+	     elapsed_cnd);
 
+      
       elapsed_dict = 0;
       elapsed_recv = 0;
-      elapsed_total = wtime();
+      nmsgs_recv = 0;
+      old_nfound_candidates = nfound_cnd;
+      elapsed_cnd = wtime();
     }
+    timer = wtime();
+    MPI_Wait(&request, &status);
+    ++nmsgs_recv;
+    elapsed_recv += wtime() - timer;
 
+    /* update buffers according to the new message */
+    sender_name = status.MPI_SOURCE; // get the name of the new sender
+    memcpy(lookup_buf, rcv_buf, rcv_array_size);
     }
   
   // good job

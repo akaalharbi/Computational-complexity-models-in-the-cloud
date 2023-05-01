@@ -1,5 +1,6 @@
 find_dist overhead = 7%-9%
 hash_16x_avx (nancy: gros) ≈ 2^24.87hash/sec
-dict_add≈2^23.41 elm/sec
+dict_add≈2^22.96 elm/sec ≈ 98.189516MB/sec
 dict_lookup ≈ 2^24.9337 elm/sec
+dict_lookup & save to file 2^22.96≈97.916717MB/sec :(
 mpi_recv overhead = 10.71% (for regenerating message)
