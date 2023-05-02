@@ -121,18 +121,20 @@ static inline int lookup_multi_save(dict *d,
   
 
   /* the stream size is multiple of one_pair size */
-  static int one_pair_size = sizeof(CTR_TYPE) + N;
+  const int one_pair_size = sizeof(CTR_TYPE) + N;
 
 
   
   /* how many digests give positive answer they get probed  */
   int npositive_dgsts = 0;
+  
   /* did dict say it has the digest? (it doesn't have to be correct)*/
-  int is_positive = 0; 
+  int is_positive = 0;
 
   /* construct the full message here */
-  static u8 M[HASH_INPUT_SIZE]; 
-  
+  u8 M[HASH_INPUT_SIZE]; 
+
+
   for (size_t i=0; i<npairs; ++i){
     /* dictionary only read |dgst| bytes by default  */
     /* probing pair #i */
@@ -143,29 +145,8 @@ static inline int lookup_multi_save(dict *d,
 				    + sizeof(CTR_TYPE)] /* skip ctr part */);
 
     
-    /* { // debugging /\* test that the message received is same as the one sent *\/ */
-    /*   memcpy(M, template, HASH_INPUT_SIZE); */
-
-    /*   /\* set the counter part *\/ */
-    /*   memcpy(M, */
-    /* 	     &ctrs_dgsts[i*one_pair_size], */
-    /* 	     sizeof(CTR_TYPE)); */
-    /*   u32 mystate[NWORDS_STATE] = {HASH_INIT_STATE}; */
-    /*   hash_single(mystate, M); */
-
-    /*   int is_equal = memcmp(mystate, */
-    /* 			    &ctrs_dgsts[i*one_pair_size */
-    /* 					+ sizeof(CTR_TYPE)], */
-    /* 			    N); */
-
-    /*   if (is_equal != 0){ */
-    /* 	printf("receiver error!"); */
-    /*   } */
-      
-    /* } */
     
     if (is_positive){ /* did we find a candidate msg||dgst? */
-      /* reconstructing the message: get the template */
       memcpy(M, template, HASH_INPUT_SIZE);
 
       /* set the counter part */
@@ -173,33 +154,13 @@ static inline int lookup_multi_save(dict *d,
 	     &ctrs_dgsts[i*one_pair_size],
 	     sizeof(CTR_TYPE));
 
-
-      /* {// debugging  start */
-      /* 	if(!is_dist_digest(&ctrs_dgsts[i*one_pair_size+sizeof(CTR_TYPE)])){ */
-      /* 	  printf("ERROR: at receiver%d\n", myrank); */
-      /* 	  print_char(&ctrs_dgsts[i*one_pair_size+sizeof(CTR_TYPE)], N); */
-      /* 	} */
-
-	
-
-      /* char txt[100]; */
-      /* snprintf(txt, sizeof(txt), "data/digests/%d", myrank); */
-      /* FILE* fp_dgsts = fopen(txt, "a"); */
-      /* fwrite(&ctrs_dgsts[i*one_pair_size+ sizeof(CTR_TYPE)], */
-      /* 	     N, */
-      /* 	     1, */
-      /* 	     fp_dgsts); */
-      /* fflush(fp_dgsts); */
-      /* fclose(fp_dgsts); */
-
-      /* } // debugging  end  */
       
       /* finally write the reconstructed message */
       fwrite(M, sizeof(u8), HASH_INPUT_SIZE, fp);
       
       fflush(fp); /* ensures it's written */
       ++npositive_dgsts;
-    }
+      }
   }
   return npositive_dgsts;
 }

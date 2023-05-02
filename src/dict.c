@@ -124,25 +124,11 @@ size_t dict_memory(size_t nelements){
 
 int dict_add_element_to(dict* d, u8* state){
   // =========================================================================+
-  // returns 1 if an element has been added, 0 otherwise                      |
-  // This dictionary is unusual:                                              |
-  // User have a value in the form:                                           |
-  // (dist pts, srvr no) || (L bits) || discard || (VAL_SIZE bits) || discard |
-  // Dictionary expects user to pass: (L bits) || discard || (VAL_SIZE bits)  |
-  // ------------------------------------------------------------------------ |
-  // we don't store (dist pts, server) since they are already determined      |
-  // The discarded bits between L and VAL_SIZE are due to the fact we move 1  |
-  // at least. Those we choose to forget them. The last disarded bits are     |
-  // discarded because they will double the dictionary size if we include em  |
-  // -------------------------------------------------------------------------|
   // INPUTS:                                                                  |
   // `*d`:  dictionary that will store state as an element                    |
   // `*state`: element to be stored in *d in the form                         |
-  //          (L bits) || discard || (VAL_SIZE bits) more precisely:          |
-  //          (L_IN_BYTES bytes)  || (VAL_SIZE bits)                          |
-  // issues may aris when VAL_SIZE is larger then what is left in the state   |
-  //                                                                          |
   // -------------------------------------------------------------------------+
+
   /* how many bytes do we need to index the buckets */
   const int idx_size =   (int) ceil((log2(NSLOTS_MY_NODE) - log2(d->nslots_per_bucket))
 				   /8.0) ;
@@ -212,22 +198,16 @@ int dict_add_element_to(dict* d, u8* state){
 
 
 int dict_has_elm(dict *d, u8 *state)
-{ // returns 1 if state is found in d, 0 otherwise                            |
+{
+  // =========================================================================+
+  // returns 1 if state is found in d, 0 otherwise                            |
   // This dictionary is unusual:                                              |
-  // User have a value in the form:                                           |
-  // (dist pts, srvr no) || (L bits) || discard || (VAL_SIZE bits) || discard |
-  // Dictionary expects user to pass: (L bits) || discard || (VAL_SIZE bits)  |
-  // ------------------------------------------------------------------------ |
-  // we don't store (dist pts, server) since they are already determined      |
-  // The discarded bits between L and VAL_SIZE are due to the fact we move 1  |
-  // at least. Those we choose to forget them. The last disarded bits are     |
-  // discarded because they will double the dictionary size if we include em  |
   // -------------------------------------------------------------------------|
   // INPUTS:                                                                  |
   // `*d`:  dictionary that will store state as an element                    |
   // `*state`: element to be looked up  in *d in the form                     |
-  //          (L bits) || discard || (VAL_SIZE bits)                          |
   // -------------------------------------------------------------------------+
+
   /* how many bytes do we need to index the buckets */
   const int idx_size =  (int) ceil((log2(NSLOTS_MY_NODE) - log2(d->nslots_per_bucket))
 				   /8.0) ;
@@ -247,23 +227,12 @@ int dict_has_elm(dict *d, u8 *state)
   
 
   int is_key_found = 0;
-  // it's enough to check if the first element is empty
-  // in this version we don't need to check if we hit zero or not.
-  /* int empty_bucket = 0; //1 - _mm256_testz_si256(comp_vect_simd, comp_vect_simd); */
-  // we can remove one of the above variables 
-  //+ todo we need to adjust simd instruction according to the type 
   REG_TYPE dict_keys_simd;// = _mm256_loadu_si256((__m256i*)  &(d->values[h]));
-  // val:u32 or val:16 depending on the N and L, as 32 or 16 will be stored
-  // and the other bits will be stored as index thus the dependency on L.
   REG_TYPE lookup_key_simd = SIMD_SET1_VALTYPE(val); // (val, val, ..., val) 
-  //__m256i zero_vect = _mm256_setzero_si256(); // no need for this with buckets
-
-
   
   // loop at most NPROBES_MAX/SIMD_LEN since we load SIMD_LEN
   // elements from dictionary each loop.
   for (size_t i=0; i< (int) (NPROBES_MAX/SIMD_LEN); ++i) {
-        
     // we are relying that the val != 0, Pr(val !=0 ) = 1/(2^32)
     // linear probing
 
@@ -285,14 +254,13 @@ int dict_has_elm(dict *d, u8 *state)
     //                   TEST 2                       //
     /*  Does key equal one of the slots?              */
     //------------------------------------------------//
-
     /* 0 no value found, otherwise a value was found  */
     is_key_found = SIMD_CMP_VALTYPE(lookup_key_simd, dict_keys_simd);
 
     if (is_key_found)
       return 1; /* we will hash the whole message again */
 
-    // Linear probing
+
     // update the index for keys load
     idx += d->nslots_per_bucket; // move to the next bucket
 
