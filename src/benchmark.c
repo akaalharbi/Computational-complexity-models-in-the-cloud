@@ -40,365 +40,15 @@
 
 // -----------------------------------------------------------------------------
 // local function
-static void load_file_to_dict(dict *d, FILE *fp)
-{
-  // ==========================================================================+
-  // Summary: Load hashes from the file *fp, and try to store them in dict *d  |
-  // Note: dict* d has the right to reject inserting element.                   |
-  // --------------------------------------------------------------------------+
-  // INPUTS:                                                                   |
-  // `*d`: Dictionary that will keep elements from *fp.                        |
-  // `*fp` : File contain number of hashes larger than nelements               |
-  // ==========================================================================+
 
-  /* Check that file exists, the file comes from external resources */  
-  if (!fp){
-    puts("I have been given a file that lives in nowhere");
-    return; // raise an error instead
-  }
 
-  
-  size_t nchunks = 10000; 
-  size_t ndigests = get_file_size(fp) / N;
-  size_t nmemb = (ndigests/nchunks >=  1) ? ndigests/nchunks : 1;
 
-  /* read digests from file to this buffer  */
-  u8* digests = (u8*) malloc( N * nmemb * sizeof(u8));
 
 
-  /*  load one chunk each time */
-  for (size_t i = 0; i<nchunks; ++i) {
-    fread(digests, N*nmemb, 1, fp);
-
-    /* add them to dictionary */
-    for (size_t j=0; j<nmemb; ++j) 
-      dict_add_element_to(d,
-			  &digests[j*N /* need to skip defined bytes */
-				   + DEFINED_BYTES] );
-  }
-
-  /* ndigests = nchunks*nmemb + remainder  */
-  // read the remainder digests, since ndigests may not mutlipe of nchunks
-  u8 stream_pt[N];
-
-  /* add as many hashes as possible */
-  while ( !feof(fp) ){
-    // use fread with a larger buffer @todo
-    fread(stream_pt, sizeof(u8), N, fp);
-    /* it adds the hash iff nprobes <= NPROBES_MAX */
-    dict_add_element_to(d, &stream_pt[DEFINED_BYTES]);
-  }
-
-  free(digests);
-  return;
-}
-
-
-
-typedef struct {
-  uint8_t M[16][64];
-} msg_avx;
-
-
-#ifdef  __AVX512F__
-size_t time_sha_avx512(){
-  // place holder for the 16 messages
-  
-  #pragma omp parallel
-  {
-  size_t nmsgs = 1600000LL;
-  msg_avx msg;
-  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
-  // fill the messages
-
-
-
-  
-  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
-  double elapsed = 0;
-  double start = wtime(); /* timing */
-
-  for (size_t i = 0; i<(nmsgs/16); ++i) {
-    sha256_multiple_x16(msg.M);
-  }
-
-  elapsed = wtime() - start;
-  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
-  
-  printf("thd%d sha_avx512_16way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
-	 omp_get_thread_num(),
-	 elapsed, (nmsgs)/elapsed,
-	 log2((nmsgs)/elapsed),
-	 hashed_MB/elapsed);
-
-  }
-  return 0;
-}
-
-
-
-size_t time_sha_one_avx512_other_sha_ni(){
-  // place holder for the 16 messages
-
-  #pragma omp parallel
-  {
-  if (omp_get_thread_num() == 0) {
-  size_t nmsgs = 16000000LL;
-  msg_avx msg;
-  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
-  // fill the messages
-
-
-
-  
-  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
-  double elapsed = 0;
-  double start = wtime(); /* timing */
-
-
-
-  uint32_t* state_ptr;
-  
-  for (size_t i = 0; i<(nmsgs/16); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
-  }
-
-  elapsed = wtime() - start;
-  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
-  
-  printf("thd%d sha_avx512_16way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
-	 omp_get_thread_num(),
-	 elapsed, (nmsgs)/elapsed,
-	 log2((nmsgs)/elapsed),
-	 hashed_MB/elapsed);
-
-  } else {
-    size_t nmsgs = 1600000LL;
-    u8 M[64] = {0};
-    getrandom(M, 64, 1);
-    uint32_t state[8] = {HASH_INIT_STATE};
-    double elapsed = 0;
-    size_t dummy = 0;
-    double start = wtime(); /* timing */
-    for (size_t i = 0; i<nmsgs; ++i) {
-      hash_single(state, M);
-    }
-
-    elapsed = wtime() - start;
-    double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
-
-    printf("thd%d sha_ni elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
-	   omp_get_thread_num(),
-	   elapsed, (nmsgs)/elapsed,
-	   log2((nmsgs)/elapsed),
-	   hashed_MB/elapsed);
-    printf("%lu\n", dummy);
-    
-    
-  }
-
-  }
-  return 0;
-}
-
-
-size_t time_sha_avx512_single_thread(){
-  // place holder for the 16 messages
-
-
-
-  size_t nmsgs = 1600000LL;
-  msg_avx msg;
-  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
-  // fill the messages
-
-
-
-  
-  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
-  double elapsed = 0;
-  double start = wtime(); /* timing */
-
-
-  uint32_t state[8] = {HASH_STATE_SIZE};
-  uint32_t* state_ptr = state;
-  
-  for (size_t i = 0; i<(nmsgs/16); ++i) {
-    state_ptr = sha256_multiple_x16(msg.M);
-    ctr += ((state[3] & 0xFF) == 0) ;
-  }
-
-  elapsed = wtime() - start;
-  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
-  
-  printf("single sha_avx512_16way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
-	 elapsed, (nmsgs)/elapsed,
-	 log2((nmsgs)/elapsed),
-	 hashed_MB/elapsed);
-
-
-  return 0;
-}
-#endif
-
-size_t time_sha_avx256(){
-  // place holder for the 16 messages
-
-  #pragma omp parallel
-  {
-  size_t nmsgs = 8000000LL;
-  msg_avx msg;
-  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
-  // fill the messages
-
-
-
-  
-  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
-  double elapsed = 0;
-  double start = wtime(); /* timing */
-
-
-  uint32_t state[8] = {HASH_INIT_STATE};
-  uint32_t* state_ptr = state;
-  
-  for (size_t i = 0; i<(nmsgs/8); ++i) {
-    state_ptr = sha256_multiple_oct(msg.M);
-    ctr += ((state[3] & 0xFF) == 0) ;
-  }
-
-  elapsed = wtime() - start;
-  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
-  
-  printf("thd%d sha_8way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
-	 omp_get_thread_num(),
-	 elapsed, (nmsgs)/elapsed,
-	 log2((nmsgs)/elapsed),
-	 hashed_MB/elapsed);
-
-  }
-  return 0;
-}
-
-
-size_t time_sha_avx256_single(){
-  // place holder for the 16 messages
-
-
-
-  size_t nmsgs = 8000000LL;
-  msg_avx msg;
-  getrandom(msg.M , 16*HASH_INPUT_SIZE, 1);
-  // fill the messages
-
-
-
-  
-  size_t ctr = 0; /* dummy variable so that the compiler won't optimize */
-  double elapsed = 0;
-  double start = wtime(); /* timing */
-
-
-  uint32_t state[8] = {HASH_INIT_STATE};
-  uint32_t* state_ptr = state;
-  
-  for (size_t i = 0; i<(nmsgs/8); ++i) {
-    state_ptr = sha256_multiple_oct(msg.M);
-    ctr += ((state[3] & 0xFF) == 0) ;
-  }
-
-  elapsed = wtime() - start;
-  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
-  
-  printf("single sha_8way  elapsed %0.2fsec i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
-	 elapsed, (nmsgs)/elapsed,
-	 log2((nmsgs)/elapsed),
-	 hashed_MB/elapsed);
-
-
-  return 0;
-}
-
-
-
-void bench_long_message_gen()
-{
-  size_t nmsgs = (1LL<<25);
-  
-  u8 Mavx[16][HASH_INPUT_SIZE] = {0};
-  u32 tr_states[16*8] = {0}; /* same as current_states but transposed */
-
-  getrandom(tr_states, 16*8, 1);
-  getrandom(Mavx , 16*HASH_INPUT_SIZE, 1);
-
-  double elapsed = 0;
-  double start = wtime(); /* timing */
-
-
-  
-  for (size_t i = 0; i<(nmsgs/NHASH_LANES); ++i) {
-      /* hash 16 messages and copy it to tr_states  */    
-      #ifdef  __AVX512F__
-      memcpy(tr_states,
-	     sha256_multiple_x16_tr(Mavx, tr_states, 0),
-	     16*HASH_STATE_SIZE);
-      #endif
-
-      #ifndef  __AVX512F__
-      #ifdef    __AVX2__
-      /* sha256_multiple_oct_tr(Mavx, tr_states); */
-
-      memcpy(tr_states,
-	     sha256_multiple_oct_tr(Mavx, tr_states),
-	     8*HASH_STATE_SIZE);
-      #endif
-      #endif
-
-    
-    /* update message counters */
-    for (int lane = 0; lane<16; ++lane)
-      ((u64*) Mavx[lane])[0] += 1;
-
-  }
-
-  elapsed = wtime() - start;
-  double hashed_MB = (nmsgs*HASH_INPUT_SIZE) / ((double) 1000000);
-  
-  printf("regenarate long_message  elapsed %0.2fsec"
-	 "i.e. %0.2f hashes/sec = 2^%0.3f hashes, %0.4f MB\n",
-	 elapsed, (nmsgs)/elapsed,
-	 log2((nmsgs)/elapsed),
-	 hashed_MB/elapsed);
-
- 
-}
 
 
 int main(int argc, char *argv[])
 {
-
-  print_attack_information();
-
-  printf("Estimated memory per dictionary=%lu Bytes ≈ 2^%0.2f Bytes\n",
-	 dict_memory(NSLOTS_MY_NODE),
-	 log2(dict_memory(NSLOTS_MY_NODE)));
-
-  #ifdef  __AVX512F__
-  /* time_sha_avx512(); */
-  #endif
-  /* puts("==============================================\n"); */
-  #ifdef  __AVX512F__ 
-  time_sha_avx512_single_thread();
-  #endif
-  /* puts("==============================================\n"); */
-  /* time_sha_one_avx512_other_sha_ni(); */
-  /* puts("==============================================\n"); */
-  /* time_sha_avx256(); */
-  /* puts("==============================================\n"); */
-  /* time_sha_avx256_single(); */
-  /* puts("==============================================\n"); */
-  bench_long_message_gen();
-  puts("==============================================\n");
 
 
 
@@ -407,49 +57,39 @@ int main(int argc, char *argv[])
   /* Benchmark dictionary query  */
   // init load dictionary
 
-
-  dict* d = dict_new(NSLOTS_MY_NODE);
-  dict* d_simd = dict_new(NSLOTS_MY_NODE);
-  u64 ndigests = PROCESS_QUOTA*10;
+  size_t factor = 1000;
+  size_t dict_size = PROCESS_QUOTA*factor;
+  dict* d = dict_new(dict_size);
+  dict* d_simd = dict_new(dict_size);
+  u64 ndigests = PROCESS_QUOTA;
   u64 size_digests = ndigests*N;
   u8* message = malloc(size_digests);
 
-  getrandom(message, size_digests, 1);
+  printf("d->nslots=%lu, d_simd->nslost=%lu\n", d->nslots, d_simd->nslots);
+
 
   double timer = 0;
   double elapsed_dict = 0;
 
 
-  timer = wtime();
-  for (size_t i=0; i<PROCESS_QUOTA; ++i) {
-    dict_add_element_to(d, (u8*) &message[N*i]);
+  for (int i=0; i<factor; i++) {
+    getrandom(message, size_digests, 0);
+    timer = wtime();
+    for (size_t i=0; i<PROCESS_QUOTA; ++i) {
+      dict_add_element_to(d, (u8*) &message[N*i]);
+    }
+    elapsed_dict += wtime() - timer;
+
   }
-  elapsed_dict += wtime() - timer;
   getrandom(message, PROCESS_QUOTA*N, 0);
 
 
   printf("Dictionary addtion took %0.2f i.e. 2^%0.4felm/sec\n",
 	 elapsed_dict,
-	 log2(NSLOTS_MY_NODE/elapsed_dict));
+	 log2(dict_size/elapsed_dict));
 
 
-  /* let's check add SIMD */
-  timer = wtime();
-  for (size_t i=0; i<PROCESS_QUOTA; ++i) {
-    dict_add_element_simd(d_simd, &message[N*i]);
-  }
-  elapsed_dict += wtime() - timer;
-  getrandom(message, PROCESS_QUOTA*N, 0);
 
-
-  printf("Dictionary addtion SIMD took %0.2f i.e. 2^%0.4felm/sec\n",
-	 elapsed_dict,
-	 log2(NSLOTS_MY_NODE/elapsed_dict));
-
-
-  puts("------------");
-  printf("ARE THEY EQUAL?%d\n",
-	 memcmp(d->values, d_simd->values, size_digests));
   
   /* FILE* fp = fopen("data/digests/0", "r"); */
   /* load_file_to_dict(d, fp); */
@@ -478,7 +118,7 @@ int main(int argc, char *argv[])
 
   // query large buffer
   u64 nqueries = PROCESS_QUOTA*10;
-  int factor = 10;
+  factor = 10;
   
   u64 nfound = 0;
   u8* queries = (u8*) malloc(sizeof(u8)*nqueries*N + 8);

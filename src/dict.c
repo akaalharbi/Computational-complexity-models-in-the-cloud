@@ -69,7 +69,9 @@ dict* dict_new(size_t nelements){
   d->nslots = (d->nbuckets)*(d->nslots_per_bucket);
 
   /* for huge pages : required memory for nslots is a mutlipe GPAGE_SIZE  */
-  d->nslots = ((d->nslots*sizeof(VAL_TYPE)) / GPAGE_SIZE ) * GPAGE_SIZE;
+  /* ceiling division */
+  d->nslots = ((d->nslots*sizeof(VAL_TYPE) + (GPAGE_SIZE-1)) / GPAGE_SIZE )
+            * GPAGE_SIZE;
   d->nslots = d->nslots / sizeof(VAL_TYPE);
     
   d->nelements = 0; /* how many elements currently in the dictionary */
@@ -117,94 +119,10 @@ size_t dict_memory(size_t nelements){
 
 
 
+
+
+
 int dict_add_element_to(dict* d, u8* state){
-  // =========================================================================+
-  // returns 1 if an element has been added, 0 otherwise                      |
-  // This dictionary is unusual:                                              |
-  // User have a value in the form:                                           |
-  // (dist pts, srvr no) || (L bits) || discard || (VAL_SIZE bits) || discard |
-  // Dictionary expects user to pass: (L bits) || discard || (VAL_SIZE bits)  |
-  // ------------------------------------------------------------------------ |
-  // we don't store (dist pts, server) since they are already determined      |
-  // The discarded bits between L and VAL_SIZE are due to the fact we move 1  |
-  // at least. Those we choose to forget them. The last disarded bits are     |
-  // discarded because they will double the dictionary size if we include em  |
-  // -------------------------------------------------------------------------|
-  // INPUTS:                                                                  |
-  // `*d`:  dictionary that will store state as an element                    |
-  // `*state`: element to be stored in *d in the form                         |
-  //          (L bits) || discard || (VAL_SIZE bits) more precisely:          |
-  //          (L_IN_BYTES bytes)  || (VAL_SIZE bits)                          |
-  // issues may aris when VAL_SIZE is larger then what is left in the state   |
-  //                                                                          |
-  // -------------------------------------------------------------------------+
-  /* how many bytes do we need to index the buckets */
-  const int idx_size =   (int) ceil((log2(NSLOTS_MY_NODE) - log2(d->nslots_per_bucket))
-				   /8.0) ;
-
-  /* if (VAL_SIZE_BYTES + idx_size > N){ */
-  /*   printf("ERROR at adding to dict! since VAL_SIZE_BYTES=%u, idx_size=%d, while N=%u\n", */
-  /* 	   VAL_SIZE_BYTES, */
-  /* 	   idx_size, */
-  /* 	   N); */
-  /* } */
-  
-  ++(d->nelements_asked_to_be_inserted);
-
-
-  /// Use linear probing to add element to the array d->values
-  // get bucket number, recall keys[nbuckets*nslots_per_bucket
-  u64 idx = 0;
-  memcpy(&idx, state, idx_size);
-  /* printf("initially idx=0x%llx, idx_size=%d\n", idx, idx_size); */
-
-  /* get the bucket number and scale the index */
-  idx = (idx % d->nbuckets) * d->nslots_per_bucket;
-
-  
-  VAL_TYPE val = 0;
-
-  memcpy(&val,
-	 &state[idx_size],
-	 VAL_SIZE_BYTES );
-
-  /* 0 means empty, we have to ignore zero values  */
-  if (val == 0) return 0;
-  
-  // linear probing 
-  for (int i=0;
-       i<(NPROBES_MAX/SIMD_LEN)*SIMD_LEN; /* only Multiples of SIMD_LEN*/
-       ++i) {
-
-    
-    // found an empty slot inside a bucket
-    /* printf("idx=%llu, d->nslots=%lu\n", idx, d->nslots); */
-    if (d->values[idx] == 0) { // found an empty slot
-      d->values[idx] = val;
-      ++(d->nelements); /* successfully added an element */
-      return 1;
-    }
-
-    if (d->values[idx] == val) { /* repeated element */
-      /* not a new element */
-      --(d->nelements_asked_to_be_inserted);
-      return 1;
-    }
-    
-
-
-    ++idx;
-    // reduce mod n->slots //
-    if (idx >= d->nslots ) /* we forgot the equal sign here */
-      idx = 0;
-  }
-  /* printf("missed entry at idx=%llu\n", idx_old); */
-  /* print_u16(&(d->values[idx_old]), NPROBES_MAX); */
-  return 0; // element has been added
-}
-
-
-int dict_add_element_simd(dict* d, u8* state){
   // =========================================================================+
   // returns 1 if an element has been added, 0 otherwise                      |
   // This dictionary is unusual:                                              |
@@ -252,8 +170,8 @@ int dict_add_element_simd(dict* d, u8* state){
   REG_TYPE dict_slots_simd;
   REG_TYPE value_simd = SIMD_SET1_VALTYPE(val); // (val, val, ..., val) 
   REG_TYPE zero_simd = SIMD_SET1_VALTYPE(0); // (val, val, ..., val) 
-  int is_zero_found = 0;
-  int is_val_found = 0;
+  int found_good_slot = 0;
+
   int zero_idx = 0; /* where to put the element in the dictionary */
   
   // linear probing: examing 16 elements at once using simd
@@ -265,32 +183,31 @@ int dict_add_element_simd(dict* d, u8* state){
     dict_slots_simd = SIMD_LOAD_SI((REG_TYPE*)  &(d->values[idx]));
 
     /* is there is a zero */
-    is_zero_found = SIMD_CMP_VALTYPE(zero_simd, dict_slots_simd);
-    if (is_zero_found){
+    found_good_slot = SIMD_CMP_VALTYPE(zero_simd, dict_slots_simd)
+                    | SIMD_CMP_VALTYPE(value_simd, dict_slots_simd);
+
+    if (found_good_slot){ /* either it's zero or we have the same value */
       /* the index of the first zero in the simd vector */
-      zero_idx = __builtin_ctz(is_zero_found);
+      zero_idx = __builtin_ctz(found_good_slot);
       /* put the val in the first zero index  */
       d->values[idx + zero_idx] = val;
       ++(d->nelements);
-
-      return 1;
-    }
-
-    is_val_found = SIMD_CMP_VALTYPE(value_simd, dict_slots_simd);
-    if (is_val_found){
-      /* don't do anything with a repeated element */
       return 1;
     }
 
     idx += d->nslots_per_bucket;
     // reduce mod n->slots //
-    if (idx >= d->nslots ) /* we forgot the equal sign here */
+    if (idx >= d->nslots ) 
       idx = 0;
   }
-  /* printf("missed entry at idx=%llu\n", idx_old); */
-  /* print_u16(&(d->values[idx_old]), NPROBES_MAX); */
-  return 0; // element has been added
+
+  return 0; // no element has been added
 }
+
+
+
+
+
 
 
 

@@ -24,7 +24,7 @@
 // with filling rate 1. In conventional linear probing memory will
 // be (1/0.91) * nslot * sizeof(uint32) while in our case it's nslots * sizeof(uint32)
 #ifndef NPROBES_MAX
-#define NPROBES_MAX 64
+#define NPROBES_MAX 32
 #endif
 
 #ifndef FILLING_RATE
@@ -62,8 +62,6 @@ size_t  dict_memory(size_t nelements);
 int dict_add_element_to(dict *d, u8 *state);
 int dict_has_elm(dict *d, u8* state);
 void dict_print(dict *d);
-int dict_add_element_simd(dict* d, u8* state);
-
 
 
 #endif
