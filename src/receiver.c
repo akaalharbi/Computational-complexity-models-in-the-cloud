@@ -243,9 +243,7 @@ static void write_digest_to_dict(dict *d,
     /* The dictionary by design will ignore all zero messages */
     tmp = ncompleted_senders;
     ncompleted_senders += status.MPI_TAG;
-    if (tmp != ncompleted_senders){
-      printf("recv%d say that %d/%d are done\n", myrank, ncompleted_senders, nsenders);
-    }
+
   }
   elapsed_total = wtime() - elapsed_total;
 

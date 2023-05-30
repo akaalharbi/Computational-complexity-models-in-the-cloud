@@ -121,20 +121,14 @@ void buffered_isend(u8 *snd_bufs, /* all send bufs */
   int is_free = 0;
   int idx = -1;
 
-  /* find a buffer with a completed sending job  */
-  while (!is_free) {
-    for (int i = 0; i<nbufs; ++i){
-      /* Check without blocking that a message has been sent */
-      MPI_Test(&requests[i], &is_free, &statuses[i]);
-      if (is_free){
-	idx = i;
-	break; /* the for loop */
-      } 
-    }
-    /* they are all busy */
-    // should we sleep for a second?
-  }
 
+
+  
+  /* find a buffer with a completed sending job  */
+  while (!is_free)
+    MPI_Testany(nbufs, requests, &idx, &is_free, MPI_STATUS_IGNORE);
+    
+  idx = (idx >= 0) ? idx : 0; /* see https://github.com/open-mpi/ompi/issues/11725 */
   /* copy the message to be sent to the free send buffer */
   memcpy(&snd_bufs[idx*msg_length], msg, msg_length);
 
@@ -543,10 +537,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	     server,
 	     TAG_DONE_HASHING,
 	     inter_comm);
-
-    printf("sender%d dit au revoir\n", myrank);
-
   }
+  printf("sender%d dit au revoir\n", myrank);
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
