@@ -46,8 +46,12 @@ static inline void show_and_save_benchmark
      size_t nhashes,
      size_t interval,
      int nsenders,
+     int myrank,
      FILE* fp)
 {
+  if (myrank != 0)
+    return; /* only rank 0 will print its statistics */
+  
   printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
 	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈%fhash/sec≈%fMB/sec, find dist=%fsec\n"
 	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
@@ -502,6 +506,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 			  (end-begin)*INTERVAL,
 			  INTERVAL,
 			  nsenders,
+			  myrank,
 			  fp_timing);
   
 
@@ -670,6 +675,7 @@ static void generate_random_digests(u8 Mavx[16][HASH_INPUT_SIZE],/* random msg *
 			      16*while_ctr,
 			      print_interval,
 			      nsenders,
+			      myrank,
 			      fp_timing);
       
       

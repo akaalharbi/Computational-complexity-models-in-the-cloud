@@ -34,8 +34,11 @@ static inline void show_and_save_benchmark(double elapsed_total,
 					   size_t nmsgs_recv,
 					   size_t interval,
 					   int nsenders,
+					   int myrank,
 					   FILE* fp)
 {
+  if (myrank != 0)
+    return; /* only first rank is going to report its */
   printf("<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
 	 "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f≈%fMB/sec\n"
 	 "mpi_recv=%f%%, dict_add=%f%%\n"
@@ -253,6 +256,7 @@ static void write_digest_to_dict(dict *d,
 			  nmsgs_recv,
 			  INTERVAL,
 			  nsenders,
+			  myrank,
 			  fp_timing);
   
 
@@ -398,6 +402,7 @@ void receiver_process_task(int const myrank,
 			      nmsgs_recv,
 			      print_interval,
 			      nsenders,
+			      myrank,
 			      fp_timing);
       
       fprintf(fp_timing, "nfound_cnd=%lu, new_cnd=%lu, t=%fsec\n",

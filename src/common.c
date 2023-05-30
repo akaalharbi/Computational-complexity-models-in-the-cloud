@@ -25,7 +25,6 @@
 #include "shared.h" // shared variables for duplicate 
 #include "memory.h"
 #include "util_files.h"
-
 #include "common.h"
 
 int n_discarded_bits(){
@@ -44,7 +43,7 @@ u64 n_needed_candidates(){
   return nneeded_candidates;
 }
 
-
+/* @todo the information here is inacuurate */
 void print_attack_information(){
   printf("\nL=%f, L_RECEIVER=%f, N=%d, DIFFICULTY=%d,\n"
          "|idx| = %dbytes, NELELEMNTS_BUCKET=%d, NSEERVERS=%d,\n"
@@ -83,8 +82,7 @@ int is_dist_state(u8 state[HASH_STATE_SIZE]){
   static const u8 ones = ( (1LL<<DIFFICULTY) - 1) << (8-DIFFICULTY);
   u8 last_8bits = ( (u8*) state)[N-1];
     
-  /* For now, we are not going to have difficulyt more than 16 bits. It will  */
-  /* take 330 years using my laptop! The longest recorded life is 122 years!  */
+  /* For now, we are not going to have difficulyt more than 8 bits. It will  */
   return ( (  last_8bits  & ones) == 0 );
 }
 

@@ -66,12 +66,12 @@
 /* bytes i.e n := 8*N bits */
 #define N 12
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1<<25LL)
+#define INTERVAL (1<<28LL)
 
 
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 2
+#define DIFFICULTY 6
 
 
 
@@ -104,8 +104,8 @@
 
 
 /* edit manually */
-#define NSERVERS 32
-#define NRECEIVERS_PER_NODE 1
+#define NSERVERS 4
+#define NRECEIVERS_PER_NODE 4
 
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
@@ -113,7 +113,7 @@
 #define DEFINED_BYTES CEILING(DEFINED_BITS, 8)
 
 
-#define TOTAL_RAM 6000000000LL
+#define TOTAL_RAM 24000000000LL
 #define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
 
 
