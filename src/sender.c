@@ -49,9 +49,8 @@ static inline void show_and_save_benchmark
      int myrank,
      FILE* fp)
 {
-  if (myrank != 0)
-    return; /* only rank 0 will print its statistics */
-  
+
+
   printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
 	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈%fhash/sec≈%fMB/sec, find dist=%fsec\n"
 	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 

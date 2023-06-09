@@ -37,8 +37,6 @@ static inline void show_and_save_benchmark(double elapsed_total,
 					   int myrank,
 					   FILE* fp)
 {
-  if (myrank != 0)
-    return; /* only first rank is going to report its */
   printf("<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
 	 "total=%fsec, mpi_recv=%fsec, dict_add=%fsec≈2^%f≈%fMB/sec\n"
 	 "mpi_recv=%f%%, dict_add=%f%%\n"
