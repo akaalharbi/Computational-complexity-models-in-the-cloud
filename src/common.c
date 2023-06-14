@@ -143,6 +143,7 @@ u32 to_which_server(u8 state[HASH_STATE_SIZE])
 void transpose_state(u32 dest[restrict 16*8],
 		     u32 src[restrict 16*8])
 {
+  /// list of states -> transoposed states
   for (int lane = 0; lane < 16; lane++) {
     dest[lane + 0*16] = src[8*lane + 0];
     dest[lane + 1*16] = src[8*lane + 1];
@@ -161,15 +162,17 @@ void untranspose_state(u32 dest[restrict 16*8],
 		       u32 src[restrict  8*16])
 {
   /* looks stupid but I am not passing dimension as an argument */
+  /// What's is actually stupid is not documenting your functions.
+  /// transponse state -> list of 16 states one after the other
     for (int lane = 0; lane < 16; lane++) {
-    dest[8*lane + 0] = src[lane + 0*16];
-    dest[8*lane + 1] = src[lane + 1*16];
-    dest[8*lane + 2] = src[lane + 2*16];
-    dest[8*lane + 3] = src[lane + 3*16];
-    dest[8*lane + 4] = src[lane + 4*16];
-    dest[8*lane + 5] = src[lane + 5*16];
-    dest[8*lane + 6] = src[lane + 6*16];
-    dest[8*lane + 7] = src[lane + 7*16];
+      dest[8*lane + 0] = src[lane + 0*16];
+      dest[8*lane + 1] = src[lane + 1*16];
+      dest[8*lane + 2] = src[lane + 2*16];
+      dest[8*lane + 3] = src[lane + 3*16];
+      dest[8*lane + 4] = src[lane + 4*16];
+      dest[8*lane + 5] = src[lane + 5*16];
+      dest[8*lane + 6] = src[lane + 6*16];
+      dest[8*lane + 7] = src[lane + 7*16];
   }
 
 }
@@ -182,6 +185,7 @@ void untranspose_state(u32 dest[restrict 16*8],
 
 void copy_transposed_digest(u8 *digest, u32 *tr_state, int lane)
 {
+  /// todo: document this function 
   for (int i = 0; i<(N/WORD_SIZE); ++i) 
     memcpy(&digest[i*WORD_SIZE],
 	   &tr_state[lane + i*16],
