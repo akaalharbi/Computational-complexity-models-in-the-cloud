@@ -11,7 +11,6 @@ sha256_oct_avx2.o: sha256_oct_avx2.asm
 
 
 
-
 # avx512
 c_sha256_x16_avx512.o: arch_avx512_type1.h c_sha256_x16_avx512.c
 
