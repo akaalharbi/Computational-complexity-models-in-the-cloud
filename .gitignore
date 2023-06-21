@@ -24,6 +24,7 @@ phase_iii
 test
 benchmark
 verify_data
+split_states
 
 # Linker output
 *.ilk
