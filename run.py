@@ -130,16 +130,34 @@ def clean_hostfile():
 
 
 def run_perf():
-    """Record the energy consumption"""
+    """Record the energy consumption."""
     import subprocess
-    cleaned_hostfile_path = "data/tmp"
-    cmd = 'mpirun -machinefile data/tmp -mca mtl psm2 -mca pml ^ucx,ofi -mca btl ^ofi,openib -map-by node:PE=1 "python src/perf_energy.py"'
-    
-    subprocess.Popen(cmd, stdin) # continue todo 
-    return 0
+
+    # make the python wrapper for perf an executable
+    subprocess.run("chmod +x src/perf_bench.py", shell=True)
+    # we know it's long commnad but what can we do!
+    # cmd = 'mpirun -machinefile data/tmp -mca mtl psm2 -mca pml ^ucx,ofi -mca btl ^ofi,openib -map-by node:PE=1 "python src/perf_bench.py"'
+    cmd = ['mpirun',
+           '-machinefile',
+           'data/tmp',
+           '-mca',
+           'mtl',
+           'psm2',
+           '-mca',
+           'pml',
+           '^ucx,ofi',
+           '-mca',
+           'btl',
+           '^ofi,openib',
+           '-map-by',
+           'node:PE=1',
+           'python src/perf_bench.py']
+
+    subprocess.run(cmd, shell=True)
 
 
 if __name__ == "__main__":
+    from multiprocessing import Process
     # parsing
     parser = argparse.ArgumentParser()
     parser.add_argument("-N",
@@ -183,4 +201,12 @@ if __name__ == "__main__":
                  INTERVAL=args.interval)
 
     # run phase_iii
-    run_phase_ii()
+    p1 = Process(target=run_phase_ii)
+    p2 = Process(target=run_perf)
+
+    p1.start()
+    p2.start()
+
+    # todo use timeout to exit the process when collecting enough candidates
+    p1.join()
+    p2.join()
