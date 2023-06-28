@@ -99,12 +99,12 @@ int is_dist_digest(u8 state[N]){
 }
 
 
-int is_dist_msg(u8 M[HASH_INPUT_SIZE]){
-  WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE};
-  hash_single(state, M);
+/* int is_dist_msg(u8 M[HASH_INPUT_SIZE]){ */
+/*   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE}; */
+/*   hash_single(state, M); */
 
-  return is_dist_state((u8*) state);
-}
+/*   return is_dist_state((u8*) state); */
+/* } */
 
 
 

@@ -1,5 +1,5 @@
 """Configure the arguments of the attack in config.h
-python run.py  --nservers 32 --receivers 32 -N 12 --ram 64000000000 --interval 30
+python run.py  --nservers 4 --receivers 96 -N 9 --ram 164000000000 --interval 25 -d 1
 """
 import argparse
 
@@ -95,11 +95,6 @@ def parse_config(N=None,
 
 
 def run_phase_ii():
-    """Allow coredumps, compile all files, then run them using mpirun.
-
-    Note: this will be rewritten using python subprocess to allow using
-    perf.
-    """
     import os
 
     os.system("ulimit -c unlimited")
@@ -107,9 +102,9 @@ def run_phase_ii():
     os.system("echo 'core' | sudo-g5k tee /proc/sys/kernel/core_pattern")
     os.system("sudo-g5k apt install nasm")
     os.system("cd lib/sha256_intel_avx/ && make clean && make all && cd ../../")
+
     os.system("make clean && make all")
-    # here is
-    os.system("mpirun -machinefile $OAR_NODEFILE  -map-by node:PE=1 ./phase_ii")
+    os.system("mpirun -machinefile $OAR_NODEFILE  -mca mtl psm2 -mca pml ^ucx,ofi -mca btl ^ofi,openib  -map-by node:PE=1 ./phase_ii")
 
 
 def clean_hostfile():
@@ -129,29 +124,32 @@ def clean_hostfile():
             f.write(line)
 
 
-def run_perf():
+def run_perf(np):
     """Record the energy consumption."""
     import subprocess
+
+    clean_hostfile()
 
     # make the python wrapper for perf an executable
     subprocess.run("chmod +x src/perf_bench.py", shell=True)
     # we know it's long commnad but what can we do!
-    # cmd = 'mpirun -machinefile data/tmp -mca mtl psm2 -mca pml ^ucx,ofi -mca btl ^ofi,openib -map-by node:PE=1 "python src/perf_bench.py"'
-    cmd = ['mpirun',
-           '-machinefile',
-           'data/tmp',
-           '-mca',
-           'mtl',
-           'psm2',
-           '-mca',
-           'pml',
-           '^ucx,ofi',
-           '-mca',
-           'btl',
-           '^ofi,openib',
-           '-map-by',
-           'node:PE=1',
-           'python src/perf_bench.py']
+    cmd = f'mpirun -machinefile $OAR_NODEFILE -np {np} -mca mtl psm2 -mca pml ^ucx,ofi -mca btl ^ofi,openib -map-by node:PE=1 src/perf_bench.py'
+    print(f"cmd={cmd}")
+    # cmd = ['mpirun',
+    #        '-machinefile',
+    #        'data/tmp',
+    #        '-mca',
+    #        'mtl',
+    #        'psm2',
+    #        '-mca',
+    #        'pml',
+    #        '^ucx,ofi',
+    #        '-mca',
+    #        'btl',
+    #        '^ofi,openib',
+    #        '-map-by',
+    #        'node:PE=1',
+    #        'python src/perf_bench.py']
 
     subprocess.run(cmd, shell=True)
 
@@ -201,12 +199,17 @@ if __name__ == "__main__":
                  INTERVAL=args.interval)
 
     # run phase_iii
-    p1 = Process(target=run_phase_ii)
-    p2 = Process(target=run_perf)
+    # p1 = Process(target=run_phase_ii, args=())
+    # p2 = Process(target=run_perf, args=(args.nservers,))
 
-    p1.start()
-    p2.start()
+    # p1.start()
+    # #run_phase_ii()
+    # p2.start()
 
-    # todo use timeout to exit the process when collecting enough candidates
-    p1.join()
-    p2.join()
+    # # # todo use timeout to exit the process when collecting enough candidates
+    # p1.join()
+    # p2.join()
+
+    run_phase_ii()
+
+    
