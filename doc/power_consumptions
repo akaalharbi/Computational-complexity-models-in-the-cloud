@@ -1,0 +1,11 @@
+Note about power consumption
+
+ Performance counter stats for 'system wide':
+
+            243.43 Joules power/energy-pkg/                                           
+             15.12 Joules power/energy-ram/                                           
+
+       1.001315457 seconds time elapsed
+
+
+while on kwcollect is around 336 watts i.e. 

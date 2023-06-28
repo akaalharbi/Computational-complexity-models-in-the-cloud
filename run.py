@@ -1,10 +1,11 @@
-# Configure the arguments of the attack in config.h
-# python run.py  --nservers 32 --receivers 32 -N 12 --ram 64000000000 --interval 30
+"""Configure the arguments of the attack in config.h
+python run.py  --nservers 32 --receivers 32 -N 12 --ram 64000000000 --interval 30
+"""
 import argparse
 
 
 def get_free_memory():
-    """ Return available memory in kB"""
+    """Return available memory in kB."""
     import re
     with open("/proc/meminfo") as f:
         meminfo = f.read()
@@ -94,6 +95,11 @@ def parse_config(N=None,
 
 
 def run_phase_ii():
+    """Allow coredumps, compile all files, then run them using mpirun.
+
+    Note: this will be rewritten using python subprocess to allow using
+    perf.
+    """
     import os
 
     os.system("ulimit -c unlimited")
@@ -101,9 +107,36 @@ def run_phase_ii():
     os.system("echo 'core' | sudo-g5k tee /proc/sys/kernel/core_pattern")
     os.system("sudo-g5k apt install nasm")
     os.system("cd lib/sha256_intel_avx/ && make clean && make all && cd ../../")
-
     os.system("make clean && make all")
+    # here is
     os.system("mpirun -machinefile $OAR_NODEFILE  -map-by node:PE=1 ./phase_ii")
+
+
+def clean_hostfile():
+    """Remove all repeated hosts names in $OAR_NODEFILE
+
+    The goal is to run one process per node.
+    """
+    import os
+    file_path = os.environ["OAR_NODEFILE"]
+    lines_set = set([])
+    with open(file_path, 'r') as f:
+        for line in f:
+            lines_set.add(line)
+    lines = list(lines_set)
+    with open("data/tmp_hosts", 'w') as f:
+        for line in lines:
+            f.write(line)
+
+
+def run_perf():
+    """Record the energy consumption"""
+    import subprocess
+    cleaned_hostfile_path = "data/tmp"
+    cmd = 'mpirun -machinefile data/tmp -mca mtl psm2 -mca pml ^ucx,ofi -mca btl ^ofi,openib -map-by node:PE=1 "python src/perf_energy.py"'
+    
+    subprocess.Popen(cmd, stdin) # continue todo 
+    return 0
 
 
 if __name__ == "__main__":
