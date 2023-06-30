@@ -11,15 +11,12 @@ This program will:
 Planning for run_run_phase_iii:
 * todo!
 """
+from src.time_required import time_required
 
 
 
-def times_required():
-    """Given all attack parameters estimate how long does it take.
 
-    This inlcude regenerating the message and collecting enough collisions.-
-    """
-    pass
+
 
 def get_server_names():
     """Get the server names to retrieve their power usage later.
@@ -34,15 +31,45 @@ def get_server_names():
 
     return server_names
 
-def copy_folder(): # todo args
-    pass
+def get_power_consumption_data(t_start, t_end):
+    server_names = get_server_names()
+    # combine server names
+    url_to_download = f"{server_names}"
 
-def attack_choices():  # todo set parameters
+    # download url
+    # save the data into a file
+
+
+def init_folder(n,
+                nstates,
+                nsenders,
+                nreceivers,):
+    """Copy the long message attack template folder to modify the new foldre.
+    """
+
+    import os
+    os.system(f"cp -r long-message-attack experiments/{n}_nstates{nstates}_nsenders{nsenders}_nreceivers{nreceivers}")
+    os.chdir(f"experiments/{n}_nstates{nstates}_nsenders{nsenders}_nreceivers{nreceivers}")
+
+    # truncate the states file
+    os.system(f"truncate --size={nstates*32} data/states")
+
+
+def attack_choices(n,
+                   nservers,
+                   ncores_per_server,
+                   server_memory):  # todo set parameters
     """Return the best five attack parameters on a given and a given nservers.
     """
-    pass
+    # loop over available choices
+    # difficulty <= 8
+    choices = []  # (nstates, nsenders, nreceivers, time_needed)
+
+    return choices[:5]
+
 
 if __name__ == "__main__":
+    import os
     # get the number of servers.
     # find the best 5 attack parameters.
     # for each one of them create a folder_name_parameters
@@ -50,4 +77,8 @@ if __name__ == "__main__":
     # run each attack in its repsoecting folder for at most for at
     # most 3x the time estimated time.
     # collect the energy consumption.
-    pass
+    os.system("mkdir -p experiments")
+
+    # download the power consumption data
+    # return to the base folder after the end of each experiment
+    os.chdir("../../")
