@@ -11,7 +11,7 @@ This program will:
 Planning for run_run_phase_iii:
 * todo!
 """
-from src.time_required import time_required
+from src.time_required import time_required, seconds_2_time
 
 
 
@@ -50,17 +50,18 @@ def get_power_consumption_data(t_start, t_end):
 def init_folder(n,
                 nstates,
                 nsenders,
-                nreceivers,):
+                nreceivers,
+                difficulty):
     """Copy the long message attack template folder to modify the new foldre.
     """
 
     import os
-    os.system(f"cp -r long-message-attack experiments/{n}_nstates{nstates}_nsenders{nsenders}_nreceivers{nreceivers}")
-    os.chdir(f"experiments/{n}_nstates{nstates}_nsenders{nsenders}_nreceivers{nreceivers}")
+    os.system(f"cp -r long-message-attack experiments/N{n}_nstates{nstates}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}")
+    os.chdir(f"experiments/long-message-attack experiments/N{n}_nstates{nstates}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}")
 
     # truncate the states file
     os.system(f"truncate --size={nstates*32} data/states")
-    
+
 
 
 def attack_choices(n,
@@ -91,7 +92,7 @@ def attack_choices(n,
         nsenders = (ncores_per_server*nservers) - nreceivers
         for diff in range(0, 9):
             # compute l
-
+ 
             # rule 1: don't pass n/2 limit
             # rule 2: we can't use more states than memory allows us!
             # rule 3: we can't fill memory with nstates less than available
@@ -106,7 +107,7 @@ def attack_choices(n,
                               nreceivers,
                               diff)
 
-            choices.append((t, nsenders, nreceivers, nstates, diff))
+            choices.append((t, nstates, nsenders, nreceivers, diff))
 
     # sort choices according to the time in ascending order
     sorted(choices, key=lambda tup: tup[0])
@@ -115,16 +116,77 @@ def attack_choices(n,
 
 if __name__ == "__main__":
     import os
-    # get the number of servers.
+    import argparse
+    from math import log2
+    from datetime import datetime
+
+    # This the folder where all experiments will be done
+    os.system("mkdir -p experiments")
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-n",
+                        type=int,
+                        help="Number of BITS to be attacked, multiple of 8")
+
+    parser.add_argument("--nservers",
+                        type=int,
+                        help="How many servers?")
+
+    # assume all servers are the same.
+    parser.add_argument("--ncores",
+                        type=int,
+                        help="How many cpu cores does a server have?")
+
+    parser.add_argument("-r",
+                        "--ram",
+                        type=int,
+                        help="what is the available memory for\
+                        the dictionary per server?")
+    args = parser.parse_args()
+
     # find the best 5 attack parameters.
+    best_parameters = attack_choices(args.n,
+                                     args.nservers,
+                                     args.ncores,
+                                     args.ram)
+
+    print("summary of the parameters")
+    print("-------------------------")
+    total_expected_time = sum(tup[0] for tup in best_parameters)}
+    print(f"total exp time = {seconds_2_time(total_expected_time)}")
+    for p in best_parameters:
+        print(f"time={2*p[0]}, nsenders={p[2]}, nreceivers={p[3]},\
+        l={log2(p[1])} difficulty={p[4]}")
+    
+    
+
     # for each one of them create a folder_name_parameters
-    # get the estimated time of the attack given a set of parameters
     # run each attack in its repsoecting folder for at most for at
     # most 3x the time estimated time.
-    # collect the energy consumption.
-    os.system(f"python run_phase_ii.py -N {1}")
-    os.system("mkdir -p experiments")
+    for atck in best_parameters:
+        # N will be in bytes 
+        init_folder(args.n//8,
+                    atck[1],  # nstates
+                    atck[2],  # nsenders
+                    atck[3],  # nreceivers
+                    atck[4],  # difficulty
+                    )
 
-    # download the power consumption data
-    # return to the base folder after the end of each experiment
-    os.chdir("../../")
+        t_start = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        # run the attack, nstates is used from states file
+        # nsenders is computed on the fly.
+        os.system(f"timeout {3*p[0]}s python run_phase_ii.py --nservers \
+        {args.nservers}  --receivers {atck[4]} -N {n//8} --ram {arg.ram} \
+        --interval 23 -d {atck[4]}")
+        t_end = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        
+        # collect the energy consumption.
+        get_power_consumption_data(t_start, t_end)
+        # return to the base folder
+        os.chdir("../../")    
+        # repeat
+    print("we are done! many thanks to grid5000.fr")
+
+    # todo list 
+    # write another script to treat the collected data
+    # write another script to run phase_iii based on the existing folder

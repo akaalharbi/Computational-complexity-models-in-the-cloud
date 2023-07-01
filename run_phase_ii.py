@@ -1,5 +1,5 @@
 """Configure the arguments of the attack in config.h
-python run.py  --nservers 4 --receivers 96 -N 9 --ram 164000000000 --interval 25 -d 1
+python run_phase_ii.py  --nservers 4 --receivers 96 -N 9 --ram 164000000000 --interval 25 -d 1
 """
 import argparse
 
