@@ -32,12 +32,19 @@ def get_server_names():
     return server_names
 
 def get_power_consumption_data(t_start, t_end):
-    server_names = get_server_names()
-    # combine server names
-    url_to_download = f"{server_names}"
+    import os
+    job_id = os.environ["OAR_JOBID"]
 
-    # download url
-    # save the data into a file
+    # &start_time=2021-06-08T15:00&end_time=2021-06-08T17:00
+    # combine server names
+    url_to_download = f"https://api.grid5000.fr/stable/sites/grenoble/metrics?job_id={job_id}&metrics=bmc_node_power_watt&&start_time={t_start}&end_time={t_end}"
+
+    commad = f"curl '{url_to_download}' | jq -r '.[] | [.timestamp, .device_id, .metric_id, .value, .labels|tostring] | @csv'  > data/bmc_watt{job_id}.csv"
+    # download & save the data into a file
+    os.system(commad)
+    # curl 'https://api.grid5000.fr/stable/sites/grenoble/metrics?job_id=2296184&metrics=bmc_node_power_watt' | jq -r '.[] | [.timestamp, .device_id, .metric_id, .value, .labels|tostring] | @csv'  > bmc_watt.cs
+
+
 
 
 def init_folder(n,
@@ -53,18 +60,56 @@ def init_folder(n,
 
     # truncate the states file
     os.system(f"truncate --size={nstates*32} data/states")
+    
 
 
 def attack_choices(n,
                    nservers,
                    ncores_per_server,
                    server_memory):  # todo set parameters
-    """Return the best five attack parameters on a given and a given nservers.
     """
+    Return the best five attack parameters on a given and a given nservers.
+    """
+
+    import os
     # loop over available choices
     # difficulty <= 8
     choices = []  # (nstates, nsenders, nreceivers, time_needed)
+    INTERVAL = 2**23
+    # how many bytes in the file
+    nbytes = os.stat("data/states").st_size
+    # how many states when the file gets uncompressed
+    # n_available_states = (nbytes/32) * (INTERVAL)
+    total_memory_nstates = nbytes*INTERVAL
+    available_memory = server_memory*nservers
 
+    print(available_memory, total_memory_nstates)
+
+    for nreceivers in range(nservers,  # start
+                            nservers*ncores_per_server - nservers,
+                            nservers):  # step size
+        nsenders = (ncores_per_server*nservers) - nreceivers
+        for diff in range(0, 9):
+            # compute l
+
+            # rule 1: don't pass n/2 limit
+            # rule 2: we can't use more states than memory allows us!
+            # rule 3: we can't fill memory with nstates less than available
+            #         in phase_i!
+            nstates = min(2**(n/2),
+                          total_memory_nstates/(2**diff),
+                          available_memory/(32))
+
+            t = time_required(n,
+                              nstates,
+                              nsenders,
+                              nreceivers,
+                              diff)
+
+            choices.append((t, nsenders, nreceivers, nstates, diff))
+
+    # sort choices according to the time in ascending order
+    sorted(choices, key=lambda tup: tup[0])
     return choices[:5]
 
 
@@ -77,6 +122,7 @@ if __name__ == "__main__":
     # run each attack in its repsoecting folder for at most for at
     # most 3x the time estimated time.
     # collect the energy consumption.
+    os.system(f"python run_phase_ii.py -N {1}")
     os.system("mkdir -p experiments")
 
     # download the power consumption data

@@ -53,7 +53,7 @@ def nqueries(n,  # as number of bits
              hashes_sec_core,
              dict_queries_sec,
              difficulty):
-    """How many queries are needed (expected)?."""
+    """How many seconds needed to get reach the expected number of queries."""
     nqueries_sec = min(nqueries_sender(nsenders, hashes_sec_core, difficulty),
                        nqueries_receiver(nreceivers, dict_queries_sec))
 
@@ -61,7 +61,7 @@ def nqueries(n,  # as number of bits
 
 
 def times_required(n,  # n in bits not bytes
-                   l,  # 2^l is the number of hashes stored in phase_i
+                   nstates,  # nstates stored in phase_i
                    nsenders,
                    nreceivers,
                    difficulty):
@@ -74,14 +74,15 @@ def times_required(n,  # n in bits not bytes
     # how many hashes can oure compressed file
     # hashes_sec_phase_i = 2^25  # 2^24.72
     dict_add_sec = 2**23.41
-    nhashes_stored = int(2**l)
+    nhashes_stored = nstates
 
+    # todo check the arguments are in correct order!
     time_rgen_msg = regen_msg_time(nsenders,
-                                   nreceivers,  # nsenders
+                                   nreceivers,
                                    hashes_sec_core,
                                    dict_add_sec,
                                    difficulty,
-                                   2**l,  # nhashes stored
+                                   nhashes_stored,
                                    )
 
     time_phase_ii = nqueries(n, nsenders, nreceivers, nhashes_stored,
