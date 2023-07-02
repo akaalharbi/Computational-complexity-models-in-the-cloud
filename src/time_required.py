@@ -60,7 +60,7 @@ def nqueries(n,  # as number of bits
     return 2**n / (nqueries_sec*nhashes_stored)
 
 
-def times_required(n,  # n in bits not bytes
+def time_required(n,  # n in bits not bytes
                    nstates,  # nstates stored in phase_i
                    nsenders,
                    nreceivers,

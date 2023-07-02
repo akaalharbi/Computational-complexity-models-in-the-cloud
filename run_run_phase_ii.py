@@ -11,7 +11,13 @@ This program will:
 Planning for run_run_phase_iii:
 * todo!
 """
-from src.time_required import time_required, seconds_2_time
+# python3 run_run_phase_ii.py -n 72 --nservers 4 --ncores 32 -r 164000000000
+
+import sys
+
+from long_message_attack.src.time_required import time_required, seconds_2_time
+INTERVAL = 2**23
+
 
 
 
@@ -56,11 +62,16 @@ def init_folder(n,
     """
 
     import os
-    os.system(f"cp -r long-message-attack experiments/N{n}_nstates{nstates}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}")
-    os.chdir(f"experiments/long-message-attack experiments/N{n}_nstates{nstates}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}")
 
+    os.system(f"cp -r long_message_attack experiments/N{n}_nstates{int(nstates)}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}")
+    os.chdir(f"experiments/N{n}_nstates{int(nstates)}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}")
+    
     # truncate the states file
-    os.system(f"truncate --size={nstates*32} data/states")
+    print(f"Going to truncate the states file to {nstates*32}")
+    # since our  states file doesn't contain all states but rather
+    # a compressed file
+    nbytes_in_states_file = (nstates*32)//INTERVAL
+    os.system(f"truncate --size={nbytes_in_states_file} data/states")
 
 
 
@@ -76,9 +87,9 @@ def attack_choices(n,
     # loop over available choices
     # difficulty <= 8
     choices = []  # (nstates, nsenders, nreceivers, time_needed)
-    INTERVAL = 2**23
+
     # how many bytes in the file
-    nbytes = os.stat("data/states").st_size
+    nbytes = os.stat("long_message_attack/data/states").st_size
     # how many states when the file gets uncompressed
     # n_available_states = (nbytes/32) * (INTERVAL)
     total_memory_nstates = nbytes*INTERVAL
@@ -100,7 +111,8 @@ def attack_choices(n,
             nstates = min(2**(n/2),
                           total_memory_nstates/(2**diff),
                           available_memory/(32))
-
+            nstates = int(nstates)
+            
             t = time_required(n,
                               nstates,
                               nsenders,
@@ -110,8 +122,9 @@ def attack_choices(n,
             choices.append((t, nstates, nsenders, nreceivers, diff))
 
     # sort choices according to the time in ascending order
-    sorted(choices, key=lambda tup: tup[0])
-    return choices[:5]
+    # sorted(choices, 
+    choices.sort(key=lambda tup: tup[0])
+    return choices[:10]
 
 
 if __name__ == "__main__":
@@ -152,11 +165,13 @@ if __name__ == "__main__":
 
     print("summary of the parameters")
     print("-------------------------")
-    total_expected_time = sum(tup[0] for tup in best_parameters)}
+    total_expected_time = sum(tup[0] for tup in best_parameters)
     print(f"total exp time = {seconds_2_time(total_expected_time)}")
     for p in best_parameters:
-        print(f"time={2*p[0]}, nsenders={p[2]}, nreceivers={p[3]},\
+        print(f"nsenders={p[2]}, nreceivers={p[3]},\
         l={log2(p[1])} difficulty={p[4]}")
+        print(f"time={seconds_2_time(3*p[0])}")
+        print("----------------------------------------")
     
     
 
@@ -164,6 +179,12 @@ if __name__ == "__main__":
     # run each attack in its repsoecting folder for at most for at
     # most 3x the time estimated time.
     for atck in best_parameters:
+        print("=======================================")
+        print("Now attacking: ")
+        print(f"nsenders={p[2]}, nreceivers={p[3]},\
+        nstates={log2(p[1])} difficulty={p[4]}")
+        print(f"time={seconds_2_time(3*p[0])}")
+
         # N will be in bytes 
         init_folder(args.n//8,
                     atck[1],  # nstates
@@ -175,11 +196,16 @@ if __name__ == "__main__":
         t_start = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         # run the attack, nstates is used from states file
         # nsenders is computed on the fly.
-        os.system(f"timeout {3*p[0]}s python run_phase_ii.py --nservers \
-        {args.nservers}  --receivers {atck[4]} -N {n//8} --ram {arg.ram} \
-        --interval 23 -d {atck[4]}")
+        N = args.n//8
+        print(t_start)
+        command = f"timeout {int(3*p[0])}s python run_phase_ii.py\
+ --nservers {args.nservers}  --receivers {atck[3]} -N {N} --ram {args.ram} \
+ --interval 23 -d {atck[4]}"
+        print(command)
+        os.system(command)
         t_end = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-        
+        print(t_end)
+        print("************************************************")
         # collect the energy consumption.
         get_power_consumption_data(t_start, t_end)
         # return to the base folder
