@@ -305,7 +305,7 @@ void receiver_process_task(int const myrank,
   snprintf(timing_file_name, sizeof(timing_file_name),
 	   "data/stats/receiver_dict_%d",
 	   myrank);
-  FILE* fp_timing = fopen(timing_file_name, "w");
+  FILE* fp_timing = fopen(timing_file_name, "a");
 
 
   /* MPI_Request_free(&request); /\* in 1st time there is no waiting  *\/ */
@@ -405,6 +405,7 @@ void receiver_process_task(int const myrank,
 	     nfound_cnd,
 	     nfound_cnd-old_nfound_candidates,
 	     elapsed_cnd);
+      fflush(fp_timing); /* ensure that stats are written */
 
       
       elapsed_dict = 0;
