@@ -113,14 +113,16 @@ int main(int argc, char* argv[]) /* single machine */
   
   /* load messages candidates, hash them, sort them */
   FILE* fp = fopen("data/messages/archive", "r");
+  FILE* fp_results = fopen("data/results", "w");  
   size_t nmsgs = (get_file_size(fp)) / HASH_INPUT_SIZE;
-  
+  size_t ncollisions = 0;
 
 
   printf("============================\n"
 	 "We have %lu candidates, \n"
 	 "============================\n", nmsgs);
-
+  fprintf(fp_results, "we have %lu candidates\n", nmsgs);
+  
   const WORD_TYPE state_init[NWORDS_STATE] = {HASH_INIT_STATE};
   /* We have three arrays: */
   u8* msgs  = (u8*) malloc( sizeof(u8)*nmsgs*HASH_INPUT_SIZE );
@@ -199,7 +201,7 @@ int main(int argc, char* argv[]) /* single machine */
 
   #pragma omp parallel for
   for(size_t ith_state=0; ith_state<(nmiddle_states-1); ++ith_state){
-    double start = wtime();
+    /* double start = wtime(); */
     u8 M_priv[HASH_INPUT_SIZE] = {0};
     CTR_TYPE* M_ctr_pt_priv = (CTR_TYPE*) M_priv;
     /* In the states file we keep the initial st */
@@ -230,13 +232,13 @@ int main(int argc, char* argv[]) /* single machine */
 
 	if (srearch_ptr_priv){
 	  printf("Yes at %llu\n", M_ctr_pt_priv[0]);
-	    
+
 	  size_t idx = linear_search((u8*)state_priv,
 				     dgsts,
 				     nmsgs,
 				     N);
-
           printf("at index=%lu, random msg=\n", idx);
+
 	  print_byte_array(&msgs[idx*HASH_INPUT_SIZE], HASH_INPUT_SIZE);
 	  printf("long message ctr=%llu\n", ((u64*)M_priv)[0]);
 	  print_byte_txt("hash long=", (u8*)state_priv, N);
@@ -245,6 +247,9 @@ int main(int argc, char* argv[]) /* single machine */
 	  hash_single(state_rnd, &msgs[idx*HASH_INPUT_SIZE]);
 	  print_byte_txt("hash rnd =", (u8*)state_rnd, N);
 
+	  #pragma omp atomic
+	  ++ncollisions;
+	  
 	  puts("----------------------------");
 	}
 	  	 
@@ -259,11 +264,13 @@ int main(int argc, char* argv[]) /* single machine */
   }
   
 
-
+  fprintf(fp_results, "ncollisions = %lu\n", ncollisions);
   free(msgs);
   free(dgsts);
   free(dgsts_orderd);
   free(middle_states);
+  fclose(fp_results);
+  
   /* free(middle_ctr); */
   
 } // quit the function
