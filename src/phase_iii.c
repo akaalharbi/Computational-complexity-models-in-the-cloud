@@ -265,6 +265,7 @@ int main(int argc, char* argv[]) /* single machine */
   
 
   fprintf(fp_results, "ncollisions = %lu\n", ncollisions);
+  fprintf(fp_results, "END\n", ncollisions);
   free(msgs);
   free(dgsts);
   free(dgsts_orderd);
