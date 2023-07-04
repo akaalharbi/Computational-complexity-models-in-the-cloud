@@ -37,7 +37,7 @@ def get_server_names():
 
     return server_names
 
-def get_power_consumption_data(t_start, t_end):
+def save_power_consumption_data(t_start, t_end):
     import os
     job_id = os.environ["OAR_JOBID"]
 
@@ -103,7 +103,7 @@ def attack_choices(n,
         nsenders = (ncores_per_server*nservers) - nreceivers
         for diff in range(0, 9):
             # compute l
- 
+
             # rule 1: don't pass n/2 limit
             # rule 2: we can't use more states than memory allows us!
             # rule 3: we can't fill memory with nstates less than available
@@ -112,7 +112,7 @@ def attack_choices(n,
                           total_memory_nstates/(2**diff),
                           available_memory/(32))
             nstates = int(nstates)
-            
+
             t = time_required(n,
                               nstates,
                               nsenders,
@@ -122,7 +122,7 @@ def attack_choices(n,
             choices.append((t, nstates, nsenders, nreceivers, diff))
 
     # sort choices according to the time in ascending order
-    # sorted(choices, 
+    # sorted(choices,
     choices.sort(key=lambda tup: tup[0])
     return choices[:10]
 
@@ -135,7 +135,7 @@ if __name__ == "__main__":
 
     # This the folder where all experiments will be done
     os.system("mkdir -p experiments")
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-n",
                         type=int,
@@ -172,8 +172,8 @@ if __name__ == "__main__":
         l={log2(p[1])} difficulty={p[4]}")
         print(f"time={seconds_2_time(3*p[0])}")
         print("----------------------------------------")
-    
-    
+
+
 
     # for each one of them create a folder_name_parameters
     # run each attack in its repsoecting folder for at most for at
@@ -207,9 +207,9 @@ if __name__ == "__main__":
         print(t_end)
         print("************************************************")
         # collect the energy consumption.
-        get_power_consumption_data(t_start, t_end)
+        save_power_consumption_data(t_start, t_end)
         # return to the base folder
-        os.chdir("../../")    
+        os.chdir("../../")
         # repeat
     print("we are done! many thanks to grid5000.fr")
 
