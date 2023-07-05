@@ -12,16 +12,8 @@ Planning for run_run_phase_iii:
 * todo!
 """
 # python3 run_run_phase_ii.py -n 72 --nservers 4 --ncores 32 -r 164000000000
-
-import sys
-
-from long_message_attack.src.time_required import time_required, seconds_2_time
+from src.time_required import time_required, seconds_2_time
 INTERVAL = 2**23
-
-
-
-
-
 
 
 def get_server_names():
@@ -53,6 +45,9 @@ def save_power_consumption_data(t_start, t_end):
 
 
 
+
+
+
 def init_folder(n,
                 nstates,
                 nsenders,
@@ -62,17 +57,43 @@ def init_folder(n,
     """
 
     import os
+    files = os.listdir()
+    # notice that we are ignoring src folder since not all c files are needed
+    # also we want Makefile for phase_ii not the general one!
+    ignored_dir = set([".gdbinit", "playground", "backup_data", ".gitignore",
+                       ".git", "src", "Makefile"])
 
-    os.system(f"cp -r long_message_attack experiments/N{n}_nstates{int(nstates)}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}")
-    os.chdir(f"experiments/N{n}_nstates{int(nstates)}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}")
-    
+
+    path = f"experiments/N{n}_nstates{int(nstates)}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}"
+
+    # create the special folder for the experiments
+    os.mkdir(path)
+
+    for f in files:
+        if f in ignored_dir:
+            continue
+        # copy the necessary files
+        os.system(f"rsync -avzP {f} {os.path.join(path, f)}")
+
+    # copy files needed from src/
+    src_path = os.path.join(path, "src/")
+    os.mkdir(src_path)
+    src_files = ["common.c", "dict.c", "phase_ii.c", "receiver.c",
+                 "sender.c", "time_required.py"]
+
+    # copy only needed source files for phase_ii
+    for src in src_files:
+        os.system(f"cp src/{src} {os.path.join(path, 'src/')}")
+
+    os.chdir(path)
+    os.system("mv Makefile_phase_ii Makefile")
+
     # truncate the states file
     print(f"Going to truncate the states file to {nstates*32}")
     # since our  states file doesn't contain all states but rather
     # a compressed file
     nbytes_in_states_file = (nstates*32)//INTERVAL
     os.system(f"truncate --size={nbytes_in_states_file} data/states")
-
 
 
 def attack_choices(n,

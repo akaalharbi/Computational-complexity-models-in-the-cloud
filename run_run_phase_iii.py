@@ -51,8 +51,8 @@ def folders_that_need_treatment():
 def complete_folder(path):
     """Add missing files for phase_iii to a folder."""
     import os
-    os.system(f"rsync -avzP long_message_attack_full/src/ {os.path.join(path, 'src/')}")
-    os.system(f"rsync -avzP long_message_attack_full/Makefile {os.path.join(path, 'Makefile')}")
+    os.system(f"rsync -avzP src/ {os.path.join(path, 'src/')}")
+    os.system(f"rsync -avzP Makefile {os.path.join(path, 'Makefile')}")
 
 
 def estimate_time_needed(path):
@@ -91,6 +91,7 @@ if __name__ == "__main__":
     import os
     from datetime import datetime
 
+    # relative paths: experiments/folder_name
     folders = folders_that_need_treatment()
     time_needed = [estimate_time_needed(d) for d in folders]
     current_path = os.getcwd()
@@ -106,7 +107,6 @@ if __name__ == "__main__":
     for d in folders:
         complete_folder(d)
         create_archive(d)
-
 
         os.chdir(d)
 
