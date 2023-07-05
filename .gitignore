@@ -25,6 +25,9 @@ test
 benchmark
 verify_data
 split_states
+experiments
+experiments/*
+
 
 # Linker output
 *.ilk

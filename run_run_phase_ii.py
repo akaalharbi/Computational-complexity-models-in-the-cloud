@@ -57,11 +57,12 @@ def init_folder(n,
     """
 
     import os
+
     files = os.listdir()
     # notice that we are ignoring src folder since not all c files are needed
     # also we want Makefile for phase_ii not the general one!
     ignored_dir = set([".gdbinit", "playground", "backup_data", ".gitignore",
-                       ".git", "src", "Makefile"])
+                       ".git", "src", "Makefile", "doc"])
 
 
     path = f"experiments/N{n}_nstates{int(nstates)}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}"
@@ -73,8 +74,9 @@ def init_folder(n,
         if f in ignored_dir:
             continue
         # copy the necessary files
-        os.system(f"rsync -avzP {f} {os.path.join(path, f)}")
+        os.system(f"rsync -a {f} {path}")
 
+    print(f"done with rysncy {path}")
     # copy files needed from src/
     src_path = os.path.join(path, "src/")
     os.mkdir(src_path)
@@ -84,6 +86,8 @@ def init_folder(n,
     # copy only needed source files for phase_ii
     for src in src_files:
         os.system(f"cp src/{src} {os.path.join(path, 'src/')}")
+
+    os.system(f"rsync -a src/util/ {os.path.join(path, 'src/')}util")
 
     os.chdir(path)
     os.system("mv Makefile_phase_ii Makefile")
@@ -110,7 +114,7 @@ def attack_choices(n,
     choices = []  # (nstates, nsenders, nreceivers, time_needed)
 
     # how many bytes in the file
-    nbytes = os.stat("long_message_attack/data/states").st_size
+    nbytes = os.stat("data/states").st_size
     # how many states when the file gets uncompressed
     # n_available_states = (nbytes/32) * (INTERVAL)
     total_memory_nstates = nbytes*INTERVAL
@@ -145,7 +149,8 @@ def attack_choices(n,
     # sort choices according to the time in ascending order
     # sorted(choices,
     choices.sort(key=lambda tup: tup[0])
-    return choices[:10]
+    # return the best 10 parameters or the closest number if they are < 10
+    return choices[:min(10, len(choices))]
 
 
 if __name__ == "__main__":
