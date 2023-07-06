@@ -61,10 +61,10 @@ def nqueries(n,  # as number of bits
 
 
 def time_required(n,  # n in bits not bytes
-                   nstates,  # nstates stored in phase_i
-                   nsenders,
-                   nreceivers,
-                   difficulty):
+                  nstates,  # nstates stored in phase_i
+                  nsenders,
+                  nreceivers,
+                  difficulty):
     """Given all attack parameters estimate how long does it take.
 
     This inlcude regenerating the message and collecting enough collisions.-

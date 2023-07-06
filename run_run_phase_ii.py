@@ -64,7 +64,7 @@ def init_folder(n,
     """
 
     import os
-    import time
+
     files = os.listdir()
     # notice that we are ignoring src folder since not all c files are needed
     # also we want Makefile for phase_ii not the general one!
@@ -82,7 +82,7 @@ def init_folder(n,
 
     # if by accident we ran phase_iii, we need to clean the source files.
     os.system(f"rm -rf {os.path.join(path, 'src/')}")
-    
+
     for f in files:
         if f in ignored_dir:
             continue
@@ -101,7 +101,7 @@ def init_folder(n,
         os.system(f"cp src/{src} {os.path.join(path, 'src/')}")
 
     os.system(f"rsync -a src/util/ {os.path.join(path, 'src/')}util")
-        
+
     os.chdir(path)
     os.system("mv Makefile_phase_ii Makefile")
 
@@ -124,6 +124,7 @@ def attack_choices(n,
     """
 
     import os
+    from math import log2
     # loop over available choices
     # difficulty <= 8
     choices = []  # (nstates, nsenders, nreceivers, time_needed)
@@ -135,7 +136,7 @@ def attack_choices(n,
     total_memory_nstates = nbytes*INTERVAL
     available_memory = server_memory*nservers
 
-    print(available_memory, total_memory_nstates)
+    print(f"mem avail=2^{log2(available_memory)}, states_mem = 2^{log2(total_memory_nstates)}")
 
     for nreceivers in range(nservers,  # start
                             nservers*ncores_per_server - nservers,
@@ -148,9 +149,12 @@ def attack_choices(n,
             # rule 2: we can't use more states than memory allows us!
             # rule 3: we can't fill memory with nstates less than available
             #         in phase_i!
+            # @todo this is wrong! correct your calculation we're being biased
+            # towards 0 difficulty!
+
             nstates = min(2**(n/2),
-                          total_memory_nstates/(2**diff),
-                          available_memory/(32))
+                          total_memory_nstates/(32),
+                          (available_memory*2**diff)/(32))
             nstates = int(nstates)
 
             t = time_required(n,
@@ -173,7 +177,7 @@ if __name__ == "__main__":
     import argparse
     from math import log2
     from datetime import datetime
-    from time import sleep
+
 
     # This the folder where all experiments will be done
     os.system("mkdir -p experiments")
@@ -228,7 +232,7 @@ if __name__ == "__main__":
         print(f"time={seconds_2_time(4*p[0])}")
 
         # N will be in bytes
-        
+
         init_folder(args.n//8,
                     atck[1],  # nstates
                     atck[2],  # nsenders
@@ -240,7 +244,7 @@ if __name__ == "__main__":
             print(f"skipping {atck}")
             os.chdir("../../")
             continue
-            
+
         t_start = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         # run the attack, nstates is used from states file
         # nsenders is computed on the fly.
