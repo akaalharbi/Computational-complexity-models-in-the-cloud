@@ -37,15 +37,22 @@ def save_power_consumption_data(t_start, t_end):
     # combine server names
     url_to_download = f"https://api.grid5000.fr/stable/sites/grenoble/metrics?job_id={job_id}&metrics=bmc_node_power_watt&&start_time={t_start}&end_time={t_end}"
 
-    commad = f"curl '{url_to_download}' | jq -r '.[] | [.timestamp, .device_id, .metric_id, .value, .labels|tostring] | @csv'  > data/bmc_watt{job_id}.csv"
+    commad = f"curl '{url_to_download}' | jq -r '.[] | [.timestamp, .device_id, .metric_id, .value, .labels|tostring] | @csv'  > data/phase_ii_bmc_watt{job_id}.csv"
     # download & save the data into a file
     os.system(commad)
     # curl 'https://api.grid5000.fr/stable/sites/grenoble/metrics?job_id=2296184&metrics=bmc_node_power_watt' | jq -r '.[] | [.timestamp, .device_id, .metric_id, .value, .labels|tostring] | @csv'  > bmc_watt.cs
 
 
 
+def say_folder_is_done():
+    """Assume we are inside the folder."""
+    with open("data/phase_ii_status", "w") as f:
+        f.write("DONE!")
 
+def is_folder_done():
+    import os
 
+    return os.path.exists("data/phase_ii_status")
 
 
 def init_folder(n,
@@ -57,19 +64,25 @@ def init_folder(n,
     """
 
     import os
-
+    import time
     files = os.listdir()
     # notice that we are ignoring src folder since not all c files are needed
     # also we want Makefile for phase_ii not the general one!
     ignored_dir = set([".gdbinit", "playground", "backup_data", ".gitignore",
-                       ".git", "src", "Makefile", "doc"])
+                       ".git", "src", "Makefile", "doc", "experiments"])
 
 
     path = f"experiments/N{n}_nstates{int(nstates)}_nsenders{nsenders}_nreceivers{nreceivers}_diff{difficulty}"
 
     # create the special folder for the experiments
-    os.mkdir(path)
+    if not os.path.exists(path):
+        os.mkdir(path)
+        # copy the data folder only once!
+        os.system(f"rysnc -a data {path})")
 
+    # if by accident we ran phase_iii, we need to clean the source files.
+    os.system(f"rm -rf {os.path.join(path, 'src/')}")
+    
     for f in files:
         if f in ignored_dir:
             continue
@@ -88,7 +101,7 @@ def init_folder(n,
         os.system(f"cp src/{src} {os.path.join(path, 'src/')}")
 
     os.system(f"rsync -a src/util/ {os.path.join(path, 'src/')}util")
-
+        
     os.chdir(path)
     os.system("mv Makefile_phase_ii Makefile")
 
@@ -98,6 +111,8 @@ def init_folder(n,
     # a compressed file
     nbytes_in_states_file = (nstates*32)//INTERVAL
     os.system(f"truncate --size={nbytes_in_states_file} data/states")
+
+    return path
 
 
 def attack_choices(n,
@@ -150,7 +165,7 @@ def attack_choices(n,
     # sorted(choices,
     choices.sort(key=lambda tup: tup[0])
     # return the best 10 parameters or the closest number if they are < 10
-    return choices[:min(10, len(choices))]
+    return choices[:min(20, len(choices))]
 
 
 if __name__ == "__main__":
@@ -158,6 +173,7 @@ if __name__ == "__main__":
     import argparse
     from math import log2
     from datetime import datetime
+    from time import sleep
 
     # This the folder where all experiments will be done
     os.system("mkdir -p experiments")
@@ -191,12 +207,12 @@ if __name__ == "__main__":
 
     print("summary of the parameters")
     print("-------------------------")
-    total_expected_time = sum(tup[0] for tup in best_parameters)
+    total_expected_time = 4*sum(tup[0] for tup in best_parameters)
     print(f"total exp time = {seconds_2_time(total_expected_time)}")
     for p in best_parameters:
         print(f"nsenders={p[2]}, nreceivers={p[3]},\
         l={log2(p[1])} difficulty={p[4]}")
-        print(f"time={seconds_2_time(3*p[0])}")
+        print(f"time={seconds_2_time(4*p[0])}")
         print("----------------------------------------")
 
 
@@ -209,9 +225,10 @@ if __name__ == "__main__":
         print("Now attacking: ")
         print(f"nsenders={p[2]}, nreceivers={p[3]},\
         nstates={log2(p[1])} difficulty={p[4]}")
-        print(f"time={seconds_2_time(3*p[0])}")
+        print(f"time={seconds_2_time(4*p[0])}")
 
-        # N will be in bytes 
+        # N will be in bytes
+        
         init_folder(args.n//8,
                     atck[1],  # nstates
                     atck[2],  # nsenders
@@ -219,18 +236,25 @@ if __name__ == "__main__":
                     atck[4],  # difficulty
                     )
 
+        if is_folder_done():
+            print(f"skipping {atck}")
+            os.chdir("../../")
+            continue
+            
         t_start = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         # run the attack, nstates is used from states file
         # nsenders is computed on the fly.
         N = args.n//8
         print(t_start)
-        command = f"timeout {int(3*p[0])}s python run_phase_ii.py\
+        command = f"timeout {int(4*p[0])}s python run_phase_ii.py\
  --nservers {args.nservers}  --receivers {atck[3]} -N {N} --ram {args.ram} \
  --interval 23 -d {atck[4]}"
         print(command)
+        # sleep(10)
         os.system(command)
         t_end = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         print(t_end)
+        say_folder_is_done()  # we should not visit the folder again
         print("************************************************")
         # collect the energy consumption.
         save_power_consumption_data(t_start, t_end)

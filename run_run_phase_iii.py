@@ -9,6 +9,8 @@
 # print the sum of the estimated time.
 # 2- run phase_iii for each folder that is not completed
 # 3- download energy consumption
+INTERVAL = 2**13
+
 def seconds_2_time(t):
     """Convert times given as seconds into a readable string."""
     from math import floor
@@ -34,12 +36,22 @@ def folders_that_need_treatment():
                    if os.path.isdir(os.path.join(path, d))]
 
     for d in directories:
-        with open(os.path.join(path, d), "r") as f:
+        data_path = os.path.join(path, d) + "/data/results"
+
+        if not os.path.exists(os.path.join(path, d) + "/data/phase_ii_status"):
+            continue  # skip this folder it has not been completed by phase ii
+
+        if not os.path.exists(data_path):
+            unworked_folders.append(os.path.join(path, d))
+            continue
+        
+        with open(data_path, "r") as f:
             for line in f:
                 last_line = line
         if last_line[:3] == "END":
             # this folder passed phase_iii
             continue
+        
         unworked_folders.append(os.path.join(path, d))
 
         # open d/data/results
@@ -58,18 +70,22 @@ def complete_folder(path):
 def estimate_time_needed(path):
     """Return estimation of nseconds needed to complete phase_iii."""
     import os
-    path_to_archive = os.stat(os.path.join(path, "data/messages/archive"))
-    nbytes = os.stat(path_to_archive)
-
+    path_to_archive = os.path.join(path, "data/states")
+    nbytes = os.stat(path_to_archive).st_size
+    nbytes = nbytes*INTERVAL
+    print(f"|{path_to_archive}|={nbytes} bytes")
     # how many seconds are estimated to regenerate the long message which is
     # the heaviest part in phase_iii
-    return (nbytes/(32*os.cpu_count()*(2**24)))
+    #print((nbytes/(32*os.cpu_count()*(2**23))))
+    return (nbytes/(os.cpu_count()*(2**23)))
 
 
 def create_archive(path):
     """Create archive file in data/messages/."""
     import os
-    path_to_messages = os.stat(os.path.join(path, "data/messages/"))
+    path_to_messages = os.path.join(path, "data/messages/")
+    print(path)
+    os.system(f"rm -f {path_to_messages}archive")
     os.system(f"cat {path_to_messages}* > {path_to_messages+'archive'}")
 
 def save_power_consumption_data(t_start, t_end):
@@ -81,7 +97,7 @@ def save_power_consumption_data(t_start, t_end):
     # combine server names
     url_to_download = f"https://api.grid5000.fr/stable/sites/grenoble/metrics?job_id={job_id}&metrics=bmc_node_power_watt&&start_time={t_start}&end_time={t_end}"
 
-    commad = f"curl '{url_to_download}' | jq -r '.[] | [.timestamp, .device_id, .metric_id, .value, .labels|tostring] | @csv'  > data/bmc_watt{job_id}.csv"
+    commad = f"curl '{url_to_download}' | jq -r '.[] | [.timestamp, .device_id, .metric_id, .value, .labels|tostring] | @csv'  > data/phase_iii_bmc_watt{job_id}.csv"
     # download & save the data into a file
     os.system(commad)
     # curl 'https://api.grid5000.fr/stable/sites/grenoble/metrics?job_id=2296184&metrics=bmc_node_power_watt' | jq -r '.[] | [.timestamp, .device_id, .metric_id, .value, .labels|tostring] | @csv'  > bmc_watt.cs
@@ -93,6 +109,10 @@ if __name__ == "__main__":
 
     # relative paths: experiments/folder_name
     folders = folders_that_need_treatment()
+
+    for d in folders:
+        create_archive(d)
+
     time_needed = [estimate_time_needed(d) for d in folders]
     current_path = os.getcwd()
 
@@ -100,13 +120,13 @@ if __name__ == "__main__":
     print(f"There are {len(folders)} we're going to work on")
     print(f"Treating all of them is expected to take {seconds_2_time(sum(time_needed))}")
 
-    for i in len(folders):
+    for i in range(len(folders)):
         print(f"folder={folders[i]}, takes={time_needed[i]}sec")
-
+    
     # Actual computation:
     for d in folders:
         complete_folder(d)
-        create_archive(d)
+
 
         os.chdir(d)
 
