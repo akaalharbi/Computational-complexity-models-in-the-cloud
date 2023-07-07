@@ -133,7 +133,7 @@ u32 to_which_server(u8 state[HASH_STATE_SIZE])
   /* since the last bits are the distinguished point and thery are zero */
   /* and they are the most significant bits in snd_to_server*/
   /* no shift nor mask is needed */
-  snd_to_server = snd_to_server % NSERVERS;
+  snd_to_server = (snd_to_server % (0x7fffffff)) % NSERVERS;
 
   return snd_to_server;
 } 
