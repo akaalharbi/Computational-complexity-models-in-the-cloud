@@ -79,8 +79,10 @@ void print_attack_information(){
 int is_dist_state(u8 state[HASH_STATE_SIZE]){
   /* check if the last X bits  if we read digest as little endian are zeros  */
   /* terms on the left get all 1s, term on right move 1s to the end */
-  static const u8 ones = ( (1LL<<DIFFICULTY) - 1) << (8-DIFFICULTY);
-  u8 last_8bits = ( (u8*) state)[N-1];
+  /* A quick fix for n=92 ignore */
+  /* only the first 4bits */
+  static const u8 ones = ( (1LL<<DIFFICULTY) - 1); // << (8-DIFFICULTY);
+  u8 last_8bits = (( (u8*) state)[N-1]);
     
   /* For now, we are not going to have difficulyt more than 8 bits. It will  */
   return ( (  last_8bits  & ones) == 0 );
@@ -97,14 +99,6 @@ int is_dist_digest(u8 state[N]){
   /* take 330 years using my laptop! The longest recorded life is 122 years!  */
   return ( (  last_8bits  & ones) == 0 );
 }
-
-
-/* int is_dist_msg(u8 M[HASH_INPUT_SIZE]){ */
-/*   WORD_TYPE state[NWORDS_STATE] = {HASH_INIT_STATE}; */
-/*   hash_single(state, M); */
-
-/*   return is_dist_state((u8*) state); */
-/* } */
 
 
 

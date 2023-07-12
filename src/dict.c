@@ -138,6 +138,11 @@ int dict_add_element_to(dict* d, u8* state){
   // issues may aris when VAL_SIZE is larger then what is left in the state   |
   //                                                                          |
   // -------------------------------------------------------------------------+
+  
+  // @Warning!
+  /* special case n=92, mask the last 4 bits with zero */
+  state[N-1] = state[N-1] & 0xf;
+
   /* how many bytes do we need to index the buckets */
   const int idx_size =   (int) ceil((log2(NSLOTS_MY_NODE) - log2(d->nslots_per_bucket))
 				   /8.0) ;

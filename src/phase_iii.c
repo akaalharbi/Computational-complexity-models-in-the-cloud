@@ -143,6 +143,10 @@ int main(int argc, char* argv[]) /* single machine */
     memcpy(state, state_init, HASH_STATE_SIZE);
     hash_single(state, &msgs[i*HASH_INPUT_SIZE]);
 
+    // @Warning!
+    /* special case n=92, mask the last 4 bits with zero */
+    ((u8*) state)[N-1] = ((u8*) state)[N-1] & 0xf;
+
     /* a sanity check  */
     assert(is_dist_digest((u8*)state));
 
@@ -195,21 +199,18 @@ int main(int argc, char* argv[]) /* single machine */
 
 
   // ----------------------------- PART 4 ------------------------------------
-
-
-
-
   #pragma omp parallel for
   for(size_t ith_state=0; ith_state<(nmiddle_states-1); ++ith_state){
     /* double start = wtime(); */
     u8 M_priv[HASH_INPUT_SIZE] = {0};
     CTR_TYPE* M_ctr_pt_priv = (CTR_TYPE*) M_priv;
     /* In the states file we keep the initial st */
-
+    
     // CTR_TYPE next_ctr = middle_ctr[ith_state+1];
     WORD_TYPE state_priv[HASH_STATE_SIZE];
-    u8* srearch_ptr_priv = NULL;
+    u8 digest_priv[N] = {0};
     
+    u8* srearch_ptr_priv = NULL;
 
     memcpy(state_priv,
 	   &middle_states[ith_state*NWORDS_STATE],
@@ -222,13 +223,18 @@ int main(int argc, char* argv[]) /* single machine */
     for (u64 ctr=0; ctr<INTERVAL; ++ctr) {
       hash_single(state_priv, M_priv);
       ++M_ctr_pt_priv[0];
-
-
-
+ 
       
       if(is_dist_digest((u8*) state_priv)){
-      /* if(1){ */
-	srearch_ptr_priv = bsearch(state_priv, dgsts_orderd, nmsgs, N, cmp_dgst);
+	/* if(1){ */
+
+	// @Warning! This change the global state of the program.
+	/* special case n=92, mask the last 4 bits with zero */
+	memcpy(digest_priv, state_priv, N);
+	digest_priv[N-1] = digest_priv[N-1] & 0xf;
+
+	
+	srearch_ptr_priv = bsearch(digest_priv, dgsts_orderd, nmsgs, N, cmp_dgst);
 
 	if (srearch_ptr_priv){
 	  printf("Yes at %llu\n", M_ctr_pt_priv[0]);

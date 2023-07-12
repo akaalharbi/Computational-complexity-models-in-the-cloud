@@ -210,10 +210,17 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
       if (lane < n_active_lanes){
 	/* do usefule work only when we are acting on active lane  */
 	*n_dist_points = i;
+
         /* update counter the ith counter */
 	msg_ctrs_out[i] = ((CTR_TYPE*)Mavx[lane])[0];
-	/* get the digest to digests vector */
+
+        /* get the digest to digests vector */
 	copy_transposed_digest(&digests[i*N], tr_states, lane);
+
+        // @Warning!
+        /* special case n=92, mask the last 4 bits with zero */
+	digests[i*N + (N-1)] = digests[i*N + (N-1)] & 0xf;
+	
       }
     }
   } /* end if (cmp_mask) */
