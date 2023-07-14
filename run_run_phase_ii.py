@@ -78,7 +78,7 @@ def init_folder(n,
     if not os.path.exists(path):
         os.mkdir(path)
         # copy the data folder only once!
-        os.system(f"rysnc -a data {path}")
+        os.system(f"rsync -a data {path}")
 
     # if by accident we ran phase_iii, we need to clean the source files.
     os.system(f"rm -rf {os.path.join(path, 'src/')}")
@@ -89,7 +89,7 @@ def init_folder(n,
         # copy the necessary files
         os.system(f"rsync -a {f} {path}")
 
-    print(f"done with rysncy {path}")
+    print(f"done with rsync {path}")
     # copy files needed from src/
     src_path = os.path.join(path, "src/")
     os.mkdir(src_path)
