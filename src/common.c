@@ -92,7 +92,7 @@ int is_dist_digest(u8 state[N]){
   /* check if the last X bits  if we read digest as little endian are zeros  */
 
   /* terms on the left get all 1s, term on right move 1s to the end */
-  static const u8 ones = ( (1LL<<DIFFICULTY) - 1) << (8-DIFFICULTY);
+  static const u8 ones = ( (1LL<<DIFFICULTY) - 1); // << (8-DIFFICULTY);
   u8 last_8bits = ( (u8*) state)[N-1];
     
   /* For now, we are not going to have difficulyt more than 16 bits. It will  */
