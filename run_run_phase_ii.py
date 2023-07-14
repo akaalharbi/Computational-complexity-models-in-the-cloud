@@ -78,7 +78,7 @@ def init_folder(n,
     if not os.path.exists(path):
         os.mkdir(path)
         # copy the data folder only once!
-        os.system(f"rysnc -a data {path})")
+        os.system(f"rysnc -a data {path}")
 
     # if by accident we ran phase_iii, we need to clean the source files.
     os.system(f"rm -rf {os.path.join(path, 'src/')}")
