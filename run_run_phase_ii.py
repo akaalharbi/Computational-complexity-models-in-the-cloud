@@ -77,8 +77,9 @@ def init_folder(n,
     # create the special folder for the experiments
     if not os.path.exists(path):
         os.mkdir(path)
+        
         # copy the data folder only once!
-        os.system(f"rysnc -a data {path})")
+        os.system(f"rsync -a data {path}")
 
     # if by accident we ran phase_iii, we need to clean the source files.
     os.system(f"rm -rf {os.path.join(path, 'src/')}")
@@ -175,7 +176,7 @@ def attack_choices(n,
 if __name__ == "__main__":
     import os
     import argparse
-    from math import log2
+    from math import log2, ceil
     from datetime import datetime
 
 
@@ -232,8 +233,8 @@ if __name__ == "__main__":
         print(f"time={seconds_2_time(4*p[0])}")
 
         # N will be in bytes
-
-        init_folder(args.n//8,
+        N = ceil(args.n/8)
+        init_folder(N,
                     atck[1],  # nstates
                     atck[2],  # nsenders
                     atck[3],  # nreceivers
@@ -248,7 +249,7 @@ if __name__ == "__main__":
         t_start = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         # run the attack, nstates is used from states file
         # nsenders is computed on the fly.
-        N = args.n//8
+        
         print(t_start)
         command = f"timeout {int(4*p[0])}s python run_phase_ii.py\
  --nservers {args.nservers}  --receivers {atck[3]} -N {N} --ram {args.ram} \
