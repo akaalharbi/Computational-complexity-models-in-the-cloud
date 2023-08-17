@@ -98,11 +98,13 @@ def extract_candidates_stats(text):
 def parse_receiver_file(f_inp, f_csv):
     """Extract data from f_inp and write the extracted data to csv_name."""
     import re
-    matches = re.findall(r".*(\d)+", f_inp.name)
+    matches = re.findall(r"(\d+)", f_inp.name)
+    # print(f"file_name={f_inp.name}")
     receiver_name = matches[0]
-    print(f"treating receiver {receiver_name} that is {f_inp.name}")
+    # print(f"receiver_name={receiver_name}")
 
-    bracket = "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-"
+
+    bracket = "<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-<-\n"
 
     # read the first 6 lines which corresponds to rehashing a message.
     is_bracket_open = False
@@ -120,39 +122,55 @@ def parse_receiver_file(f_inp, f_csv):
     # reset variables
     text = ""
     is_bracket_open = False
+    next_line_candidates = False
+
+    print(f"DONE with regen stats {receiver_name} receiver")
 
     # Actual parsing:
     for line in f_inp:  # complete where stopped before
+        # print(f"bracket={bracket == line}, {line}")
+
         if line == bracket:
             tmp = is_bracket_open
             is_bracket_open = (is_bracket_open + 1) % 2
+            # print(f"is_bracket_open={is_bracket_open}")
 
             # we just closed a bracket that was open, i.e. receiving stats
             if tmp and not is_bracket_open:
                 # treat the text
                 text += line
+                # print(f"text={text}")
                 csv_line = extract_receiving_stats(text)
-                csv_line += f",{receiver_name}"
-                # @todo add receiver_name!
-                f_csv.write(text)
+                # print("+"*40)
+                # print(f"inside brackets:\n{text}")
+                # print(csv_line)
+                # print("+"*40)
+                f_csv.write(csv_line)
                 text = ""
+                next_line_candidates = True
+
                 continue  # don't do extra computation
 
         # or we only read a cadnidates statistics
-        if line != bracket and not is_bracket_open:
+        if line != bracket and next_line_candidates:
             text = line
-            csv_line = extract_candidates_stats(text)
-            csv_line += f",{receiver_name}"
-            f_csv.write(text)
+            csv_line = "," + extract_candidates_stats(text)
+            csv_line += f",{receiver_name}\n"
+            # print("+"*40)
+            # print(f"candidates {text}")
+            # print(csv_line)
+            # print("+"*40)
+            f_csv.write(csv_line)
             # @todo add receiver name!
             text = ""  # reset the text
+            next_line_candidates = False
             continue  # don't do extra computation
 
         # Accumlate receiving statistics text
         text += line
 
 
-def parse_receivers(folder):
+def parse_receivers():
     """Process all receiver_* files and store the result in sender.csv.
 
     This function doesn't change path, it assumes that we are in stats/ folder.
@@ -160,10 +178,10 @@ def parse_receivers(folder):
     import os
 
     file_names = os.listdir("data/stats/")  # get all files names that start with
-    file_names = filter(lambda x: "receiver" in x, file_names)
+    file_names = filter(lambda x: "receiver_" in x, file_names)
     file_names = [os.path.join("data/stats/", f_name) for f_name in file_names]
-
-    csv_file = open("data/stats/receivers.csv")
+    # print(f"files are {file_names}")
+    csv_file = open("data/stats/receivers.csv", "w")
     # add csv header
     # todo
 
