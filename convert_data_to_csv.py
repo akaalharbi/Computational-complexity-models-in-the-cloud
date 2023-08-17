@@ -86,11 +86,11 @@ def extract_candidates_stats(text):
     matches = re.findall(r'new_cnd=(\d+)', text)
     new_cnd = matches[0]
 
-    matches = re.findall(r't=(\d+\.\d+)sec', text)
-    t = matches[0]
+    # matches = re.findall(r't=(\d+\.\d+)sec', text)
+    # t = matches[0]
 
     # Combine the extracted data into a CSV line
-    csv_line = f"{nfound_cnd},{new_cnd},{t}"
+    csv_line = f"{nfound_cnd},{new_cnd}"
 
     return csv_line
 
@@ -182,6 +182,7 @@ def parse_receivers():
     file_names = [os.path.join("data/stats/", f_name) for f_name in file_names]
     # print(f"files are {file_names}")
     csv_file = open("data/stats/receivers.csv", "w")
+    csv_file.write("time_sec,mpi_recv_sec,dict_add_sec,dict_add_speed_MB,mpi_recv_percent,dict_add_percent,recv_speed_MB,exp_all_receivers_MB,nsenders,nreceivers,difficulty,interval,nmsgs_recv,nfound_cnd,new_cnd,receiver_name\n")
     # add csv header
     # todo
 
@@ -190,26 +191,91 @@ def parse_receivers():
         parse_receiver_file(receiver_file, csv_file)
 
 
-def parse_sender():
+
+
+
+
+def extract_sender_stat(text):
+    """Extract sender stats into csv format."""
+    import re
+
+    # Remove delimiters
+    text = text.replace("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->", "")
+
+    # Split text by lines
+    lines = text.strip().split('\n')
+
+    # Initialize list to store extracted data
+    data = []
+
+    # Extract data from each line
+    for line in lines:
+        # Use regular expressions to extract numeric values
+        values = re.findall(r'[\d.]+', line)
+        data.extend(values)
+
+    # Convert list to CSV format
+    csv_data = ",".join(data)
+
+    return csv_data
+
+
+def parse_sender_file(f_inp, f_csv):
+    """Loop over all senders stats and collect them inside single csv file."""
+    import re
+    matches = re.findall(r"(\d+)", f_inp.name)
+    # print(f"file_name={f_inp.name}")
+    sender_name = matches[0]
+    # print(f"i.e. name={sender_name}")
+    bracket = "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
+    is_bracket_open = False
+    text = ""
+
+    # The actual parsing
+    for line in f_inp:
+        if line == bracket:
+            tmp = is_bracket_open
+            is_bracket_open = (is_bracket_open + 1) % 2
+
+            # we just closed a bracket that was open
+            if tmp and not is_bracket_open:
+
+                text += line
+                # print("+++++++++++++++++++++++++++++++++")
+                # print(f"{text}")
+                # print("++++++++++++++++++++++++++++++++")
+                csv_line = extract_sender_stat(text)
+                csv_line += f",{sender_name}\n"
+                # print(f"sender {sender_name} going to write\n{csv_line}")
+                f_csv.write(csv_line)
+                text = ""
+                continue  # don't do any other computation
+
+        text += line
+
+
+def parse_senders():
     """
     Process all sender_* files and store the result in sender.csv.
 
     This function doesn't change path, it assumes that we are in stats/ folder.
     """
-    # with open(file_name, "r"): as f:
-    #
-    #     # else if it's a candidate 
-    #     pass
+    import os
+
+    file_names = os.listdir("data/stats/")  # get all files names that start with
+    file_names = filter(lambda x: "sender_" in x, file_names)
+    file_names = [os.path.join("data/stats/", f_name) for f_name in file_names]
+    # print(f"files are {file_names}")
+    csv_file = open("data/stats/senders.csv", "w")
+    csv_file.write("time,mpi_wait_sec,hash_sec,hash_speed,hash_speed_MB,find_dist_sec,mpi_send_percent,hash_percent,find_dist_percent,send_speed_MB,exp_all_senders_speed_MB,nsenders,nreceivers,difficulty,interval,nsends\n")
+    # add csv header
+    # todo
+
+    for f in file_names:
+        print(f"Going to treat {f}")
+        sender_file = open(f, "r")
+        parse_sender_file(sender_file, csv_file)
 
 
-def total_consumption():
-    """Get the total energy consumption and the average energy per bit.
-
-    This function doesn't change path, it assumes that we are in stats/ folder.
-    """
-    pass
-
-
-def create_summary():
-    """Combine the 3 csv files sender, receiver, and total_consumption."""
-    pass
+parse_receivers()
+parse_senders()
