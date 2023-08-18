@@ -116,7 +116,8 @@ def parse_receiver_file(f_inp, f_csv):
         text += f_inp.readline()
 
     csv_line = extract_receiving_stats(text)
-    csv_line = csv_line + ",0,0,0," + receiver_name + "\n"
+    # two entries: nnew_candidates, nfound_candidates, we ignore time
+    csv_line = csv_line + ",0,0," + receiver_name + "\n"
     f_csv.write(csv_line)
 
     # reset variables
@@ -267,7 +268,7 @@ def parse_senders():
     file_names = [os.path.join("data/stats/", f_name) for f_name in file_names]
     # print(f"files are {file_names}")
     csv_file = open("data/stats/senders.csv", "w")
-    csv_file.write("time,mpi_wait_sec,hash_sec,hash_speed,hash_speed_MB,find_dist_sec,mpi_send_percent,hash_percent,find_dist_percent,send_speed_MB,exp_all_senders_speed_MB,nsenders,nreceivers,difficulty,interval,nsends\n")
+    csv_file.write("time,mpi_wait_sec,hash_sec,hash_speed,hash_speed_MB,find_dist_sec,mpi_send_percent,hash_percent,find_dist_percent,send_speed_MB,exp_all_senders_speed_MB,nsenders,nreceivers,difficulty,interval,nsends,sender_name\n")
     # add csv header
     # todo
 
