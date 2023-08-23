@@ -1,6 +1,6 @@
 #include "numbers_shorthands.h"
 #include "hash.h"
-
+#include "sha256_single.h"
 #include "dict.h"
 #include <bits/types/struct_timeval.h>
 
