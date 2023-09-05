@@ -22,7 +22,73 @@
 #include "include/common.h"
 #include <x86intrin.h>
 #include <mpi.h>
+#include <math.h>
+#include <string.h>
+#include <stdlib.h>
+
+
 #define N_ACTIVE_LANES 16 /* this should be somewhere else */
+
+#include <sys/time.h>
+#include <bits/types/struct_timeval.h>
+double wtime()
+{
+        struct timeval ts;
+        gettimeofday(&ts, 0);
+        return (double) ts.tv_sec + ts.tv_usec / 1e6;
+}
+
+size_t get_file_size(FILE *fp)
+{
+  /* return file size in bytes */
+  u64 old_position = ftell(fp);
+  fseek(fp, 0L, SEEK_END);
+  size_t size = ftell(fp);
+  /* go back to the old position */
+  fseek(fp, old_position, SEEK_SET);
+  return size;
+}
+
+
+static inline void show_and_save_benchmark
+    (double total_elapsed,
+     double elapsed_mpi_send,
+     double elapsed_hash,
+     double elapsed_extract_dist,
+     size_t nmsgs_sent,
+     size_t nbytes_per_server,
+     size_t nhashes,
+     size_t interval,
+     int nsenders,
+     int myrank)
+{
+
+
+  printf("->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n"
+	 "total=%fsec, mpi_wait=%fsec, hash=%fsec≈%fhash/sec≈%fMB/sec, find dist=%fsec\n"
+	 "mpi_send=%f%%, hash=%f%%, find dist=%f%%\n" 
+	 "send %f MB/sec, exp[all senders] = %f MB/sec, nsenders=%d, nservers=%d\n"
+	 "DIFFICULTY=%d, INTERVAL=%d, nsends=%lu\n"
+	 "->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->->\n",
+	 total_elapsed,
+	 elapsed_mpi_send,
+	 elapsed_hash,
+	 (nhashes) / elapsed_hash,
+	 (nhashes*N) / (elapsed_hash*1000000),
+	 elapsed_extract_dist,
+	 100*elapsed_mpi_send/total_elapsed,
+	 100*elapsed_hash/total_elapsed,
+	 100*elapsed_extract_dist/total_elapsed,
+	 nmsgs_sent*((nbytes_per_server)/total_elapsed)/1000000,
+	 nsenders*nmsgs_sent*((nbytes_per_server)/total_elapsed)/1000000,
+	 nsenders,
+	 NSERVERS,
+	 DIFFICULTY,
+	 (int) log2(interval),
+	 nmsgs_sent);
+
+}    
+
 
 void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 			 int n_active_lanes, /* in */
@@ -45,7 +111,7 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
   //                 distinguished points.                                     |
   // - n_dist_points: how many distinguished points have been found.           |
   // --------------------------------------------------------------------------+
-
+  // note: I think this function is fine, did not test thoroughly
 
   /* Init an AVX512 vector */
   const REG_TYPE zero = SIMD_SETZERO_SI();
@@ -124,10 +190,17 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* u8* bsnd_buf = (u8*) malloc((((sizeof(u8)*N + sizeof(CTR_TYPE))* PROCESS_QUOTA) + MPI_BSEND_OVERHEAD) */
   /* 			      * NSERVERS); */
 
+
+  // @todo create stats array
+  // one for total number of digests a receiver gets
+  // another for number of sends a receiver gets
+
+  u64 total_digests[NSERVERS] = {0};
+  u64 total_nmsgs[NSERVERS] = {0};
   // -------------------------------- PART 1 ----------------------------------+
   // VARIABLES DEFINITIONS
 
-
+  
   FILE* fp = fopen("data/states", "r");
 
   char file_name[FILE_NAME_MAX_LENGTH];
@@ -184,9 +257,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
 
   // *************************** DEBUGGING INIT ********************************//
-  u32 single_states[16][NWORDS_DIGEST] = {0};
-  u8 single_data[16][64] = {0};
-  u32 un_tr_states[16*NWORDS_DIGEST] = {0};
+  /* u32 single_states[16][NWORDS_DIGEST] = {0}; */
+  /* u8 single_data[16][64] = {0}; */
+  /* u32 un_tr_states[16*NWORDS_DIGEST] = {0}; */
   
   // ********************************DEBUGGING*********************************//
 
@@ -210,11 +283,11 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
     // ****************************** DEBUGGING *********************************//
     
-    memcpy(single_states, &states[local_idx*NWORDS_STATE], HASH_STATE_SIZE*16);
-    for (int lane=0; lane<16; ++lane) {
-      ((u64*) single_data[lane])[0] = INTERVAL * (global_idx + lane);
-      /* sha256_single(single_states[lane], single_data[0]); */
-    }
+    /* memcpy(single_states, &states[local_idx*NWORDS_STATE], HASH_STATE_SIZE*16); */
+    /* for (int lane=0; lane<16; ++lane) { */
+    /*   ((u64*) single_data[lane])[0] = INTERVAL * (global_idx + lane); */
+    /*   /\* sha256_single(single_states[lane], single_data[0]); *\/ */
+    /* } */
     // **************************************************************************//
 
     
@@ -233,25 +306,25 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       elapsed_hash += (wtime() - timer);
 
       // ****************************** DEBUGGING *********************************//
-      untranspose_state(un_tr_states, tr_states);
-      for (int lane=0; lane<16; ++lane) {
-	sha256_single(single_states[lane], single_data[lane]);
-	((u64*) single_data[lane])[0] += 1;
+      /* untranspose_state(un_tr_states, tr_states); */
+      /* for (int lane=0; lane<16; ++lane) { */
+      /* 	sha256_single(single_states[lane], single_data[lane]); */
+      /* 	((u64*) single_data[lane])[0] += 1; */
 	
-	if (memcmp(single_states[lane], &un_tr_states[lane*NWORDS_STATE], HASH_STATE_SIZE) != 0){
-	  printf("*****************************************************\n"
-		 "At global_idx=%lu, hash_n=%llu, lane=%d, sender=%d\n"
-		 "*****************************************************\n",
-		global_idx,
-		hash_n,
-		lane,
-		myrank);
-	  exit(EXIT_FAILURE);
-	  // print a debug information and exit the program
-	}
+      /* 	if (memcmp(single_states[lane], &un_tr_states[lane*NWORDS_STATE], HASH_STATE_SIZE) != 0){ */
+      /* 	  printf("*****************************************************\n" */
+      /* 		 "At global_idx=%lu, hash_n=%llu, lane=%d, sender=%d\n" */
+      /* 		 "*****************************************************\n", */
+      /* 		global_idx, */
+      /* 		hash_n, */
+      /* 		lane, */
+      /* 		myrank); */
+      /* 	  exit(EXIT_FAILURE); */
+      /* 	  // print a debug information and exit the program */
+      /* 	} */
 	  
-	// @todo add if condition to check they are all the same
-      }
+      /* 	// @todo add if condition to check they are all the same */
+      /* } */
 
       // **************************************************************************//    
 
@@ -267,21 +340,13 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       /* however in most cases we are not going to use it unless we are in */
       /* the boundary. */
       timer = wtime();
-      if (n_active_lanes == 16){
-	extract_dist_points_16(tr_states, /* transposed states */
-			    Mavx, /* messages used */
-			    digests, /* save the distinguished hashes here */
-			    msg_ctrs, /* messages are the same except counter */
-			    &n_dist_points); /* how many dist points found? */
 
-      }else {/* this function slower than the one above! */
-	extract_dist_points_dynamic(tr_states, /* transposed states */
-			    n_active_lanes,
-			    Mavx, /* messages used */
-			    digests, /* save the distinguished hashes here */
-			    msg_ctrs, /* messages are the same except counter */
-			    &n_dist_points); /* how many dist points found? */
-      }
+      extract_dist_points_dynamic(tr_states, /* transposed states */
+				  n_active_lanes,
+				  Mavx, /* messages used */
+				  digests, /* save the distinguished hashes here*/
+				  msg_ctrs, /*messagesarethe same except counter*/
+				  &n_dist_points); /*how many dist points found?*/
       elapsed_extract_dist += wtime() - timer;
 
       
@@ -299,24 +364,29 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	       N);
 
         ++servers_counters[server_id];
+	++total_digests[server_id]; // debugging 
+	// @todo increase here total number a server should receive
 
+	
 	/* if the server buffer is full, send immediately */
 	if (servers_counters[server_id] == PROCESS_QUOTA){
-
+	  // @todo increase here counter for number of packets sent
+	  // @todo 
 	  timer = wtime();
+	  ++total_nmsgs[server_id];
 	  /* send  &work_buf[server_id*PROCESS_QUOTA*N] -> server[server_id] */
-	  buffered_isend(snd_bufs,
-			 requests,
-			 statuses,
-			 nbufs,
-			 &work_buf[server_id*PROCESS_QUOTA*N],
-			 N*PROCESS_QUOTA,
-			 server_id,
-			 TAG_DICT_SND,
-			 inter_comm);
+	  /* buffered_isend(snd_bufs, */
+	  /* 		 requests, */
+	  /* 		 statuses, */
+	  /* 		 nbufs, */
+	  /* 		 &work_buf[server_id*PROCESS_QUOTA*N], */
+	  /* 		 N*PROCESS_QUOTA, */
+	  /* 		 server_id, */
+	  /* 		 TAG_DICT_SND, */
+	  /* 		 inter_comm); */
 	  
-	  /* it should be called elapsed_mpi_send */
-	  elapsed_mpi_send += wtime() - timer;
+	  /* /\* it should be called elapsed_mpi_send *\/ */
+	  /* elapsed_mpi_send += wtime() - timer; */
 
 	  ++nmsgs_sent;
 	  /* consider it as empty buffer without the overhead of erasing it */
@@ -339,54 +409,17 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   
   total_elapsed = wtime() - total_elapsed;
 
-  show_and_save_benchmark(total_elapsed,
-			  elapsed_mpi_send,
-			  
-			  elapsed_hash,
-			  elapsed_extract_dist,
-			  nmsgs_sent,
-			  (N*PROCESS_QUOTA),
-			  (end-begin)*INTERVAL,
-			  INTERVAL,
-			  nsenders,
-			  myrank,
-			  fp_timing);
   
 
 
   // -------------------------------- PART 4 ----------------------------------+
-  // Send the digests that remained in the buffer and tell the receivers that
-  // I finished hashing.
 
-  /* check there are no more mpi_isend hanging */
-  for (int k = 0; k<nbufs; ++k)
-    MPI_Wait(&requests[k], &statuses[k]);
-
-
-  /* Tell every receiver that you are done!, and send the remaining digests */
-  for (int server=0; server<NSERVERS; ++server){
-    /* we may have some digests that we have not sent since their number is */
-    /* less than the PROCESS_QUOTA. We have to send them!.  */
-
-    /* set all the empty digests places in work_buffer as zero since they will  */
-    /* be ignored by the receiver by default. */
-    // Before: 
-    /* server i buffer: {dgst1, .., dgstk, random garbage}*/
-    /* lft term: server i buffer begin, right term: nbytes to reach garbage */
-    memset(&work_buf[N*PROCESS_QUOTA*server + N*servers_counters[server]],
-	   0,
-	   N*(PROCESS_QUOTA-servers_counters[server]));
-
-    // After:
-    /* server i buffer: {dgst1, .., dgstk, 0, ..., 0}, len = PROCESS_QUOTA */
-    /* By default the receiver will ignore zero digests */
-    MPI_Send(&work_buf[server*PROCESS_QUOTA*N],
-	     PROCESS_QUOTA*N,
-	     MPI_UNSIGNED_CHAR,
-	     server,
-	     TAG_DONE_HASHING,
-	     inter_comm);
-  }
+  /* we may have some digests that we have not sent since their number is */
+  /* less than the PROCESS_QUOTA. We have to send themn!.  */
+  // @todo: save the three lists in a file
+  //   total_digests, total_nmsgs, servers_counters (#left messages)
+  // @todo write a function to do this, it's already a large function
+  
   printf("sender%d dit au revoir\n", myrank);
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
@@ -497,3 +530,12 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   return; // au revoir.
 }
 
+
+
+int main(int argc, char* argv[])
+{
+  // @todo
+  // get number of receivers from command line
+  // init senders
+  
+}
