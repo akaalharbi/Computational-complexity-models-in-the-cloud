@@ -65,7 +65,7 @@ $(OBJDIR)/%.o: $(SRC)/%.c
 
 
 
-TARGETS = split_states verify_data benchmark phase_i phase_ii phase_iii
+TARGETS = sha256_dist
 
 # REMOVE TARGETS FROM $(OBJECTS)
 TARGET_OBJECTS = $(addprefix $(OBJDIR)/,  $(addsuffix .o, $(TARGETS)) )
@@ -76,12 +76,6 @@ $(info common objects = $(COMMON_OBJECTS))
 all: $(TARGETS) lib
 	mkdir -p obj
 	mkdir -p data
-	mkdir -p data/digests
-	mkdir -p data/messages
-	mkdir -p data/digests
-	mkdir -p data/messages
-	mkdir -p data/stats
-	mkdir -p data/verify
 
 
 
@@ -90,24 +84,7 @@ all: $(TARGETS) lib
 # 1- remove all $(TARGETS) members from dependencies
 # 2- add X.o as a dependency
 
-verify_data: $(OBJDIR)/verify_data.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
-split_states: $(OBJDIR)/split_states.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
-
-benchmark: $(OBJDIR)/benchmark.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
-
-phase_i: $(OBJDIR)/phase_i.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
-phase_ii: $(OBJDIR)/phase_ii.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
-phase_iii: $(OBJDIR)/phase_iii.o $(COMMON_OBJECTS)
+sha256_dist: $(OBJDIR)/sha256_dist.o $(COMMON_OBJECTS)
 	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 

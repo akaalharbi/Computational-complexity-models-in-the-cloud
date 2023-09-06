@@ -15,11 +15,13 @@
 
 // Boilerplate code
 // add intel code to a lib folder!
-#include "include/c_sha256_avx.h"
-#include "include/numbers_shorthands.h"
-#include "include/config.h" // maybe the issue is here! remove all dynamicism
+#include "c_sha256_avx.h"
+#include "numbers_shorthands.h"
+#include "config.h" // maybe the issue is here! remove all dynamicism
 // and hardcode everything
-#include "include/common.h"
+#include "common.h"
+#include <stddef.h>
+#include <stdio.h>
 #include <x86intrin.h>
 #include <mpi.h>
 #include <math.h>
@@ -165,6 +167,13 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
   } /* end if (cmp_mask) */
 }
 
+void write_sizet_array_to_file(size_t arr[], u64 length, FILE* fp)
+{
+  for (size_t i = 0; i<length; ++i){
+    fprintf(fp, "%lu, ", arr[i]);
+  }
+  fprintf(fp, "\n");
+}
 
 static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 					    u32 tr_states[restrict 16*8],
@@ -195,8 +204,8 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   // one for total number of digests a receiver gets
   // another for number of sends a receiver gets
 
-  u64 total_digests[NSERVERS] = {0};
-  u64 total_nmsgs[NSERVERS] = {0};
+  size_t total_digests[NSERVERS] = {0};
+  size_t total_nmsgs[NSERVERS] = {0};
   // -------------------------------- PART 1 ----------------------------------+
   // VARIABLES DEFINITIONS
 
@@ -419,6 +428,11 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   // @todo: save the three lists in a file
   //   total_digests, total_nmsgs, servers_counters (#left messages)
   // @todo write a function to do this, it's already a large function
+  FILE* f_dist = fopen("data/dist", "w");
+  write_sizet_array_to_file(total_digests, NSERVERS, f_dist);
+  write_sizet_array_to_file(total_nmsgs, NSERVERS, f_dist);
+  write_sizet_array_to_file(servers_counters, NSERVERS, f_dist);
+
   
   printf("sender%d dit au revoir\n", myrank);
   /* أترك المكان كما كان أو أفضل ما كان  */
@@ -536,6 +550,12 @@ int main(int argc, char* argv[])
 {
   // @todo
   // get number of receivers from command line
-  // init senders
-  
+  // however it's already defined in the config file
+  int myrank, nsenders;
+  MPI_Init(NULL, NULL);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nsenders);
+
+  // The 2nd argument is for intercomm, but we are not going to send anything!
+  sender(MPI_COMM_WORLD, MPI_COMM_WORLD);
 }
