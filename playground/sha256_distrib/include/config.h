@@ -104,7 +104,7 @@
 
 
 /* edit manually */
-#define NSERVERS 4
+#define NSERVERS 16
 #define NRECEIVERS_PER_NODE 4
 
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
