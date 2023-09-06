@@ -320,7 +320,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       /* 	sha256_single(single_states[lane], single_data[lane]); */
       /* 	((u64*) single_data[lane])[0] += 1; */
 	
-      /* 	if (memcmp(single_states[lane], &un_tr_states[lane*NWORDS_STATE], HASH_STATE_SIZE) != 0){ */
+      /* if (memcmp(single_states[lane], &un_tr_states[lane*NWORDS_STATE], HASH_STATE_SIZE) != 0){ */
       /* 	  printf("*****************************************************\n" */
       /* 		 "At global_idx=%lu, hash_n=%llu, lane=%d, sender=%d\n" */
       /* 		 "*****************************************************\n", */
@@ -428,17 +428,22 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   // @todo: save the three lists in a file
   //   total_digests, total_nmsgs, servers_counters (#left messages)
   // @todo write a function to do this, it's already a large function
-  FILE* f_dist = fopen("data/dist", "w");
-  write_sizet_array_to_file(total_digests, NSERVERS, f_dist);
-  write_sizet_array_to_file(total_nmsgs, NSERVERS, f_dist);
-  write_sizet_array_to_file(servers_counters, NSERVERS, f_dist);
-
+  char dist_file_name[100];
+  sprintf(dist_file_name, "data/dist/%d", myrank);
+  
+  FILE* fp_dist = fopen("data/dist", "w");
+  
+  write_sizet_array_to_file(total_digests, NSERVERS, fp_dist);
+  write_sizet_array_to_file(total_nmsgs, NSERVERS, fp_dist);
+  write_sizet_array_to_file(servers_counters, NSERVERS, fp_dist);
+  
   
   printf("sender%d dit au revoir\n", myrank);
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
   fclose(fp_timing);
+  fclose(fp_dist);
 }
 
 
@@ -529,15 +534,9 @@ void sender( MPI_Comm local_comm, MPI_Comm inter_comm)
   /* print_byte_txt(txt, M,HASH_INPUT_SIZE); */
   puts("\n");
 
-  
-
-
-
   free(work_buf);
   free(snd_buf);
   free(server_counters);
-
-
 
   MPI_Finalize(); 
 
@@ -558,4 +557,5 @@ int main(int argc, char* argv[])
 
   // The 2nd argument is for intercomm, but we are not going to send anything!
   sender(MPI_COMM_WORLD, MPI_COMM_WORLD);
+  MPI_Finalize();
 }
