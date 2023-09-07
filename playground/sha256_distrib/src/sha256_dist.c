@@ -435,9 +435,12 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   sprintf(dist_file_name, "data/dist%d", myrank);
   
   FILE* fp_dist = fopen(dist_file_name, "w");
-  
+
+  // how many digests in total are assigned to a server
   write_sizet_array_to_file(total_digests, NSERVERS, fp_dist);
+  // #msgs (includes several digests)
   write_sizet_array_to_file(total_nmsgs, NSERVERS, fp_dist);
+  // how many digests are left in the buffer that was not sent
   write_sizet_array_to_file(servers_counters, NSERVERS, fp_dist);
   
   
