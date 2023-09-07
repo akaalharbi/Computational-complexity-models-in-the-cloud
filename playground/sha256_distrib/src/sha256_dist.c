@@ -214,7 +214,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 
   char file_name[FILE_NAME_MAX_LENGTH];
   snprintf(file_name, sizeof(file_name), "data/stats/sender_%d", myrank);
-  FILE* fp_timing = fopen(file_name, "w");
+  // FILE* fp_timing = fopen(file_name, "w");
 
   
   int server_id, n_dist_points;
@@ -442,7 +442,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   /* أترك المكان كما كان أو أفضل ما كان  */
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
-  fclose(fp_timing);
+  //  fclose(fp_timing);
   fclose(fp_dist);
 }
 
