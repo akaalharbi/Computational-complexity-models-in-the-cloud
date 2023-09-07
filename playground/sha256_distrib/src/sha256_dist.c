@@ -52,6 +52,16 @@ size_t get_file_size(FILE *fp)
 }
 
 
+void write_sizet_array_to_file(size_t arr[], u64 length, FILE* fp)
+{
+  for (size_t i = 0; i<length; ++i){
+    fprintf(fp, "%lu, ", arr[i]);
+  }
+  fprintf(fp, "\n");
+  puts("done saving data to the file");
+}
+
+
 static inline void show_and_save_benchmark
     (double total_elapsed,
      double elapsed_mpi_send,
@@ -167,13 +177,6 @@ void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE]
   } /* end if (cmp_mask) */
 }
 
-void write_sizet_array_to_file(size_t arr[], u64 length, FILE* fp)
-{
-  for (size_t i = 0; i<length; ++i){
-    fprintf(fp, "%lu, ", arr[i]);
-  }
-  fprintf(fp, "\n");
-}
 
 static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE],
 					    u32 tr_states[restrict 16*8],
@@ -429,9 +432,9 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   //   total_digests, total_nmsgs, servers_counters (#left messages)
   // @todo write a function to do this, it's already a large function
   char dist_file_name[100];
-  sprintf(dist_file_name, "data/dist/%d", myrank);
+  sprintf(dist_file_name, "data/dist%d", myrank);
   
-  FILE* fp_dist = fopen("data/dist", "w");
+  FILE* fp_dist = fopen(dist_file_name, "w");
   
   write_sizet_array_to_file(total_digests, NSERVERS, fp_dist);
   write_sizet_array_to_file(total_nmsgs, NSERVERS, fp_dist);
@@ -439,7 +442,7 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
   
   
   printf("sender%d dit au revoir\n", myrank);
-  /* أترك المكان كما كان أو أفضل ما كان  */
+
   memset(work_buf, 0, N*PROCESS_QUOTA*NSERVERS); 
   memset(servers_counters, 0, sizeof(size_t)*NSERVERS);
   //  fclose(fp_timing);
