@@ -101,6 +101,78 @@ static inline void show_and_save_benchmark
 
 }    
 
+void extract_dist_points_16(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
+			 u8 Mavx[restrict 16][HASH_INPUT_SIZE],
+			 u8 digests[restrict 16 * N], /* out */
+			 CTR_TYPE msg_ctrs_out[restrict 16], /* out */
+			 int* n_dist_points) /* out */
+{
+  // ==========================================================================+
+  // Summary: Find the distinguished digests in tr_state, and save them to     |
+  //          states. Also, return how many disitingusihed points have been    |
+  //          found. A point is disitingusihed if it has x bits on the right   |
+  //          most position that are zero. x = `DIFFICULTY` defined in config.h|
+  // INPUT:                                                                    |
+  // - tr_states: transposed states of hash (specific  to sha256)              |
+  // - n_active_lanes: How many hashes out of 16 we consider. e.g. only first 7|
+  // - Mavx: Messages that used to generate this tr_states.                    |
+  // - msg_ctrs_out: save the messages counters that when are hashed generate  |
+  //                 distinguished points.                                     |
+  // - n_dist_points: how many distinguished points have been found.           |
+  // --------------------------------------------------------------------------+
+
+
+  /* Init an AVX512/AVX2 vector */
+  const REG_TYPE zero = SIMD_SETZERO_SI();
+
+  /* use this mask to check if a digest is a distinguished point or not! */
+  const REG_TYPE dist_mask_vect = SIMD_SET1_EPI32(DIST_PT_MASK);
+  REG_TYPE digests_last_word ; /* _mm512_load_epi32 */
+  REG_TYPE cmp_vect;
+  u16 cmp_mask = 0; /* bit i is set iff the ith digest is disitingusihed */
+  *n_dist_points = 0; /* old data should not interfer with the new one */
+  
+  // test for distinguishedn point //
+  /* load the last words of digests, we assume digest is aligned  */
+  /* load last significant row in tr_state i.e. last words of each digest */
+  digests_last_word = SIMD_LOADU_SI(&tr_states[(N_NWORDS_CEIL - 1)*16]);
+
+  /* A distinguished point will have cmp_vect ith entry =  0  */
+  cmp_vect = SIMD_AND_EPI32(digests_last_word, dist_mask_vect);
+  /* cmp_mask will have the ith bit = 1 if the ith element in cmp_vect is -1 */
+
+  cmp_mask = SIMD_CMP_EPI32(cmp_vect, zero);
+  /* printf("cmp_mask = %u\n", cmp_mask); */
+
+
+
+  if (cmp_mask) { /* found at least a distinguished point? */
+    *n_dist_points = __builtin_popcount(cmp_mask);
+    int lane = 0;
+    int trailing_zeros = 0;
+
+    for (int i=0;
+	 (i < *n_dist_points);
+	 ++i)
+      {
+      /* Basically get the index of the set bit in cmp_mask */
+      /* Daniel Lemire has other methods that are found in his blog */
+      trailing_zeros = __builtin_ctz(cmp_mask); 
+      lane += trailing_zeros;
+
+      /* remove all bits up to the found lane  */
+      cmp_mask = (cmp_mask >> trailing_zeros) ^ 1;
+
+      /* update counter the ith counter */
+      msg_ctrs_out[i] = ((CTR_TYPE*)Mavx[lane])[0];
+
+      /* get the digest to digests vector */
+      copy_transposed_digest(&digests[i*N], tr_states, lane);
+      /* assert(is_dist_digest(&digests[i*N])); */
+    }
+  } /* end if (cmp_mask) */
+}
+
 
 void extract_dist_points_dynamic(WORD_TYPE tr_states[restrict 16 * NWORDS_STATE],
 			 int n_active_lanes, /* in */
@@ -353,12 +425,23 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
       /* the boundary. */
       timer = wtime();
 
-      extract_dist_points_dynamic(tr_states, /* transposed states */
-				  n_active_lanes,
-				  Mavx, /* messages used */
-				  digests, /* save the distinguished hashes here*/
-				  msg_ctrs, /*messagesarethe same except counter*/
-				  &n_dist_points); /*how many dist points found?*/
+
+      if (n_active_lanes == 16){
+	extract_dist_points_16(tr_states, /* transposed states */
+			       Mavx, /* messages used */
+			       digests, /* save the distinguished hashes here */
+			       msg_ctrs, /* messages are the same except counter */
+			       &n_dist_points); /* how many dist points found? */
+
+      }else {/* this function slower than the one above! */
+	extract_dist_points_dynamic(tr_states, /* transposed states */
+				    n_active_lanes,
+				    Mavx, /* messages used */
+				    digests, /* save the distinguished hashes here */
+				    msg_ctrs, /* messages are the same except counter */
+				    &n_dist_points); /* how many dist points found? */
+      }
+
       elapsed_extract_dist += wtime() - timer;
 
       
