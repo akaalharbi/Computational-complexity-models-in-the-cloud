@@ -474,7 +474,10 @@ void receiver(int local_rank, /* myrank among dictionaries */
 	   dict_memory(NSLOTS_MY_NODE));
   print_memory_usage(txt);
 
-  dict* d = dict_new(NSLOTS_MY_NODE);
+  /* a stupid workaround not to destroy the struct */
+  dict dd = dict_new(NSLOTS_MY_NODE);
+  dict* d = &dd;
+  
   double time_start = wtime();
 
 
@@ -489,8 +492,8 @@ void receiver(int local_rank, /* myrank among dictionaries */
 
   printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n"
 	 "recv #%d dict read in %0.2fsec\n"
-	 "It has %lu elms, we tried to insert  %lu elms\n"
-	 "d->nslots = %lu, d->nelements=%lu, filling rate=%f \n"
+	 "It has %llu elms, we tried to insert  %llu elms\n"
+	 "d->nslots = %llu, d->nelements=%llu, filling rate=%f \n"
 	 "nelements/n_asked_to_inserted=%f\n"
 	 "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n",
 	 local_rank, wtime() - time_start,

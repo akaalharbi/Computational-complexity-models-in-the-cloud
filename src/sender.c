@@ -378,12 +378,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	 myrank, begin, end, (end-begin), nstates);
 
 
-  // *************************** DEBUGGING INIT ********************************//
-  u32 single_states[16][NWORDS_DIGEST] = {0};
-  u8 single_data[16][64] = {0};
-  u32 un_tr_states[16*NWORDS_DIGEST] = {0};
-  
-  // ********************************DEBUGGING*********************************//
 
 
 
@@ -403,14 +397,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
     transpose_state(tr_states, &states[local_idx*NWORDS_STATE]);
 
 
-    // ****************************** DEBUGGING *********************************//
-    
-    memcpy(single_states, &states[local_idx*NWORDS_STATE], HASH_STATE_SIZE*16);
-    for (int lane=0; lane<16; ++lane) {
-      ((u64*) single_data[lane])[0] = INTERVAL * (global_idx + lane);
-      /* sha256_single(single_states[lane], single_data[0]); */
-    }
-    // **************************************************************************//
 
     
     /* set message counters for all lanes (although not all will be used  ) */
@@ -427,28 +413,6 @@ static void regenerate_long_message_digests(u8 Mavx[restrict 16][HASH_INPUT_SIZE
 	     16*HASH_STATE_SIZE);
       elapsed_hash += (wtime() - timer);
 
-      // ****************************** DEBUGGING *********************************//
-      untranspose_state(un_tr_states, tr_states);
-      for (int lane=0; lane<16; ++lane) {
-	sha256_single(single_states[lane], single_data[lane]);
-	((u64*) single_data[lane])[0] += 1;
-	
-	if (memcmp(single_states[lane], &un_tr_states[lane*NWORDS_STATE], HASH_STATE_SIZE) != 0){
-	  printf("*****************************************************\n"
-		 "At global_idx=%lu, hash_n=%llu, lane=%d, sender=%d\n"
-		 "*****************************************************\n",
-		global_idx,
-		hash_n,
-		lane,
-		myrank);
-	  exit(EXIT_FAILURE);
-	  // print a debug information and exit the program
-	}
-	  
-	// @todo add if condition to check they are all the same
-      }
-
-      // **************************************************************************//    
 
       
       inited = 1; /* sha256_x16 has alread a copy of the state */

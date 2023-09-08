@@ -59,8 +59,10 @@ int main(int argc, char *argv[])
 
   size_t factor = 1000;
   size_t dict_size = PROCESS_QUOTA*factor;
-  dict* d = dict_new(dict_size);
-  dict* d_simd = dict_new(dict_size);
+  dict dd = dict_new(dict_size);
+  dict dd_simd = dict_new(dict_size);
+  dict* d = &dd;
+  dict* d_simd = &dd_simd;
   u64 ndigests = PROCESS_QUOTA;
   u64 size_digests = ndigests*N;
   u8* message = malloc(size_digests);

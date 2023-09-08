@@ -94,7 +94,7 @@ def init_folder(n,
     src_path = os.path.join(path, "src/")
     os.mkdir(src_path)
     src_files = ["common.c", "dict.c", "phase_ii.c", "receiver.c",
-                 "sender.c", "time_required.py", "sha256_single.c"]
+                 "sender.c", "time_required.py", "sha256_single.c", "miller_rabin.c"]
 
     # copy only needed source files for phase_ii
     for src in src_files:

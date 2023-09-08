@@ -104,7 +104,7 @@ def run_phase_ii():
     os.system("cd lib/sha256_intel_avx/ && make clean && make all && cd ../../")
 
     os.system("make clean && make all")
-    os.system("mpirun -machinefile $OAR_NODEFILE  -mca mtl psm2 -mca pml ^ucx,ofi -mca btl ^ofi,openib  -map-by node:PE=1 ./phase_ii")
+    os.system("mpirun -machinefile $OAR_NODEFILE -mca orte_base_help_aggregate 0 -mca mtl psm2 -mca pml ^ucx,ofi -mca btl ^ofi,openib  -map-by node:PE=1 ./phase_ii")
 
 
 def clean_hostfile():

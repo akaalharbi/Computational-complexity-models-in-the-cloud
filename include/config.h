@@ -64,14 +64,14 @@
 
 // Let N := n / 8
 /* bytes i.e n := 8*N bits */
-#define N 12
+#define N 9
 /* record the whole state after each each interval has passed */
-#define INTERVAL (1<<28LL)
+#define INTERVAL (1<<20LL)
 
 
 
 // nbits are zero, tphis will be defined according to the send latency
-#define DIFFICULTY 6
+#define DIFFICULTY 1
 
 
 
@@ -104,8 +104,8 @@
 
 
 /* edit manually */
-#define NSERVERS 4
-#define NRECEIVERS_PER_NODE 4
+#define NSERVERS 2
+#define NRECEIVERS_PER_NODE 2
 
 #define LOG2_NSERVERS BITS_TO_REPRESENT(NSERVERS)
 #define DEFINED_BITS (LOG2_NSERVERS + DIFFICULTY) // @todo check
@@ -113,8 +113,9 @@
 #define DEFINED_BYTES CEILING(DEFINED_BITS, 8)
 
 
-#define TOTAL_RAM 24000000000LL
-#define NSLOTS_MY_NODE (TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))
+#define TOTAL_RAM 14000000000LL
+// @todo only changed for debugging since it uses 64 bit val instead of 32 bits 
+#define NSLOTS_MY_NODE ((TOTAL_RAM / (VAL_SIZE_BYTES*NRECEIVERS_PER_NODE))>>1)
 
 
  /* store 2^L elements in the dictionary  */
