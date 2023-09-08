@@ -12,7 +12,7 @@
 
 
 // create dict
-dict dict_create(u64 nelements)
+dict dict_new(u64 nelements)
 {
   u64 p = 1;
   /* Find the largest prime smaller than nelements */
@@ -35,21 +35,37 @@ dict dict_create(u64 nelements)
   return d;
 }
 
+
+
 // insert
-void dict_insert(u64 val, dict* d)
+void dict_add_element_to(dict* d, u8* state)
 {
+  /* take the first 8 bytes */
+  u64 val = ((u64*) state)[0];
   d->keys[val % d->p] = val;
 }
 
 // search
-int dict_search(u64 val, dict* d)
+int dict_has_elm(dict* d, u8* state)
 {
+
+  // a code is not complete without this gymnastic
+  u64 val = ((u64*) state)[0];
   // if there is an element or not
   return (d->keys[val % d->p] > 0);
 }
 
 
-#ifdef TEST_MAIN
+
+void dict_free(dict *d) { free(d->keys); }
+
+size_t  dict_memory(size_t nelements){ return sizeof(u64)*nelements ;}
+
+
+void dict_print(dict *d){return;}
+
+
+#ifdef TEST_MAIN_SIMPLE_DICT
 #include "../include/test_dict.h"
 
 int main()
