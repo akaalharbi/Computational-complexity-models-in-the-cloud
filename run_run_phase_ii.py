@@ -77,6 +77,7 @@ def init_folder(n,
     # create the special folder for the experiments
     if not os.path.exists(path):
         os.mkdir(path)
+        
         # copy the data folder only once!
         os.system(f"rsync -a data {path}")
 
@@ -89,7 +90,7 @@ def init_folder(n,
         # copy the necessary files
         os.system(f"rsync -a {f} {path}")
 
-    print(f"done with rsync {path}")
+    print(f"done with rysncy {path}")
     # copy files needed from src/
     src_path = os.path.join(path, "src/")
     os.mkdir(src_path)
@@ -135,7 +136,7 @@ def attack_choices(n,
     # n_available_states = (nbytes/32) * (INTERVAL)
     total_memory_nstates = nbytes*INTERVAL
     available_memory = server_memory*nservers
-
+    nmsgs = 10000
     print(f"mem avail=2^{log2(available_memory)}, states_mem = 2^{log2(total_memory_nstates)}")
 
     for nreceivers in range(nservers,  # start
@@ -151,7 +152,7 @@ def attack_choices(n,
             #         in phase_i!
             # @todo this is wrong! correct your calculation we're being biased
             # towards 0 difficulty!
-
+            available_memory = server_memory*nservers - (nsenders*nmsgs*nreceivers*(n/8))
             nstates = min(2**(n/2),
                           total_memory_nstates/(32),
                           (available_memory*2**diff)/(32))
@@ -175,7 +176,7 @@ def attack_choices(n,
 if __name__ == "__main__":
     import os
     import argparse
-    from math import log2
+    from math import log2, ceil
     from datetime import datetime
 
 
@@ -232,8 +233,8 @@ if __name__ == "__main__":
         print(f"time={seconds_2_time(4*p[0])}")
 
         # N will be in bytes
-
-        init_folder(args.n//8,
+        N = ceil(args.n/8)
+        init_folder(N,
                     atck[1],  # nstates
                     atck[2],  # nsenders
                     atck[3],  # nreceivers
@@ -245,23 +246,23 @@ if __name__ == "__main__":
             os.chdir("../../")
             continue
 
-        t_start = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        # t_start = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
         # run the attack, nstates is used from states file
         # nsenders is computed on the fly.
-        N = args.n//8
-        print(t_start)
-        command = f"timeout {int(4*p[0])}s python run_phase_ii.py\
- --nservers {args.nservers}  --receivers {atck[3]} -N {N} --ram {args.ram} \
- --interval 23 -d {atck[4]}"
-        print(command)
+
+        # print(t_start)
+        # command = f"timeout {int(4*p[0])}s python run_phase_ii.py\
+        # --nservers {args.nservers}  --receivers {atck[3]} -N {N} --ram {args.ram} \
+        # --interval 23 -d {atck[4]}"
+        # print(command)
         # sleep(10)
-        os.system(command)
-        t_end = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-        print(t_end)
-        say_folder_is_done()  # we should not visit the folder again
-        print("************************************************")
+        # os.system(command)
+        # t_end = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        # print(t_end)
+        # say_folder_is_done()  # we should not visit the folder again
+        # print("************************************************")
         # collect the energy consumption.
-        save_power_consumption_data(t_start, t_end)
+        # save_power_consumption_data(t_start, t_end)
         # return to the base folder
         os.chdir("../../")
         # repeat
