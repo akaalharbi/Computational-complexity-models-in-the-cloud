@@ -7,24 +7,27 @@
 
 
 # Part 1: Basic Flags in the compile and linking
-CC = gcc
+##############################################
+#             Table of Contents              #
+# 1: Basic Flags in the compile and linking  #
+# 2: where to put and to find files?         #
+# 3: Compiling and Linking                   #
+##############################################
 
-# Doesn't work
-# MPI_INCLUDE := $(shell mpicc -showme:compile | grep -e . )
-# MPI_LINK := $(shell mpicc -showme:link)
+# Part 1: Basic Flags in the compile and linking
+CC = mpiicc
 
+#MPI_INCLUDE := $(shell mpicc -showme:compile)
+#MPI_LINK := $(shell mpicc -showme:link)
 
-MPI_INCLUDE = -I/usr/lib/x86_64-linux-gnu/openmpi/include -I/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi
-MPI_LINK = -L/usr/lib/x86_64-linux-gnu/openmpi/lib -lmpi
+#INCLUDE = -Iinclude $(MPI_INCLUDE)
+#LDLIBS  =  $(MPI_LINK) -lm -L./lib/sha256_intel_avx/ -lsha256_avx 
 
+INCLUDE = -Iinclude
+LDLIBS  =  -lm -L./lib/sha256_intel_avx/ -lsha256_avx 
 
-
-INCLUDE = -Iinclude $(MPI_INCLUDE)
-LDLIBS  =  $(MPI_LINK) -lm -L./lib/sha256_intel_avx/ -lsha256_avx 
-
-LDFLAGS = -march=native -fno-strict-aliasing -O3 -flto -fopenmp -pthread   #-fsanitize=address 
-# note: -fanalyzer doesn't report when -flto is enabled
-CFLAGS =  -march=native -fno-strict-aliasing -O3 -flto -fopenmp -Wall -fopt-info-all -fanalyzer #-fsanitize=address 
+LDFLAGS = -march=native -fno-strict-aliasing -O3 -flto -qopenmp -pthread
+CFLAGS =  -march=native -fno-strict-aliasing -O3 -flto -qopenmp -Wall
 #CFLAGS += -DVERBOSE_LEVEL=2 
 
 
@@ -48,11 +51,7 @@ OBJECTS := $(FILENAMES:$(SRC)/%.c=$(OBJDIR)/%.o)
 
 
 
-
-
-
 # Part 3: Compiling and Linking
-
 
 lib:
 	cd lib/sha256_intel_avx && make clean && make all
@@ -65,7 +64,7 @@ $(OBJDIR)/%.o: $(SRC)/%.c
 
 
 
-TARGETS = split_states verify_data benchmark phase_i phase_ii phase_iii
+TARGETS = phase_ii
 
 # REMOVE TARGETS FROM $(OBJECTS)
 TARGET_OBJECTS = $(addprefix $(OBJDIR)/,  $(addsuffix .o, $(TARGETS)) )
@@ -90,25 +89,9 @@ all: $(TARGETS) lib
 # 1- remove all $(TARGETS) members from dependencies
 # 2- add X.o as a dependency
 
-verify_data: $(OBJDIR)/verify_data.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
-split_states: $(OBJDIR)/split_states.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
-
-benchmark: $(OBJDIR)/benchmark.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
-
-phase_i: $(OBJDIR)/phase_i.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
-
 phase_ii: $(OBJDIR)/phase_ii.o $(COMMON_OBJECTS)
 	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
-phase_iii: $(OBJDIR)/phase_iii.o $(COMMON_OBJECTS)
-	$(CC)  $^ $(LDFLAGS) $(LDLIBS) -o $@ 
 
 
 .PHONY: clean
@@ -122,4 +105,3 @@ purge:
 	rm -rf data/messages
 	rm -rf data/stats
 	rm -rf data/verify
-
