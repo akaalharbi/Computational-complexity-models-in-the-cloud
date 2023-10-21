@@ -154,7 +154,7 @@
 #define TAG_SND_DGST 3
 #define TAG_MESSAGES_CANDIDATES 4
 #define ARCHIVE_SERVER NSERVERS
-#define PROCESS_QUOTA 100000LL // i.e. send 10^5 digests to each server @by_hand
+#define PROCESS_QUOTA 1000LL // i.e. send 10^3 digests to each server @by_hand
 
 #endif // LONG_MESSAGE_MPI_CONFIG
 
